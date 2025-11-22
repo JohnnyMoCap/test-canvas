@@ -1,0 +1,13 @@
+<div
+  class="viewport-root"
+  (wheel)="onWheel($event)"
+  (pointerdown)="onPointerDown($event)"
+  (pointerup)="onPointerUp($event)"
+  (pointermove)="onPointerMove($event)"
+>
+  <canvas #canvasEl></canvas>
+  <div class="controls">
+    <button (click)="resetCamera()">Reset</button>
+    <label>Zoom: some number idk</label>
+  </div>
+</div>

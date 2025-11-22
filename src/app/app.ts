@@ -1,12 +1,36 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
+import { Box } from '../intefaces/boxes.interface';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [CanvasViewportComponent],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrls: ['./app.css'],
+  standalone: true,
 })
 export class App {
-  protected readonly title = signal('test-canvas');
+  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
+    const x = Math.random();
+    const y = Math.random();
+
+    const w = Math.random() / 100;
+    const h = Math.random() / 100;
+
+    // Random rotation (0–360 degrees)
+    const rotation = Math.random() * Math.PI * 2;
+
+    // Style groups for batching (5 styles)
+    const styleId = `style-${1 + (i % 5)}`;
+
+    return {
+      id: i,
+      x,
+      y,
+      w,
+      h,
+      rotation,
+      styleId,
+    };
+  });
 }
