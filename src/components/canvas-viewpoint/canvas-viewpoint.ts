@@ -187,7 +187,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       w: raw.w * W,
       h: raw.h * H,
       rotation: raw.rotation ?? 0,
-      styleId: raw.styleId,
     } as const;
   }
 
@@ -232,8 +231,33 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.dirty.set(true);
   }
 
+  // -- Create or get cached template for a given color
+  private getTemplateForColor(color: string) {
+    if (this.templateCache.has(color)) return this.templateCache.get(color)!;
+
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    // Fill
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, c.width, c.height);
+
+    // Stroke
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.strokeRect(0, 0, c.width, c.height);
+
+    this.templateCache.set(color, c);
+    return c;
+  }
+
+  // -- Optimized render frame with batching by color
   private renderFrame() {
     if (!this.ctx) return;
+    console.log(this.quadtree);
     const ctx = this.ctx;
     const canvas = this.canvasRef.nativeElement;
 
@@ -241,7 +265,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Apply camera transform: we make canvas center be world origin.
+    // Camera transform
     const cam = this.camera();
     ctx.setTransform(
       cam.zoom,
@@ -252,47 +276,38 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       canvas.height / 2 - cam.y * cam.zoom
     );
     if (cam.rotation !== 0) {
-      // Rotate around world origin (canvas center after translate)
       ctx.translate(cam.x, cam.y);
       ctx.rotate(cam.rotation);
       ctx.translate(-cam.x, -cam.y);
     }
 
-    // Draw background if cached
+    // Draw background
     if (this.bgCanvas) {
-      // background assumed to be sized to world coordinates; here we simply draw it at origin
       ctx.drawImage(this.bgCanvas, -this.bgCanvas.width / 2, -this.bgCanvas.height / 2);
     }
 
-    // Cull boxes using quadtree to viewport
+    // Cull visible boxes
     const viewBounds = this.getViewBoundsInWorld(canvas.width, canvas.height, cam);
-    const visibleBoxes = this.queryVisible(viewBounds); // returns raw normalized boxes (payload)
+    const visibleBoxes = this.queryVisible(viewBounds)
+      .map((b) => this.normalizeBoxToWorld(b))
+      .filter((b): b is NonNullable<typeof b> => !!b);
 
-    // Convert visible raw boxes to world units for drawing
-    const worldBoxes = visibleBoxes
-      .map((raw) => this.normalizeBoxToWorld(raw))
-      .filter((w): w is NonNullable<typeof w> => !!w);
-
-    // Batch draw: group by styleId
-    const groups = new Map<string, typeof worldBoxes>();
-    for (const wb of worldBoxes) {
-      const key = wb.styleId ?? 'default';
-      if (!groups.has(key)) groups.set(key, [] as typeof worldBoxes);
-      groups.get(key)!.push(wb);
+    // Group boxes by color for batching
+    const groups = new Map<string, typeof visibleBoxes>();
+    for (const b of visibleBoxes) {
+      const color = b.raw.color ?? '#ffffff88';
+      if (!groups.has(color)) groups.set(color, [] as typeof visibleBoxes);
+      groups.get(color)!.push(b);
     }
+    console.log(groups);
 
-    for (const [styleId, boxes] of groups.entries()) {
-      // For now assume same style: fill + stroke
-      // Build a single Path2D for all rectangles (with rotation accounted per box via save/restore minimal)
-      // Path2D cannot be rotated per-box without transform, so we'll draw with cached template when rotation=0
-      const template = this.getTemplateForStyle(styleId);
-
+    // Draw each color group using cached template
+    for (const [color, boxes] of groups.entries()) {
+      const template = this.getTemplateForColor(color);
       for (const b of boxes) {
         if (!b.rotation || b.rotation === 0) {
-          // draw via template cached centered at [0,0], we need to draw at b.x - w/2, b.y - h/2
           ctx.drawImage(template, b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
         } else {
-          // rotated: use save/translate/rotate/drawImage
           ctx.save();
           ctx.translate(b.x, b.y);
           ctx.rotate(b.rotation);
@@ -301,8 +316,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         }
       }
     }
-
-    // Optionally draw outlines in one stroke (example: we skip for simplicity)
   }
 
   private getViewBoundsInWorld(
@@ -358,32 +371,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  // -- Caching helpers
-  private getTemplateForStyle(styleId: string) {
-    if (this.templateCache.has(styleId)) return this.templateCache.get(styleId)!;
-    // create small offscreen canvas with unit box drawn at 1x1 - we'll scale when drawing
-    const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 256; // reasonable default and will be scaled
-    const ctx = c.getContext('2d')!;
-    ctx.clearRect(0, 0, c.width, c.height);
-    // Draw box background
-    ctx.fillStyle = '#ffffff88';
-    ctx.fillRect(0, 0, c.width, c.height);
-    // Stroke
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#333';
-    ctx.strokeRect(0, 0, c.width, c.height);
-    this.templateCache.set(styleId, c);
-    return c;
-  }
-
   private async loadBackground(url: string) {
     return new Promise<void>((resolve, reject) => {
       this.bgImage.onload = () => {
         // create cached canvas same size as image in world units
-        console.log(this.bgImage);
-
         const c = document.createElement('canvas');
         c.width = this.bgImage.width;
         c.height = this.bgImage.height;

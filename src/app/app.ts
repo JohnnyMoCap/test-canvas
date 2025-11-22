@@ -23,6 +23,8 @@ export class App {
     // Style groups for batching (5 styles)
     const styleId = `style-${1 + (i % 5)}`;
 
+    const color = predefinedColors[Math.floor(Math.random() * predefinedColors.length)];
+
     return {
       id: i,
       x,
@@ -31,6 +33,12 @@ export class App {
       h,
       rotation,
       styleId,
+      color,
     };
   });
 }
+
+const predefinedColors = Array.from(
+  { length: 50 },
+  (_, i) => `hsl(${Math.floor((i / 50) * 360)}, 70%, 50%)`
+);
