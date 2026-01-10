@@ -20,6 +20,9 @@ import { NametagUtils } from './utils/nametag-utils';
 import { InteractionUtils } from './utils/interaction-utils';
 import { RenderUtils } from './utils/render-utils';
 import { CreationUtils } from './utils/creation-utils';
+import { BoxCreationUtils } from './utils/box-creation-utils';
+import { BoxStateUtils } from './utils/box-state-utils';
+import { ContextMenuUtils, ContextMenuState } from './utils/context-menu-utils';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 
@@ -54,10 +57,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private nextTempId = 1; // Counter for temporary IDs
 
   // Context menu
-  contextMenuVisible = false;
-  contextMenuX = 0;
-  contextMenuY = 0;
-  private contextMenuWorldPos: { x: number; y: number } | null = null;
+  private contextMenuState: ContextMenuState = ContextMenuUtils.close();
+  get contextMenuVisible() {
+    return this.contextMenuState.visible;
+  }
+  get contextMenuX() {
+    return this.contextMenuState.x;
+  }
+  get contextMenuY() {
+    return this.contextMenuState.y;
+  }
 
   // Signals
   private _boxes = signal<Box[]>([]);
@@ -143,53 +152,27 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   onContextMenuSelect(type: BoxType) {
-    console.log(this.contextMenuWorldPos);
-    console.log(this.bgCanvas);
-    if (!this.contextMenuWorldPos || !this.bgCanvas) return;
+    if (!this.contextMenuState.worldPos || !this.bgCanvas) return;
 
-    const typeInfo = BOX_TYPES[type];
-    const cam = this.camera();
-
-    // Scale default size based on zoom (larger at low zoom, smaller at high zoom)
-    const worldW = typeInfo.defaultSize.w / cam.zoom;
-    const worldH = typeInfo.defaultSize.h / cam.zoom;
-
-    // Convert world position (center of box) to normalized coordinates
-    const normalizedPos = BoxUtils.worldToNormalized(
-      this.contextMenuWorldPos.x,
-      this.contextMenuWorldPos.y,
+    const newBox = BoxCreationUtils.createBoxFromContextMenu(
+      type,
+      this.contextMenuState.worldPos.x,
+      this.contextMenuState.worldPos.y,
+      this.camera(),
       this.bgCanvas.width,
-      this.bgCanvas.height
-    );
-    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
-      worldW,
-      worldH,
-      this.bgCanvas.width,
-      this.bgCanvas.height
+      this.bgCanvas.height,
+      BoxCreationUtils.generateTempId(this.nextTempId++)
     );
 
-    const newBox: Box = {
-      tempId: `temp-${this.nextTempId++}`,
-      x: normalizedPos.x,
-      y: normalizedPos.y,
-      w: normalizedDims.w,
-      h: normalizedDims.h,
-      rotation: 0,
-      color: typeInfo.defaultColor,
-    };
-    console.log(newBox);
-
-    this._boxes.set([...this._boxes(), newBox]);
+    this._boxes.set(BoxStateUtils.addBox(this._boxes(), newBox));
     this.rebuildIndex();
     this.scheduleRender();
 
-    // Close the context menu
     this.closeContextMenu();
   }
 
   closeContextMenu() {
-    this.contextMenuVisible = false;
-    this.contextMenuWorldPos = null;
+    this.contextMenuState = ContextMenuUtils.close();
   }
 
   onWheel(e: WheelEvent) {
@@ -236,13 +219,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
 
     // Don't handle pointer events if clicking on the context menu
-    // The menu component will handle its own clicks
-    if (this.contextMenuVisible && (e.target as HTMLElement).closest('app-box-context-menu')) {
+    if (this.contextMenuState.visible && ContextMenuUtils.isWithinMenu(e.target as HTMLElement)) {
       return;
     }
 
     // Close context menu if clicking outside
-    if (this.contextMenuVisible) {
+    if (this.contextMenuState.visible) {
       this.closeContextMenu();
       return;
     }
@@ -250,10 +232,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Handle right-click for context menu
     if (e.button === 2) {
       e.preventDefault();
-      this.contextMenuX = e.clientX;
-      this.contextMenuY = e.clientY;
-      this.contextMenuWorldPos = worldPos;
-      this.contextMenuVisible = true;
+      this.contextMenuState = ContextMenuUtils.open(e.clientX, e.clientY, worldPos.x, worldPos.y);
       return;
     }
 
@@ -367,41 +346,21 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (
       this.createState.isCreating &&
       this.createState.startPoint &&
-      this.createState.currentPoint
+      this.createState.currentPoint &&
+      this.bgCanvas
     ) {
-      const previewBox = CreationUtils.createPreviewBox(
+      const newBox = BoxCreationUtils.createBoxFromDrag(
         this.createState.startPoint.x,
         this.createState.startPoint.y,
         this.createState.currentPoint.x,
-        this.createState.currentPoint.y
+        this.createState.currentPoint.y,
+        this.bgCanvas.width,
+        this.bgCanvas.height,
+        BoxCreationUtils.generateTempId(this.nextTempId++)
       );
 
-      // Only create if box is large enough (min 10x10 pixels)
-      if (previewBox.w >= 10 && previewBox.h >= 10 && this.bgCanvas) {
-        const normalizedPos = BoxUtils.worldToNormalized(
-          previewBox.x,
-          previewBox.y,
-          this.bgCanvas.width,
-          this.bgCanvas.height
-        );
-        const normalizedDims = BoxUtils.worldDimensionsToNormalized(
-          previewBox.w,
-          previewBox.h,
-          this.bgCanvas.width,
-          this.bgCanvas.height
-        );
-
-        const newBox: Box = {
-          tempId: `temp-${this.nextTempId++}`,
-          x: normalizedPos.x,
-          y: normalizedPos.y,
-          w: normalizedDims.w,
-          h: normalizedDims.h,
-          rotation: 0,
-          color: BOX_TYPES.finding.defaultColor,
-        };
-
-        this._boxes.set([...this._boxes(), newBox]);
+      if (newBox) {
+        this._boxes.set(BoxStateUtils.addBox(this._boxes(), newBox));
         this.rebuildIndex();
       }
 
@@ -575,11 +534,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const deltaAngle = currentAngle - this.rotationStartAngle;
     const newRotation = this.boxStartRotation + deltaAngle;
 
-    const updatedBoxes = this._boxes().map((b) =>
-      String(getBoxId(b)) === this.selectedBoxId ? { ...b, rotation: newRotation } : b
+    this._boxes.set(
+      BoxStateUtils.updateBoxRotation(this._boxes(), this.selectedBoxId, newRotation)
     );
-
-    this._boxes.set(updatedBoxes);
     this.rebuildIndex();
     this.scheduleRender();
   }
@@ -638,13 +595,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.height
     );
 
-    const updatedBoxes = this._boxes().map((b) =>
-      String(getBoxId(b)) === this.selectedBoxId
-        ? { ...b, x: normalizedPos.x, y: normalizedPos.y, w: normalizedDims.w, h: normalizedDims.h }
-        : b
+    this._boxes.set(
+      BoxStateUtils.updateBoxGeometry(
+        this._boxes(),
+        this.selectedBoxId,
+        normalizedPos.x,
+        normalizedPos.y,
+        normalizedDims.w,
+        normalizedDims.h
+      )
     );
-
-    this._boxes.set(updatedBoxes);
     this.rebuildIndex();
     this.scheduleRender();
   }
@@ -658,11 +618,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.width,
       this.bgCanvas.height
     );
-    const updatedBoxes = this._boxes().map((b) =>
-      String(getBoxId(b)) === boxId ? { ...b, x: normalized.x, y: normalized.y } : b
-    );
 
-    this._boxes.set(updatedBoxes);
+    this._boxes.set(
+      BoxStateUtils.updateBoxPosition(this._boxes(), boxId, normalized.x, normalized.y)
+    );
     this.rebuildIndex();
     this.scheduleRender();
   }
