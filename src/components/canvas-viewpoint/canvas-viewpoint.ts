@@ -9,21 +9,26 @@ import {
   signal,
   effect,
 } from '@angular/core';
-import { Box } from '../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../intefaces/boxes.interface';
 import { Quadtree } from './core/quadtree';
 import { Camera, ResizeCorner, TextMetrics } from './core/types';
+import { CreateBoxState, BoxType, BOX_TYPES } from './core/creation-state';
 import { CoordinateTransform } from './utils/coordinate-transform';
 import { CameraUtils } from './utils/camera-utils';
 import { BoxUtils } from './utils/box-utils';
 import { NametagUtils } from './utils/nametag-utils';
 import { InteractionUtils } from './utils/interaction-utils';
 import { RenderUtils } from './utils/render-utils';
+import { CreationUtils } from './utils/creation-utils';
+
+import { BoxContextMenuComponent } from './box-context-menu.component';
 
 @Component({
   selector: 'app-canvas-viewport',
   templateUrl: './canvas-viewpoint.html',
   styleUrls: ['./canvas-viewpoint.css'],
   standalone: true,
+  imports: [BoxContextMenuComponent],
 })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -37,7 +42,22 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @Input() backgroundUrl?: string;
 
   showNametags = true;
-  debugShowQuadtree = true;
+  debugShowQuadtree = true; //TODO: add more debug options
+
+  // Creation mode
+  isCreateMode = false;
+  private createState: CreateBoxState = {
+    isCreating: false,
+    startPoint: null,
+    currentPoint: null,
+  };
+  private nextTempId = 1; // Counter for temporary IDs
+
+  // Context menu
+  contextMenuVisible = false;
+  contextMenuX = 0;
+  contextMenuY = 0;
+  private contextMenuWorldPos: { x: number; y: number } | null = null;
 
   // Signals
   private _boxes = signal<Box[]>([]);
@@ -109,6 +129,69 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  toggleCreateMode() {
+    this.isCreateMode = !this.isCreateMode;
+    if (!this.isCreateMode) {
+      this.createState = {
+        isCreating: false,
+        startPoint: null,
+        currentPoint: null,
+      };
+      this.scheduleRender();
+    }
+    this.updateCursor();
+  }
+
+  onContextMenuSelect(type: BoxType) {
+    console.log(this.contextMenuWorldPos);
+    console.log(this.bgCanvas);
+    if (!this.contextMenuWorldPos || !this.bgCanvas) return;
+
+    const typeInfo = BOX_TYPES[type];
+    const cam = this.camera();
+
+    // Scale default size based on zoom (larger at low zoom, smaller at high zoom)
+    const worldW = typeInfo.defaultSize.w / cam.zoom;
+    const worldH = typeInfo.defaultSize.h / cam.zoom;
+
+    // Convert world position (center of box) to normalized coordinates
+    const normalizedPos = BoxUtils.worldToNormalized(
+      this.contextMenuWorldPos.x,
+      this.contextMenuWorldPos.y,
+      this.bgCanvas.width,
+      this.bgCanvas.height
+    );
+    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
+      worldW,
+      worldH,
+      this.bgCanvas.width,
+      this.bgCanvas.height
+    );
+
+    const newBox: Box = {
+      tempId: `temp-${this.nextTempId++}`,
+      x: normalizedPos.x,
+      y: normalizedPos.y,
+      w: normalizedDims.w,
+      h: normalizedDims.h,
+      rotation: 0,
+      color: typeInfo.defaultColor,
+    };
+    console.log(newBox);
+
+    this._boxes.set([...this._boxes(), newBox]);
+    this.rebuildIndex();
+    this.scheduleRender();
+
+    // Close the context menu
+    this.closeContextMenu();
+  }
+
+  closeContextMenu() {
+    this.contextMenuVisible = false;
+    this.contextMenuWorldPos = null;
+  }
+
   onWheel(e: WheelEvent) {
     e.preventDefault();
     const delta = -e.deltaY;
@@ -152,9 +235,44 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.camera()
     );
 
+    // Don't handle pointer events if clicking on the context menu
+    // The menu component will handle its own clicks
+    if (this.contextMenuVisible && (e.target as HTMLElement).closest('app-box-context-menu')) {
+      return;
+    }
+
+    // Close context menu if clicking outside
+    if (this.contextMenuVisible) {
+      this.closeContextMenu();
+      return;
+    }
+
+    // Handle right-click for context menu
+    if (e.button === 2) {
+      e.preventDefault();
+      this.contextMenuX = e.clientX;
+      this.contextMenuY = e.clientY;
+      this.contextMenuWorldPos = worldPos;
+      this.contextMenuVisible = true;
+      return;
+    }
+
+    // Handle create mode
+    if (this.isCreateMode && e.button === 0) {
+      this.createState.isCreating = true;
+      this.createState.startPoint = worldPos;
+      this.createState.currentPoint = worldPos;
+      this.scheduleRender();
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
+
+    // Disable normal interactions in create mode
+    if (this.isCreateMode) return;
+
     // Check rotation knob
     if (this.selectedBoxId) {
-      const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+      const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
       if (box && this.bgCanvas) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb && InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, this.camera())) {
@@ -212,12 +330,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           this.ctx
         )
       ) {
-        clickedBoxId = String(rawBox.id);
+        clickedBoxId = String(getBoxId(rawBox));
         break;
       }
 
       if (CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) {
-        clickedBoxId = String(rawBox.id);
+        clickedBoxId = String(getBoxId(rawBox));
         break;
       }
     }
@@ -226,7 +344,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.selectedBoxId = clickedBoxId;
       this.isDraggingBox = true;
       this.dragStartWorld = worldPos;
-      const box = this._boxes().find((b) => String(b.id) === clickedBoxId);
+      const box = this._boxes().find((b) => String(getBoxId(b)) === clickedBoxId);
       if (box && this.bgCanvas) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb) this.boxStartPos = { x: wb.x, y: wb.y };
@@ -245,6 +363,56 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   onPointerUp(e: PointerEvent) {
+    // Handle create mode
+    if (
+      this.createState.isCreating &&
+      this.createState.startPoint &&
+      this.createState.currentPoint
+    ) {
+      const previewBox = CreationUtils.createPreviewBox(
+        this.createState.startPoint.x,
+        this.createState.startPoint.y,
+        this.createState.currentPoint.x,
+        this.createState.currentPoint.y
+      );
+
+      // Only create if box is large enough (min 10x10 pixels)
+      if (previewBox.w >= 10 && previewBox.h >= 10 && this.bgCanvas) {
+        const normalizedPos = BoxUtils.worldToNormalized(
+          previewBox.x,
+          previewBox.y,
+          this.bgCanvas.width,
+          this.bgCanvas.height
+        );
+        const normalizedDims = BoxUtils.worldDimensionsToNormalized(
+          previewBox.w,
+          previewBox.h,
+          this.bgCanvas.width,
+          this.bgCanvas.height
+        );
+
+        const newBox: Box = {
+          tempId: `temp-${this.nextTempId++}`,
+          x: normalizedPos.x,
+          y: normalizedPos.y,
+          w: normalizedDims.w,
+          h: normalizedDims.h,
+          rotation: 0,
+          color: BOX_TYPES.finding.defaultColor,
+        };
+
+        this._boxes.set([...this._boxes(), newBox]);
+        this.rebuildIndex();
+      }
+
+      this.createState = {
+        isCreating: false,
+        startPoint: null,
+        currentPoint: null,
+      };
+      this.scheduleRender();
+    }
+
     this.isPointerDown = false;
     this.isDraggingBox = false;
     this.isResizing = false;
@@ -266,6 +434,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.camera()
     );
 
+    // Handle creation preview
+    if (this.createState.isCreating && this.createState.startPoint) {
+      this.createState.currentPoint = worldPos;
+      this.scheduleRender();
+      return;
+    }
+
+    // Disable normal interactions in create mode
+    if (this.isCreateMode) return;
+
     if (this.isRotating && this.selectedBoxId) {
       this.handleRotation(worldPos.x, worldPos.y);
       return;
@@ -286,7 +464,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     if (this.selectedBoxId && !this.isPointerDown && this.bgCanvas) {
-      const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+      const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
       if (box) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb) {
@@ -331,6 +509,15 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private detectHover(wx: number, wy: number) {
+    // Skip hover detection in create mode
+    if (this.isCreateMode) {
+      if (this.hoveredBoxId !== null) {
+        this.hoveredBoxId = null;
+        this.scheduleRender();
+      }
+      return;
+    }
+
     const candidates = this.quadtree
       ? (this.quadtree.queryRange(wx - 1, wy - 1, 2, 2) as Box[])
       : this._boxes();
@@ -358,12 +545,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           this.ctx
         )
       ) {
-        foundBoxId = String(rawBox.id);
+        foundBoxId = String(getBoxId(rawBox));
         break;
       }
 
       if (CoordinateTransform.pointInBox(wx, wy, worldBox)) {
-        foundBoxId = String(rawBox.id);
+        foundBoxId = String(getBoxId(rawBox));
         break;
       }
     }
@@ -378,7 +565,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private handleRotation(wx: number, wy: number) {
     if (!this.selectedBoxId || !this.bgCanvas) return;
 
-    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
     if (!box) return;
 
     const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
@@ -389,7 +576,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const newRotation = this.boxStartRotation + deltaAngle;
 
     const updatedBoxes = this._boxes().map((b) =>
-      String(b.id) === this.selectedBoxId ? { ...b, rotation: newRotation } : b
+      String(getBoxId(b)) === this.selectedBoxId ? { ...b, rotation: newRotation } : b
     );
 
     this._boxes.set(updatedBoxes);
@@ -400,7 +587,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private handleResize(wx: number, wy: number) {
     if (!this.selectedBoxId || !this.resizeCorner || !this.bgCanvas) return;
 
-    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
     if (!box) return;
 
     const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
@@ -452,7 +639,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
 
     const updatedBoxes = this._boxes().map((b) =>
-      String(b.id) === this.selectedBoxId
+      String(getBoxId(b)) === this.selectedBoxId
         ? { ...b, x: normalizedPos.x, y: normalizedPos.y, w: normalizedDims.w, h: normalizedDims.h }
         : b
     );
@@ -472,7 +659,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.height
     );
     const updatedBoxes = this._boxes().map((b) =>
-      String(b.id) === boxId ? { ...b, x: normalized.x, y: normalized.y } : b
+      String(getBoxId(b)) === boxId ? { ...b, x: normalized.x, y: normalized.y } : b
     );
 
     this._boxes.set(updatedBoxes);
@@ -496,7 +683,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private renderFrame() {
     if (!this.ctx) return;
-    console.log('test?');
 
     const ctx = this.ctx;
     const canvas = this.canvasRef.nativeElement;
@@ -534,9 +720,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Draw boxes
     for (const [_, boxes] of groups.entries()) {
       for (const b of boxes) {
-        RenderUtils.drawBox(ctx, b, cam, String(b.id) === this.hoveredBoxId);
+        RenderUtils.drawBox(ctx, b, cam, String(getBoxId(b.raw)) === this.hoveredBoxId);
 
-        if (String(b.id) === this.selectedBoxId) {
+        if (String(getBoxId(b.raw)) === this.selectedBoxId) {
           RenderUtils.drawSelectionUI(ctx, b, cam);
         }
       }
@@ -554,6 +740,21 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           this.nametagMetricsCache
         );
       }
+    }
+
+    // Draw creation preview
+    if (
+      this.createState.isCreating &&
+      this.createState.startPoint &&
+      this.createState.currentPoint
+    ) {
+      const previewBox = CreationUtils.createPreviewBox(
+        this.createState.startPoint.x,
+        this.createState.startPoint.y,
+        this.createState.currentPoint.x,
+        this.createState.currentPoint.y
+      );
+      CreationUtils.drawCreationPreview(ctx, previewBox, BOX_TYPES.finding.defaultColor, cam);
     }
 
     // Debug quadtree
@@ -591,9 +792,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     // Deduplicate
-    const uniqueBoxes = new Map<number, Box>();
+    const uniqueBoxes = new Map<string | number, Box>();
     for (const box of results) {
-      uniqueBoxes.set(box.id, box);
+      uniqueBoxes.set(getBoxId(box), box);
     }
     return Array.from(uniqueBoxes.values());
   }
@@ -706,5 +907,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.height,
       this.minZoom
     );
+  }
+
+  private updateCursor() {
+    if (this.isCreateMode) {
+      this.canvasRef.nativeElement.style.cursor = CreationUtils.getCreateCursor();
+    } else {
+      this.canvasRef.nativeElement.style.cursor = 'default';
+    }
   }
 }

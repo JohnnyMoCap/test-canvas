@@ -1,4 +1,5 @@
 import { Camera, ResizeCorner, TextMetrics } from '../core/types';
+import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 
 /**
  * Nametag rendering and hit detection utilities
@@ -8,12 +9,20 @@ export class NametagUtils {
    * Gets nametag bounds in world space
    */
   static getNametagBounds(
-    box: { id: number; x: number; y: number; w: number; h: number; rotation: number },
+    box: {
+      id?: number;
+      tempId?: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      rotation: number;
+    },
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D
   ): { x: number; y: number; w: number; h: number } | null {
-    const text = String(box.id);
+    const text = String(getBoxId(box));
 
     // Get or calculate metrics
     let metrics = metricsCache.get(text);
@@ -72,7 +81,15 @@ export class NametagUtils {
   static pointInNametag(
     wx: number,
     wy: number,
-    box: { id: number; x: number; y: number; w: number; h: number; rotation: number },
+    box: {
+      id?: number;
+      tempId?: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      rotation: number;
+    },
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D
@@ -92,7 +109,7 @@ export class NametagUtils {
   static drawNametag(
     ctx: CanvasRenderingContext2D,
     box: {
-      id: number;
+      raw: Box;
       x: number;
       y: number;
       w: number;
@@ -105,7 +122,7 @@ export class NametagUtils {
     canvasHeight: number,
     metricsCache: Map<string, TextMetrics>
   ): void {
-    const text = String(box.id);
+    const text = String(getBoxId(box.raw));
 
     // Get or calculate text metrics (cached for performance)
     let metrics = metricsCache.get(text);

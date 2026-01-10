@@ -4,10 +4,22 @@
   (pointerdown)="onPointerDown($event)"
   (pointerup)="onPointerUp($event)"
   (pointermove)="onPointerMove($event)"
+  (contextmenu)="$event.preventDefault()"
 >
   <canvas #canvasEl></canvas>
   <div class="controls">
     <button (click)="resetCamera()">Reset</button>
-    <label>Zoom: some number idk</label>
+    <button (click)="toggleCreateMode()" [class.active]="isCreateMode">
+      {{ isCreateMode ? 'Exit Create' : 'Create Mode' }}
+    </button>
+    <label>Zoom: {{ (camera().zoom * 100).toFixed(0) }}%</label>
   </div>
+
+  <app-box-context-menu
+    [visible]="contextMenuVisible"
+    [x]="contextMenuX"
+    [y]="contextMenuY"
+    (selectType)="onContextMenuSelect($event)"
+    (close)="closeContextMenu()"
+  ></app-box-context-menu>
 </div>

@@ -1,4 +1,4 @@
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 
 /**
  * Box normalization and transformation utilities
@@ -13,7 +13,6 @@ export class BoxUtils {
     imageHeight: number
   ): {
     raw: Box;
-    id: number;
     x: number;
     y: number;
     w: number;
@@ -25,7 +24,6 @@ export class BoxUtils {
 
     return {
       raw: box,
-      id: box.id,
       x: box.x * imageWidth - imageWidth / 2,
       y: box.y * imageHeight - imageHeight / 2,
       w: box.w * imageWidth,
