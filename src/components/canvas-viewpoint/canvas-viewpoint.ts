@@ -28,6 +28,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
   @Input() backgroundUrl?: string;
 
+  showNametags = true;
   debugShowQuadtree = true;
 
   // Signals
@@ -58,6 +59,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Offscreen caches
   private bgCanvas?: HTMLCanvasElement; // cache for background image
   private templateCache = new Map<string, HTMLCanvasElement>();
+  private nametagMetricsCache = new Map<string, { width: number; height: number }>();
   private bgImage = new Image();
 
   // Spatial index
@@ -181,7 +183,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Check if clicking on any box
+    // Check if clicking on any box (or its nametag)
     const candidates = this.quadtree
       ? (this.quadtree.queryRange(worldPos.x - 1, worldPos.y - 1, 2, 2) as Box[])
       : this._boxes();
@@ -191,6 +193,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const rawBox = candidates[i];
       const worldBox = this.normalizeBoxToWorld(rawBox);
       if (!worldBox) continue;
+
+      // Check nametag first (if nametags are visible)
+      if (this.showNametags && this.pointInNametag(worldPos.x, worldPos.y, worldBox)) {
+        clickedBoxId = String(rawBox.id);
+        break;
+      }
 
       if (this.pointInBox(worldPos.x, worldPos.y, worldBox)) {
         clickedBoxId = String(rawBox.id);
@@ -319,6 +327,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const rawBox = candidates[i];
       const worldBox = this.normalizeBoxToWorld(rawBox);
       if (!worldBox) continue;
+
+      // Check nametag first (if nametags are visible)
+      if (this.showNametags && this.pointInNametag(wx, wy, worldBox)) {
+        foundBoxId = String(rawBox.id);
+        break;
+      }
 
       if (this.pointInBox(wx, wy, worldBox)) {
         foundBoxId = String(rawBox.id);
@@ -489,11 +503,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     c.height = 256;
     const ctx = c.getContext('2d')!;
     ctx.clearRect(0, 0, c.width, c.height);
-    // Fill
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, c.width, c.height);
-    // Stroke (Standard)
-    ctx.lineWidth = 10; // Use thicker line on template, scale down in drawImage
+
+    // Only draw border (no fill for transparent interior)
+    ctx.lineWidth = 8; // Border thickness on template
     ctx.strokeStyle = color;
     ctx.strokeRect(0, 0, c.width, c.height);
 
@@ -534,7 +546,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Visibility Culling
     const viewBounds = this.getViewBoundsInWorld(canvas.width, canvas.height, cam);
 
-    // TODO: sort by some criteria (e.g., layer, y-position, id/tempId) if needed
     const visibleBoxes = this.queryVisible(viewBounds)
       .map((b) => this.normalizeBoxToWorld(b))
       .filter((b): b is NonNullable<typeof b> => !!b);
@@ -549,36 +560,30 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     // Draw
     for (const [color, boxes] of groups.entries()) {
-      const template = this.getTemplateForColor(color);
-
       for (const b of boxes) {
         ctx.save();
         ctx.translate(b.x, b.y);
         if (b.rotation) ctx.rotate(b.rotation);
 
-        // 1. Draw standard box (from cache)
-        ctx.drawImage(template, -b.w / 2, -b.h / 2, b.w, b.h);
+        // 1. Draw box border with consistent line width
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 3 / cam.zoom; // Consistent line width that scales with zoom
+        ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
 
-        // 2. HIGHLIGHT LOGIC: If this box is hovered, draw extra effects
-        if (String(b.id) === this.hoveredBoxId && String(b.id) !== this.selectedBoxId) {
-          // Draw a bolder border on top
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 4 / cam.zoom;
-          ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        // 2. HIGHLIGHT LOGIC: If this box is hovered, draw semi-transparent fill
+        if (String(b.id) === this.hoveredBoxId) {
+          // Use globalAlpha for consistent transparency rendering
+          console.log('drawing with alpha');
 
-          // Optional: Add a subtle overlay
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = b.color;
           ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+          ctx.globalAlpha = 1.0;
         }
 
         // 3. SELECTION LOGIC: If this box is selected, draw selection UI
         if (String(b.id) === this.selectedBoxId) {
-          // Draw selection border
-          ctx.strokeStyle = '#00aaff';
-          ctx.lineWidth = 3 / cam.zoom;
-          ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
-
-          // Draw corner handles
+          // Draw corner handles with box color
           const handleSize = 12 / cam.zoom;
           const corners = [
             { x: -b.w / 2, y: -b.h / 2 }, // NW
@@ -588,7 +593,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           ];
 
           ctx.fillStyle = 'white';
-          ctx.strokeStyle = '#00aaff';
+          ctx.strokeStyle = b.color; // Use box color instead of blue
           ctx.lineWidth = 2 / cam.zoom;
           for (const corner of corners) {
             ctx.fillRect(
@@ -605,7 +610,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
             );
           }
 
-          // Draw rotation knob (circle on the shorter side)
+          // Draw rotation knob (circle on the shorter side) with box color
           const knobDistance = 30 / cam.zoom;
           const knobRadius = 8 / cam.zoom;
 
@@ -619,7 +624,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           ctx.beginPath();
           ctx.moveTo(lineStartX, lineStartY);
           ctx.lineTo(knobX, knobY);
-          ctx.strokeStyle = '#00aaff';
+          ctx.strokeStyle = b.color; // Use box color instead of blue
           ctx.lineWidth = 2 / cam.zoom;
           ctx.stroke();
 
@@ -628,12 +633,19 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           ctx.arc(knobX, knobY, knobRadius, 0, Math.PI * 2);
           ctx.fillStyle = 'white';
           ctx.fill();
-          ctx.strokeStyle = '#00aaff';
+          ctx.strokeStyle = b.color; // Use box color instead of blue
           ctx.lineWidth = 2 / cam.zoom;
           ctx.stroke();
         }
 
         ctx.restore();
+      }
+    }
+
+    // Draw nametags separately (always horizontal, after all boxes)
+    if (this.showNametags) {
+      for (const b of visibleBoxes) {
+        this.drawNametag(ctx, b, b.color, cam);
       }
     }
 
@@ -671,26 +683,36 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
+    let results: Box[];
+
     if (this.quadtree) {
-      return this.quadtree.queryRange(
+      results = this.quadtree.queryRange(
         bounds.minX,
         bounds.minY,
         bounds.maxX - bounds.minX,
         bounds.maxY - bounds.minY
       ) as Box[];
+    } else {
+      results = this._boxes().filter((raw) => {
+        const wb = this.normalizeBoxToWorld(raw);
+        if (!wb) return false;
+        const halfW = wb.w / 2,
+          halfH = wb.h / 2;
+        return !(
+          wb.x + halfW < bounds.minX ||
+          wb.x - halfW > bounds.maxX ||
+          wb.y + halfH < bounds.minY ||
+          wb.y - halfH > bounds.maxY
+        );
+      });
     }
-    return this._boxes().filter((raw) => {
-      const wb = this.normalizeBoxToWorld(raw);
-      if (!wb) return false;
-      const halfW = wb.w / 2,
-        halfH = wb.h / 2;
-      return !(
-        wb.x + halfW < bounds.minX ||
-        wb.x - halfW > bounds.maxX ||
-        wb.y + halfH < bounds.minY ||
-        wb.y - halfH > bounds.maxY
-      );
-    });
+
+    // Deduplicate boxes (boxes can appear in multiple quadtree nodes)
+    const uniqueBoxes = new Map<number, Box>();
+    for (const box of results) {
+      uniqueBoxes.set(box.id, box);
+    }
+    return Array.from(uniqueBoxes.values());
   }
 
   private async loadBackground(url: string) {
@@ -970,20 +992,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const anchor = anchorCorners[this.resizeCorner];
 
     // Calculate new dimensions based on distance from anchor to mouse
-    const newW = Math.abs(localMouseX - anchor.x);
-    const newH = Math.abs(localMouseY - anchor.y);
-
-    // Enforce minimum size
-    const finalW = Math.max(10, newW);
-    const finalH = Math.max(10, newH);
+    const deltaX = localMouseX - anchor.x;
+    const deltaY = localMouseY - anchor.y;
 
     // Calculate new center position in local space (midpoint between anchor and mouse)
-    const newLocalCenterX =
-      (anchor.x + ((localMouseX - anchor.x) / Math.abs(localMouseX - anchor.x)) * finalW) / 2 +
-      anchor.x / 2;
-    const newLocalCenterY =
-      (anchor.y + ((localMouseY - anchor.y) / Math.abs(localMouseY - anchor.y)) * finalH) / 2 +
-      anchor.y / 2;
+    const newLocalCenterX = anchor.x + deltaX / 2;
+    const newLocalCenterY = anchor.y + deltaY / 2;
 
     // Transform new center back to world space
     const cosRot = Math.cos(wb.rotation);
@@ -994,8 +1008,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Convert back to normalized coordinates
     const W = this.bgCanvas.width;
     const H = this.bgCanvas.height;
-    const normalizedW = finalW / W;
-    const normalizedH = finalH / H;
+    // Use absolute values for width/height, with minimum of 1 pixel
+    const normalizedW = Math.max(1, Math.abs(deltaX)) / W;
+    const normalizedH = Math.max(1, Math.abs(deltaY)) / H;
     const normalizedX = (newWorldCenterX + W / 2) / W;
     const normalizedY = (newWorldCenterY + H / 2) / H;
 
@@ -1033,6 +1048,149 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this._boxes.set(updatedBoxes);
     this.rebuildIndex();
     this.scheduleRender();
+  }
+
+  /** Draws a nametag at the topmost corner of a box (always horizontal) */
+  private drawNametag(
+    ctx: CanvasRenderingContext2D,
+    b: NonNullable<ReturnType<CanvasViewportComponent['normalizeBoxToWorld']>>,
+    color: string,
+    cam: { zoom: number; x: number; y: number; rotation: number }
+  ) {
+    const text = String(b.id);
+
+    // Get or calculate text metrics (cached for performance)
+    let metrics = this.nametagMetricsCache.get(text);
+    if (!metrics) {
+      ctx.save();
+      ctx.font = '12px Arial, sans-serif';
+      const measured = ctx.measureText(text);
+      metrics = { width: measured.width, height: 12 };
+      this.nametagMetricsCache.set(text, metrics);
+      ctx.restore();
+    }
+
+    // Nametag properties
+    const padding = 4 / cam.zoom;
+    const fontSize = 12 / cam.zoom;
+    const textWidth = metrics.width / cam.zoom;
+    const textHeight = metrics.height / cam.zoom;
+    const tagWidth = textWidth + padding * 2;
+    const tagHeight = textHeight + padding * 2;
+
+    // Get all four corners in local (rotated) space
+    const corners = [
+      { lx: -b.w / 2, ly: -b.h / 2 },
+      { lx: b.w / 2, ly: -b.h / 2 },
+      { lx: -b.w / 2, ly: b.h / 2 },
+      { lx: b.w / 2, ly: b.h / 2 },
+    ];
+
+    // Transform corners to world space
+    const cos = Math.cos(b.rotation);
+    const sin = Math.sin(b.rotation);
+    const worldCorners = corners.map((c) => ({
+      x: b.x + (c.lx * cos - c.ly * sin),
+      y: b.y + (c.lx * sin + c.ly * cos),
+    }));
+
+    // Find topmost corner in world space (smallest y)
+    let topmostCorner = worldCorners[0];
+    for (const corner of worldCorners) {
+      if (corner.y < topmostCorner.y) {
+        topmostCorner = corner;
+      }
+    }
+
+    // Draw nametag at topmost corner, always horizontal
+    ctx.save();
+    ctx.setTransform(
+      cam.zoom,
+      0,
+      0,
+      cam.zoom,
+      this.canvasRef.nativeElement.width / 2 - cam.x * cam.zoom,
+      this.canvasRef.nativeElement.height / 2 - cam.y * cam.zoom
+    );
+
+    const tagX = topmostCorner.x;
+    const tagY = topmostCorner.y - tagHeight;
+
+    // Draw nametag background
+    ctx.fillStyle = color;
+    ctx.fillRect(tagX, tagY, tagWidth, tagHeight);
+
+    // Draw nametag text
+    ctx.fillStyle = 'white';
+    ctx.font = `${fontSize}px Arial, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.fillText(text, tagX + padding, tagY + padding);
+
+    ctx.restore();
+  }
+
+  /** Check if a world point is inside a nametag */
+  private pointInNametag(
+    wx: number,
+    wy: number,
+    b: NonNullable<ReturnType<CanvasViewportComponent['normalizeBoxToWorld']>>
+  ): boolean {
+    const text = String(b.id);
+    const cam = this.camera();
+
+    // Get or calculate metrics (ensure cache is populated)
+    let metrics = this.nametagMetricsCache.get(text);
+    if (!metrics) {
+      // Calculate and cache metrics if not already cached
+      if (this.ctx) {
+        this.ctx.save();
+        this.ctx.font = '12px Arial, sans-serif';
+        const measured = this.ctx.measureText(text);
+        metrics = { width: measured.width, height: 12 };
+        this.nametagMetricsCache.set(text, metrics);
+        this.ctx.restore();
+      } else {
+        // Fallback if ctx is not available
+        return false;
+      }
+    }
+
+    const padding = 4 / cam.zoom;
+    const textWidth = metrics.width / cam.zoom;
+    const textHeight = metrics.height / cam.zoom;
+    const tagWidth = textWidth + padding * 2;
+    const tagHeight = textHeight + padding * 2;
+
+    // Get all four corners in local (rotated) space
+    const corners = [
+      { lx: -b.w / 2, ly: -b.h / 2 },
+      { lx: b.w / 2, ly: -b.h / 2 },
+      { lx: -b.w / 2, ly: b.h / 2 },
+      { lx: b.w / 2, ly: b.h / 2 },
+    ];
+
+    // Transform corners to world space
+    const cos = Math.cos(b.rotation);
+    const sin = Math.sin(b.rotation);
+    const worldCorners = corners.map((c) => ({
+      x: b.x + (c.lx * cos - c.ly * sin),
+      y: b.y + (c.lx * sin + c.ly * cos),
+    }));
+
+    // Find topmost corner
+    let topmostCorner = worldCorners[0];
+    for (const corner of worldCorners) {
+      if (corner.y < topmostCorner.y) {
+        topmostCorner = corner;
+      }
+    }
+
+    const tagX = topmostCorner.x;
+    const tagY = topmostCorner.y - tagHeight;
+
+    // Simple AABB check (nametag is always horizontal)
+    return wx >= tagX && wx <= tagX + tagWidth && wy >= tagY && wy <= tagY + tagHeight;
   }
 
   /** Recursively draws quadtree node bounds for debugging. */
