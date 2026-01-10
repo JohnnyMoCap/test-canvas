@@ -23,6 +23,11 @@ import { CreationUtils } from './utils/creation-utils';
 import { BoxCreationUtils } from './utils/box-creation-utils';
 import { BoxStateUtils } from './utils/box-state-utils';
 import { ContextMenuUtils, ContextMenuState } from './utils/context-menu-utils';
+import { QuadtreeUtils } from './utils/quadtree-utils';
+import { BackgroundUtils } from './utils/background-utils';
+import { FrameRenderer } from './utils/frame-renderer';
+import { HoverDetectionUtils } from './utils/hover-detection-utils';
+import { PerformanceConfig } from './core/performance-config';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 
@@ -35,10 +40,6 @@ import { BoxContextMenuComponent } from './box-context-menu.component';
 })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
-
-  // Performance constants
-  private readonly TARGET_FPS = 60;
-  private readonly FRAME_TIME = 1000 / this.TARGET_FPS; // ~16.67ms for 60fps
 
   /** Public Inputs */
   @Input({ required: false }) set boxes(value: Box[] | undefined) {
@@ -102,7 +103,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   // Caches
   private bgCanvas?: HTMLCanvasElement;
-  private bgImage = new Image();
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private quadtree?: Quadtree<Box>;
   private minZoom = 0;
@@ -491,42 +491,20 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const candidates = this.quadtree
-      ? (this.quadtree.queryRange(wx - 1, wy - 1, 2, 2) as Box[])
-      : this._boxes();
+    if (!this.bgCanvas) return;
 
-    let foundBoxId: string | null = null;
-
-    for (let i = candidates.length - 1; i >= 0; i--) {
-      const rawBox = candidates[i];
-      if (!this.bgCanvas) continue;
-      const worldBox = BoxUtils.normalizeBoxToWorld(
-        rawBox,
-        this.bgCanvas.width,
-        this.bgCanvas.height
-      );
-      if (!worldBox) continue;
-
-      if (
-        this.showNametags &&
-        NametagUtils.pointInNametag(
-          wx,
-          wy,
-          worldBox,
-          this.camera(),
-          this.nametagMetricsCache,
-          this.ctx
-        )
-      ) {
-        foundBoxId = String(getBoxId(rawBox));
-        break;
-      }
-
-      if (CoordinateTransform.pointInBox(wx, wy, worldBox)) {
-        foundBoxId = String(getBoxId(rawBox));
-        break;
-      }
-    }
+    const foundBoxId = HoverDetectionUtils.detectHoveredBox(
+      wx,
+      wy,
+      this._boxes(),
+      this.quadtree,
+      this.bgCanvas.width,
+      this.bgCanvas.height,
+      this.camera(),
+      this.showNametags,
+      this.nametagMetricsCache,
+      this.ctx
+    );
 
     if (this.hoveredBoxId !== foundBoxId) {
       this.hoveredBoxId = foundBoxId;
@@ -658,9 +636,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
       // Frame rate limiting
       const elapsed = currentTime - this.lastFrameTime;
-      if (elapsed < this.FRAME_TIME) return;
+      if (elapsed < PerformanceConfig.FRAME_TIME) return;
 
-      this.lastFrameTime = currentTime - (elapsed % this.FRAME_TIME);
+      this.lastFrameTime = currentTime - (elapsed % PerformanceConfig.FRAME_TIME);
 
       if (!this.dirty()) return;
       this.renderFrame();
@@ -674,144 +652,52 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private renderFrame() {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.bgCanvas) return;
 
-    const ctx = this.ctx;
     const canvas = this.canvasRef.nativeElement;
     const cam = this.camera();
-
-    // Clear
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Apply camera transform
-    RenderUtils.applyCameraTransform(ctx, canvas.width, canvas.height, cam);
-
-    // Background
-    if (this.bgCanvas) {
-      ctx.drawImage(this.bgCanvas, -this.bgCanvas.width / 2, -this.bgCanvas.height / 2);
-    }
-
-    // Get visible boxes
     const viewBounds = CameraUtils.getViewBoundsInWorld(canvas.width, canvas.height, cam);
-    const visibleBoxes = this.queryVisible(viewBounds)
-      .map((b) =>
-        this.bgCanvas
-          ? BoxUtils.normalizeBoxToWorld(b, this.bgCanvas.width, this.bgCanvas.height)
-          : null
-      )
-      .filter((b): b is NonNullable<typeof b> => !!b);
+    const visibleBoxes = this.queryVisible(viewBounds);
 
-    // Group by color
-    const groups = new Map<string, typeof visibleBoxes>();
-    for (const b of visibleBoxes) {
-      if (!groups.has(b.color)) groups.set(b.color, []);
-      groups.get(b.color)!.push(b);
-    }
-
-    // Draw boxes
-    for (const [_, boxes] of groups.entries()) {
-      for (const b of boxes) {
-        RenderUtils.drawBox(ctx, b, cam, String(getBoxId(b.raw)) === this.hoveredBoxId);
-
-        if (String(getBoxId(b.raw)) === this.selectedBoxId) {
-          RenderUtils.drawSelectionUI(ctx, b, cam);
-        }
-      }
-    }
-
-    // Draw nametags
-    if (this.showNametags) {
-      for (const b of visibleBoxes) {
-        NametagUtils.drawNametag(
-          ctx,
-          b,
-          cam,
-          canvas.width,
-          canvas.height,
-          this.nametagMetricsCache
-        );
-      }
-    }
-
-    // Draw creation preview
-    if (
-      this.createState.isCreating &&
-      this.createState.startPoint &&
-      this.createState.currentPoint
-    ) {
-      const previewBox = CreationUtils.createPreviewBox(
-        this.createState.startPoint.x,
-        this.createState.startPoint.y,
-        this.createState.currentPoint.x,
-        this.createState.currentPoint.y
-      );
-      CreationUtils.drawCreationPreview(ctx, previewBox, BOX_TYPES.finding.defaultColor, cam);
-    }
-
-    // Debug quadtree
-    if (this.debugShowQuadtree && this.quadtree) {
-      ctx.save();
-      RenderUtils.drawQuadtreeNode(ctx, this.quadtree.root, cam);
-      ctx.restore();
-    }
+    FrameRenderer.renderFrame(
+      this.ctx,
+      canvas,
+      cam,
+      this.bgCanvas,
+      visibleBoxes,
+      this.bgCanvas.width,
+      this.bgCanvas.height,
+      this.hoveredBoxId,
+      this.selectedBoxId,
+      this.showNametags,
+      this.nametagMetricsCache,
+      this.createState,
+      this.debugShowQuadtree,
+      this.quadtree
+    );
   }
 
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
-    let results: Box[];
-
-    // During drag/resize/rotate, quadtree is stale - use all boxes instead
-    if (this.isDraggingOrInteracting || !this.quadtree) {
-      results = this._boxes().filter((raw) => {
-        if (!this.bgCanvas) return false;
-        const wb = BoxUtils.normalizeBoxToWorld(raw, this.bgCanvas.width, this.bgCanvas.height);
-        if (!wb) return false;
-        const halfW = wb.w / 2,
-          halfH = wb.h / 2;
-        return !(
-          wb.x + halfW < bounds.minX ||
-          wb.x - halfW > bounds.maxX ||
-          wb.y + halfH < bounds.minY ||
-          wb.y - halfH > bounds.maxY
-        );
-      });
-    } else {
-      results = this.quadtree.queryRange(
-        bounds.minX,
-        bounds.minY,
-        bounds.maxX - bounds.minX,
-        bounds.maxY - bounds.minY
-      ) as Box[];
-    }
-
-    // Deduplicate
-    const uniqueBoxes = new Map<string | number, Box>();
-    for (const box of results) {
-      uniqueBoxes.set(getBoxId(box), box);
-    }
-    return Array.from(uniqueBoxes.values());
+    if (!this.bgCanvas) return [];
+    return QuadtreeUtils.queryVisible(
+      this._boxes(),
+      this.quadtree,
+      bounds,
+      this.isDraggingOrInteracting,
+      this.bgCanvas.width,
+      this.bgCanvas.height
+    );
   }
 
   private async loadBackground(url: string) {
-    return new Promise<void>((resolve, reject) => {
-      this.bgImage.onload = () => {
-        const c = document.createElement('canvas');
-        c.width = this.bgImage.width;
-        c.height = this.bgImage.height;
-        const ctx = c.getContext('2d')!;
-        ctx.drawImage(this.bgImage, 0, 0);
-        this.bgCanvas = c;
+    const canvas = this.canvasRef.nativeElement;
+    const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
 
-        const canvas = this.canvasRef.nativeElement;
-        this.minZoom = CameraUtils.calculateMinZoom(canvas.width, canvas.height, c.width, c.height);
-        this.camera.set({ zoom: this.minZoom, x: 0, y: 0, rotation: 0 });
-        this.rebuildIndex();
-        this.scheduleRender();
-        resolve();
-      };
-      this.bgImage.onerror = (err) => reject(err);
-      this.bgImage.src = url;
-    });
+    this.bgCanvas = result.canvas;
+    this.minZoom = result.minZoom;
+    this.camera.set({ zoom: this.minZoom, x: 0, y: 0, rotation: 0 });
+    this.rebuildIndex();
+    this.scheduleRender();
   }
 
   private onResize() {
@@ -823,7 +709,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     canvas.height = h;
 
     if (this.bgCanvas) {
-      this.minZoom = CameraUtils.calculateMinZoom(w, h, this.bgCanvas.width, this.bgCanvas.height);
+      this.minZoom = BackgroundUtils.recalculateMinZoom(
+        w,
+        h,
+        this.bgCanvas.width,
+        this.bgCanvas.height
+      );
       this.camera.set(
         this.clampCamera({ ...this.camera(), zoom: Math.max(this.camera().zoom, this.minZoom) })
       );
@@ -832,61 +723,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private rebuildIndex() {
-    const boxes = this._boxes();
-    if (boxes.length === 0 || !this.bgCanvas) {
+    if (!this.bgCanvas) {
       this.quadtree = undefined;
       return;
     }
-
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-
-    const items = [];
-
-    for (const raw of boxes) {
-      const b = BoxUtils.normalizeBoxToWorld(raw, this.bgCanvas.width, this.bgCanvas.height);
-      if (!b) continue;
-
-      let aabb = CoordinateTransform.calculateRotatedAABB(b);
-
-      // Include nametag estimate
-      if (this.showNametags) {
-        const estimatedTagWidth = 60;
-        const estimatedTagHeight = 20;
-        aabb = {
-          x: aabb.x,
-          y: aabb.y - estimatedTagHeight,
-          w: Math.max(aabb.w, aabb.w + estimatedTagWidth),
-          h: aabb.h + estimatedTagHeight,
-        };
-      }
-
-      items.push({ raw, aabb });
-
-      minX = Math.min(minX, aabb.x);
-      minY = Math.min(minY, aabb.y);
-      maxX = Math.max(maxX, aabb.x + aabb.w);
-      maxY = Math.max(maxY, aabb.y + aabb.h);
-    }
-
-    if (minX === Infinity) {
-      this.quadtree = undefined;
-      return;
-    }
-
-    this.quadtree = new Quadtree<Box>(minX, minY, maxX - minX, maxY - minY, 8);
-
-    for (const item of items) {
-      this.quadtree.insert({
-        x: item.aabb.x,
-        y: item.aabb.y,
-        w: item.aabb.w,
-        h: item.aabb.h,
-        payload: item.raw,
-      });
-    }
+    this.quadtree = QuadtreeUtils.rebuildQuadtree(
+      this._boxes(),
+      this.bgCanvas.width,
+      this.bgCanvas.height,
+      this.showNametags
+    );
   }
 
   private clampCamera(cam: Camera): Camera {
