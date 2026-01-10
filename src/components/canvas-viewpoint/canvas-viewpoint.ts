@@ -44,6 +44,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   // Interaction State
   private hoveredBoxId: string | null = null;
+  private selectedBoxId: string | null = null;
+  private isDraggingBox = false;
+  private dragStartWorld = { x: 0, y: 0 };
+  private boxStartPos = { x: 0, y: 0 };
+  private isResizing = false;
+  private resizeCorner: 'nw' | 'ne' | 'sw' | 'se' | null = null;
+  private boxStartSize = { w: 0, h: 0 };
+  private isRotating = false;
+  private rotationStartAngle = 0;
+  private boxStartRotation = 0;
 
   // Offscreen caches
   private bgCanvas?: HTMLCanvasElement; // cache for background image
@@ -131,13 +141,96 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   onPointerDown(e: PointerEvent) {
-    this.isPointerDown = true;
+    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * this.devicePixelRatio;
+    const my = (e.clientY - rect.top) * this.devicePixelRatio;
+    const worldPos = this.screenToWorld(mx, my);
+
+    // Check if clicking on rotation knob of the selected box
+    if (this.selectedBoxId) {
+      if (this.detectRotationKnob(worldPos.x, worldPos.y)) {
+        this.isRotating = true;
+        const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+        if (box) {
+          const wb = this.normalizeBoxToWorld(box);
+          if (wb) {
+            this.rotationStartAngle = Math.atan2(worldPos.y - wb.y, worldPos.x - wb.x);
+            this.boxStartRotation = wb.rotation;
+          }
+        }
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+        return;
+      }
+
+      // Check if clicking on a corner handle of the selected box
+      const corner = this.detectCornerHandle(worldPos.x, worldPos.y);
+      if (corner) {
+        this.isResizing = true;
+        this.resizeCorner = corner;
+        this.dragStartWorld = worldPos;
+        const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+        if (box) {
+          const wb = this.normalizeBoxToWorld(box);
+          if (wb) {
+            this.boxStartPos = { x: wb.x, y: wb.y };
+            this.boxStartSize = { w: wb.w, h: wb.h };
+          }
+        }
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+        return;
+      }
+    }
+
+    // Check if clicking on any box
+    const candidates = this.quadtree
+      ? (this.quadtree.queryRange(worldPos.x - 1, worldPos.y - 1, 2, 2) as Box[])
+      : this._boxes();
+
+    let clickedBoxId: string | null = null;
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      const rawBox = candidates[i];
+      const worldBox = this.normalizeBoxToWorld(rawBox);
+      if (!worldBox) continue;
+
+      if (this.pointInBox(worldPos.x, worldPos.y, worldBox)) {
+        clickedBoxId = String(rawBox.id);
+        break;
+      }
+    }
+
+    if (clickedBoxId) {
+      // Select the box and prepare for dragging
+      this.selectedBoxId = clickedBoxId;
+      this.isDraggingBox = true;
+      this.dragStartWorld = worldPos;
+      const box = this._boxes().find((b) => String(b.id) === clickedBoxId);
+      if (box) {
+        const wb = this.normalizeBoxToWorld(box);
+        if (wb) {
+          this.boxStartPos = { x: wb.x, y: wb.y };
+        }
+      }
+      this.scheduleRender();
+    } else {
+      // Clicking on empty space - deselect
+      if (this.selectedBoxId) {
+        this.selectedBoxId = null;
+        this.scheduleRender();
+      }
+      // Start panning
+      this.isPointerDown = true;
+    }
+
     this.lastPointer = { x: e.clientX, y: e.clientY };
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }
 
   onPointerUp(e: PointerEvent) {
     this.isPointerDown = false;
+    this.isDraggingBox = false;
+    this.isResizing = false;
+    this.isRotating = false;
+    this.resizeCorner = null;
     (e.target as Element).releasePointerCapture?.(e.pointerId);
   }
 
@@ -150,10 +243,52 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // 1. Calculate World Coordinates of the mouse
     const worldPos = this.screenToWorld(mx, my);
 
-    // 2. Run Hit Test (Hover Logic)
-    this.detectHover(worldPos.x, worldPos.y);
+    // 2. Handle Box Rotation
+    if (this.isRotating && this.selectedBoxId) {
+      this.handleRotation(worldPos.x, worldPos.y);
+      return;
+    }
 
-    // 3. Handle Panning (Drag)
+    // 3. Handle Box Resizing
+    if (this.isResizing && this.selectedBoxId && this.resizeCorner) {
+      this.handleResize(worldPos.x, worldPos.y);
+      return;
+    }
+
+    // 4. Handle Box Dragging
+    if (this.isDraggingBox && this.selectedBoxId) {
+      const dx = worldPos.x - this.dragStartWorld.x;
+      const dy = worldPos.y - this.dragStartWorld.y;
+      const newX = this.boxStartPos.x + dx;
+      const newY = this.boxStartPos.y + dy;
+      this.updateBoxPosition(this.selectedBoxId, newX, newY);
+      return;
+    }
+
+    // 5. Update cursor based on handles
+    if (this.selectedBoxId && !this.isPointerDown) {
+      if (this.detectRotationKnob(worldPos.x, worldPos.y)) {
+        this.canvasRef.nativeElement.style.cursor = 'grab';
+      } else {
+        const corner = this.detectCornerHandle(worldPos.x, worldPos.y);
+        if (corner) {
+          this.canvasRef.nativeElement.style.cursor = this.getResizeCursor(
+            corner,
+            worldPos.x,
+            worldPos.y
+          );
+        } else {
+          this.canvasRef.nativeElement.style.cursor = this.hoveredBoxId ? 'pointer' : 'default';
+        }
+      }
+    }
+
+    // 6. Run Hit Test (Hover Logic) - only when not dragging
+    if (!this.isPointerDown && !this.isDraggingBox) {
+      this.detectHover(worldPos.x, worldPos.y);
+    }
+
+    // 7. Handle Panning (Drag)
     if (this.isPointerDown) {
       const dx = (e.clientX - this.lastPointer.x) * this.devicePixelRatio;
       const dy = (e.clientY - this.lastPointer.y) * this.devicePixelRatio;
@@ -398,13 +533,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     // Visibility Culling
     const viewBounds = this.getViewBoundsInWorld(canvas.width, canvas.height, cam);
-    console.log(viewBounds);
 
     // TODO: sort by some criteria (e.g., layer, y-position, id/tempId) if needed
     const visibleBoxes = this.queryVisible(viewBounds)
       .map((b) => this.normalizeBoxToWorld(b))
       .filter((b): b is NonNullable<typeof b> => !!b);
-    console.log(visibleBoxes);
 
     // Grouping
     const groups = new Map<string, typeof visibleBoxes>();
@@ -427,16 +560,77 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         ctx.drawImage(template, -b.w / 2, -b.h / 2, b.w, b.h);
 
         // 2. HIGHLIGHT LOGIC: If this box is hovered, draw extra effects
-        if (String(b.id) === this.hoveredBoxId) {
+        if (String(b.id) === this.hoveredBoxId && String(b.id) !== this.selectedBoxId) {
           // Draw a bolder border on top
-          ctx.strokeStyle = 'white'; // Or make the original color darker/brighter
-          ctx.lineWidth = 4 / cam.zoom; // Scale line width so it stays constant on screen or world
-          // To ensure it looks "bolder" than the template, we just draw a stroke rect
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 4 / cam.zoom;
           ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
 
           // Optional: Add a subtle overlay
           ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
           ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        }
+
+        // 3. SELECTION LOGIC: If this box is selected, draw selection UI
+        if (String(b.id) === this.selectedBoxId) {
+          // Draw selection border
+          ctx.strokeStyle = '#00aaff';
+          ctx.lineWidth = 3 / cam.zoom;
+          ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+
+          // Draw corner handles
+          const handleSize = 12 / cam.zoom;
+          const corners = [
+            { x: -b.w / 2, y: -b.h / 2 }, // NW
+            { x: b.w / 2, y: -b.h / 2 }, // NE
+            { x: -b.w / 2, y: b.h / 2 }, // SW
+            { x: b.w / 2, y: b.h / 2 }, // SE
+          ];
+
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = '#00aaff';
+          ctx.lineWidth = 2 / cam.zoom;
+          for (const corner of corners) {
+            ctx.fillRect(
+              corner.x - handleSize / 2,
+              corner.y - handleSize / 2,
+              handleSize,
+              handleSize
+            );
+            ctx.strokeRect(
+              corner.x - handleSize / 2,
+              corner.y - handleSize / 2,
+              handleSize,
+              handleSize
+            );
+          }
+
+          // Draw rotation knob (circle on the shorter side)
+          const knobDistance = 30 / cam.zoom;
+          const knobRadius = 8 / cam.zoom;
+
+          // Position knob on shorter side
+          const knobX = b.w < b.h ? b.w / 2 + knobDistance : 0;
+          const knobY = b.w < b.h ? 0 : b.h / 2 + knobDistance;
+          const lineStartX = b.w < b.h ? b.w / 2 : 0;
+          const lineStartY = b.w < b.h ? 0 : b.h / 2;
+
+          // Draw line from edge center to knob
+          ctx.beginPath();
+          ctx.moveTo(lineStartX, lineStartY);
+          ctx.lineTo(knobX, knobY);
+          ctx.strokeStyle = '#00aaff';
+          ctx.lineWidth = 2 / cam.zoom;
+          ctx.stroke();
+
+          // Draw knob circle
+          ctx.beginPath();
+          ctx.arc(knobX, knobY, knobRadius, 0, Math.PI * 2);
+          ctx.fillStyle = 'white';
+          ctx.fill();
+          ctx.strokeStyle = '#00aaff';
+          ctx.lineWidth = 2 / cam.zoom;
+          ctx.stroke();
         }
 
         ctx.restore();
@@ -594,6 +788,251 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         payload: item.raw,
       });
     }
+  }
+
+  /** Detects if a world point is near the rotation knob of the selected box */
+  private detectRotationKnob(wx: number, wy: number): boolean {
+    if (!this.selectedBoxId) return false;
+
+    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    if (!box) return false;
+
+    const wb = this.normalizeBoxToWorld(box);
+    if (!wb) return false;
+
+    const knobDistance = 30 / this.camera().zoom; // Distance from box edge
+    const knobSize = 10 / this.camera().zoom; // Radius of knob hit area
+
+    // Calculate knob position on the shorter side
+    const localKnobX = 0;
+    const localKnobY = wb.w < wb.h ? 0 : wb.h / 2 + knobDistance;
+    const localKnobX2 = wb.w < wb.h ? wb.w / 2 + knobDistance : 0;
+    const localKnobY2 = wb.w < wb.h ? 0 : 0;
+
+    // Use the shorter side
+    const finalKnobX = wb.w < wb.h ? localKnobX2 : localKnobX;
+    const finalKnobY = wb.w < wb.h ? localKnobY2 : localKnobY;
+
+    // Rotate knob position to world space
+    const cos = Math.cos(wb.rotation);
+    const sin = Math.sin(wb.rotation);
+    const knobWorldX = wb.x + (finalKnobX * cos - finalKnobY * sin);
+    const knobWorldY = wb.y + (finalKnobX * sin + finalKnobY * cos);
+
+    // Check if point is within knob radius
+    const dist = Math.sqrt((wx - knobWorldX) ** 2 + (wy - knobWorldY) ** 2);
+    return dist < knobSize;
+  }
+
+  /** Detects if a world point is near a corner handle of the selected box */
+  private detectCornerHandle(wx: number, wy: number): 'nw' | 'ne' | 'sw' | 'se' | null {
+    if (!this.selectedBoxId) return null;
+
+    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    if (!box) return null;
+
+    const wb = this.normalizeBoxToWorld(box);
+    if (!wb) return null;
+
+    const handleSize = 12 / this.camera().zoom;
+    const threshold = handleSize;
+
+    // Transform point to box local space (accounting for rotation)
+    const dx = wx - wb.x;
+    const dy = wy - wb.y;
+    const rot = -wb.rotation;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    const corners = [
+      { name: 'nw' as const, x: -wb.w / 2, y: -wb.h / 2 },
+      { name: 'ne' as const, x: wb.w / 2, y: -wb.h / 2 },
+      { name: 'sw' as const, x: -wb.w / 2, y: wb.h / 2 },
+      { name: 'se' as const, x: wb.w / 2, y: wb.h / 2 },
+    ];
+
+    for (const corner of corners) {
+      const distX = Math.abs(localX - corner.x);
+      const distY = Math.abs(localY - corner.y);
+      if (distX < threshold && distY < threshold) {
+        return corner.name;
+      }
+    }
+
+    return null;
+  }
+
+  /** Returns appropriate cursor style for a corner based on its actual world position */
+  private getResizeCursor(corner: 'nw' | 'ne' | 'sw' | 'se', wx: number, wy: number): string {
+    if (!this.selectedBoxId) return 'default';
+
+    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    if (!box) return 'default';
+
+    const wb = this.normalizeBoxToWorld(box);
+    if (!wb) return 'default';
+
+    // Get the actual world position of the corner
+    const cornerOffsets = {
+      nw: { x: -wb.w / 2, y: -wb.h / 2 },
+      ne: { x: wb.w / 2, y: -wb.h / 2 },
+      sw: { x: -wb.w / 2, y: wb.h / 2 },
+      se: { x: wb.w / 2, y: wb.h / 2 },
+    };
+
+    const offset = cornerOffsets[corner];
+    const cos = Math.cos(wb.rotation);
+    const sin = Math.sin(wb.rotation);
+
+    // Rotate corner offset
+    const rotatedX = offset.x * cos - offset.y * sin;
+    const rotatedY = offset.x * sin + offset.y * cos;
+
+    // Calculate angle from box center to this corner in world space
+    const angle = Math.atan2(rotatedY, rotatedX);
+
+    // Normalize angle to 0-360 degrees
+    let degrees = ((angle * 180) / Math.PI + 360) % 360;
+
+    // Map angle to cursor type (8 directions)
+    // 0° = right, 90° = down, 180° = left, 270° = up
+    if (degrees >= 337.5 || degrees < 22.5) return 'ew-resize';
+    if (degrees >= 22.5 && degrees < 67.5) return 'se-resize';
+    if (degrees >= 67.5 && degrees < 112.5) return 'ns-resize';
+    if (degrees >= 112.5 && degrees < 157.5) return 'sw-resize';
+    if (degrees >= 157.5 && degrees < 202.5) return 'ew-resize';
+    if (degrees >= 202.5 && degrees < 247.5) return 'nw-resize';
+    if (degrees >= 247.5 && degrees < 292.5) return 'ns-resize';
+    if (degrees >= 292.5 && degrees < 337.5) return 'ne-resize';
+
+    return 'nwse-resize';
+  }
+
+  /** Handles rotating a box from the rotation knob */
+  private handleRotation(wx: number, wy: number) {
+    if (!this.selectedBoxId) return;
+
+    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    if (!box) return;
+
+    const wb = this.normalizeBoxToWorld(box);
+    if (!wb) return;
+
+    // Calculate current angle from box center to mouse
+    const currentAngle = Math.atan2(wy - wb.y, wx - wb.x);
+
+    // Calculate rotation delta
+    const deltaAngle = currentAngle - this.rotationStartAngle;
+    const newRotation = this.boxStartRotation + deltaAngle;
+
+    // Update the box rotation
+    const updatedBoxes = this._boxes().map((b) => {
+      if (String(b.id) === this.selectedBoxId) {
+        return { ...b, rotation: newRotation };
+      }
+      return b;
+    });
+
+    this._boxes.set(updatedBoxes);
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
+
+  /** Handles resizing a box from a corner */
+  private handleResize(wx: number, wy: number) {
+    if (!this.selectedBoxId || !this.resizeCorner) return;
+
+    const box = this._boxes().find((b) => String(b.id) === this.selectedBoxId);
+    if (!box || !this.bgCanvas) return;
+
+    const wb = this.normalizeBoxToWorld(box);
+    if (!wb) return;
+
+    // Transform mouse position to box local space
+    const dx = wx - wb.x;
+    const dy = wy - wb.y;
+    const rot = -wb.rotation;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const localMouseX = dx * cos - dy * sin;
+    const localMouseY = dx * sin + dy * cos;
+
+    // Determine which corner is the anchor (opposite corner)
+    const anchorCorners = {
+      se: { x: -wb.w / 2, y: -wb.h / 2 }, // NW is anchor
+      sw: { x: wb.w / 2, y: -wb.h / 2 }, // NE is anchor
+      ne: { x: -wb.w / 2, y: wb.h / 2 }, // SW is anchor
+      nw: { x: wb.w / 2, y: wb.h / 2 }, // SE is anchor
+    };
+
+    const anchor = anchorCorners[this.resizeCorner];
+
+    // Calculate new dimensions based on distance from anchor to mouse
+    const newW = Math.abs(localMouseX - anchor.x);
+    const newH = Math.abs(localMouseY - anchor.y);
+
+    // Enforce minimum size
+    const finalW = Math.max(10, newW);
+    const finalH = Math.max(10, newH);
+
+    // Calculate new center position in local space (midpoint between anchor and mouse)
+    const newLocalCenterX =
+      (anchor.x + ((localMouseX - anchor.x) / Math.abs(localMouseX - anchor.x)) * finalW) / 2 +
+      anchor.x / 2;
+    const newLocalCenterY =
+      (anchor.y + ((localMouseY - anchor.y) / Math.abs(localMouseY - anchor.y)) * finalH) / 2 +
+      anchor.y / 2;
+
+    // Transform new center back to world space
+    const cosRot = Math.cos(wb.rotation);
+    const sinRot = Math.sin(wb.rotation);
+    const newWorldCenterX = wb.x + (newLocalCenterX * cosRot - newLocalCenterY * sinRot);
+    const newWorldCenterY = wb.y + (newLocalCenterX * sinRot + newLocalCenterY * cosRot);
+
+    // Convert back to normalized coordinates
+    const W = this.bgCanvas.width;
+    const H = this.bgCanvas.height;
+    const normalizedW = finalW / W;
+    const normalizedH = finalH / H;
+    const normalizedX = (newWorldCenterX + W / 2) / W;
+    const normalizedY = (newWorldCenterY + H / 2) / H;
+
+    // Update the box
+    const updatedBoxes = this._boxes().map((b) => {
+      if (String(b.id) === this.selectedBoxId) {
+        return { ...b, x: normalizedX, y: normalizedY, w: normalizedW, h: normalizedH };
+      }
+      return b;
+    });
+
+    this._boxes.set(updatedBoxes);
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
+
+  /** Updates the position of a box in world coordinates */
+  private updateBoxPosition(boxId: string, worldX: number, worldY: number) {
+    if (!this.bgCanvas) return;
+
+    const W = this.bgCanvas.width;
+    const H = this.bgCanvas.height;
+
+    // Convert world coordinates back to normalized coordinates
+    const normalizedX = (worldX + W / 2) / W;
+    const normalizedY = (worldY + H / 2) / H;
+
+    const updatedBoxes = this._boxes().map((b) => {
+      if (String(b.id) === boxId) {
+        return { ...b, x: normalizedX, y: normalizedY };
+      }
+      return b;
+    });
+
+    this._boxes.set(updatedBoxes);
+    this.rebuildIndex();
+    this.scheduleRender();
   }
 
   /** Recursively draws quadtree node bounds for debugging. */
