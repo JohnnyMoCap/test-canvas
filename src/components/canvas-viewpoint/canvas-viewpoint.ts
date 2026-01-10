@@ -422,6 +422,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
    * Calculates the axis-aligned bounding box (AABB) of a rotated box for Quadtree insertion.
    * This is crucial: if we insert the unrotated bounds, the corners of a rotated box
    * might stick out of the Quadtree node, causing hit detection to fail on edges.
+   * Also includes nametag bounds if nametags are visible.
    */
   private calculateRotatedAABB(
     box: NonNullable<ReturnType<CanvasViewportComponent['normalizeBoxToWorld']>>
@@ -429,7 +430,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const hw = box.w / 2;
     const hh = box.h / 2;
     // Four corners relative to center
-    // We only need to check 2 corners if symmetric, but full 4 is safer mental model
     const corners = [
       { x: -hw, y: -hh },
       { x: hw, y: -hh },
@@ -458,6 +458,19 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       minY = Math.min(minY, wy);
       maxX = Math.max(maxX, wx);
       maxY = Math.max(maxY, wy);
+    }
+
+    // Include nametag bounds if nametags are visible
+    // Use a fixed estimate to avoid accessing camera signal during quadtree build
+    if (this.showNametags) {
+      // Estimate nametag size: roughly 60px wide, 20px tall (conservative)
+      const estimatedTagWidth = 60;
+      const estimatedTagHeight = 20;
+
+      // Nametag is at topmost corner, so we need to extend minY upward
+      minY = minY - estimatedTagHeight;
+      // Also extend width slightly in case topmost corner is at an edge
+      maxX = Math.max(maxX, maxX + estimatedTagWidth);
     }
 
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
@@ -1130,19 +1143,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  /** Check if a world point is inside a nametag */
-  private pointInNametag(
-    wx: number,
-    wy: number,
+  /** Get nametag bounds in world space */
+  private getNametagBounds(
     b: NonNullable<ReturnType<CanvasViewportComponent['normalizeBoxToWorld']>>
-  ): boolean {
+  ): { x: number; y: number; w: number; h: number } | null {
     const text = String(b.id);
     const cam = this.camera();
 
-    // Get or calculate metrics (ensure cache is populated)
+    // Get or calculate metrics
     let metrics = this.nametagMetricsCache.get(text);
     if (!metrics) {
-      // Calculate and cache metrics if not already cached
       if (this.ctx) {
         this.ctx.save();
         this.ctx.font = '12px Arial, sans-serif';
@@ -1151,8 +1161,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.nametagMetricsCache.set(text, metrics);
         this.ctx.restore();
       } else {
-        // Fallback if ctx is not available
-        return false;
+        return null;
       }
     }
 
@@ -1189,8 +1198,22 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const tagX = topmostCorner.x;
     const tagY = topmostCorner.y - tagHeight;
 
+    return { x: tagX, y: tagY, w: tagWidth, h: tagHeight };
+  }
+
+  /** Check if a world point is inside a nametag */
+  private pointInNametag(
+    wx: number,
+    wy: number,
+    b: NonNullable<ReturnType<CanvasViewportComponent['normalizeBoxToWorld']>>
+  ): boolean {
+    const bounds = this.getNametagBounds(b);
+    if (!bounds) return false;
+
     // Simple AABB check (nametag is always horizontal)
-    return wx >= tagX && wx <= tagX + tagWidth && wy >= tagY && wy <= tagY + tagHeight;
+    return (
+      wx >= bounds.x && wx <= bounds.x + bounds.w && wy >= bounds.y && wy <= bounds.y + bounds.h
+    );
   }
 
   /** Recursively draws quadtree node bounds for debugging. */
