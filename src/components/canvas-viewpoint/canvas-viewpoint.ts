@@ -36,6 +36,10 @@ import { BoxContextMenuComponent } from './box-context-menu.component';
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
+  // Performance constants
+  private readonly TARGET_FPS = 60;
+  private readonly FRAME_TIME = 1000 / this.TARGET_FPS; // ~16.67ms for 60fps
+
   /** Public Inputs */
   @Input({ required: false }) set boxes(value: Box[] | undefined) {
     this._boxes.set(value ?? []);
@@ -78,6 +82,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private ctx?: CanvasRenderingContext2D;
   private devicePixelRatio = 1;
   private dirty = signal(true);
+  private lastFrameTime = 0;
 
   // Interaction state
   private isPointerDown = false;
@@ -92,6 +97,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private isRotating = false;
   private rotationStartAngle = 0;
   private boxStartRotation = 0;
+  private isDraggingOrInteracting = false; // Flag to defer expensive operations
+  private currentCursor = 'default'; // Track current cursor to avoid unnecessary updates
 
   // Caches
   private bgCanvas?: HTMLCanvasElement;
@@ -377,6 +384,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.isResizing = false;
     this.isRotating = false;
     this.resizeCorner = null;
+
+    // Rebuild quadtree after interaction ends
+    if (this.isDraggingOrInteracting) {
+      this.isDraggingOrInteracting = false;
+      this.rebuildIndex();
+    }
+
     (e.target as Element).releasePointerCapture?.(e.pointerId);
   }
 
@@ -404,11 +418,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (this.isCreateMode) return;
 
     if (this.isRotating && this.selectedBoxId) {
+      this.isDraggingOrInteracting = true;
       this.handleRotation(worldPos.x, worldPos.y);
       return;
     }
 
     if (this.isResizing && this.selectedBoxId && this.resizeCorner) {
+      this.isDraggingOrInteracting = true;
       this.handleResize(worldPos.x, worldPos.y);
       return;
     }
@@ -418,6 +434,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const dy = worldPos.y - this.dragStartWorld.y;
       const newX = this.boxStartPos.x + dx;
       const newY = this.boxStartPos.y + dy;
+      this.isDraggingOrInteracting = true;
       this.updateBoxPosition(this.selectedBoxId, newX, newY);
       return;
     }
@@ -428,7 +445,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb) {
           if (InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, this.camera())) {
-            this.canvasRef.nativeElement.style.cursor = 'grab';
+            this.setCursor('grab');
           } else {
             const corner = InteractionUtils.detectCornerHandle(
               worldPos.x,
@@ -437,12 +454,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
               this.camera()
             );
             if (corner) {
-              this.canvasRef.nativeElement.style.cursor = InteractionUtils.getResizeCursor(
-                corner,
-                wb
-              );
+              this.setCursor(InteractionUtils.getResizeCursor(corner, wb));
             } else {
-              this.canvasRef.nativeElement.style.cursor = this.hoveredBoxId ? 'pointer' : 'default';
+              this.setCursor(this.hoveredBoxId ? 'pointer' : 'default');
             }
           }
         }
@@ -517,7 +531,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (this.hoveredBoxId !== foundBoxId) {
       this.hoveredBoxId = foundBoxId;
       this.scheduleRender();
-      this.canvasRef.nativeElement.style.cursor = foundBoxId ? 'pointer' : 'default';
+      this.setCursor(foundBoxId ? 'pointer' : 'default');
     }
   }
 
@@ -537,7 +551,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this._boxes.set(
       BoxStateUtils.updateBoxRotation(this._boxes(), this.selectedBoxId, newRotation)
     );
-    this.rebuildIndex();
+
+    // Skip expensive quadtree rebuild during rotation
+    if (!this.isDraggingOrInteracting) {
+      this.rebuildIndex();
+    }
     this.scheduleRender();
   }
 
@@ -605,7 +623,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         normalizedDims.h
       )
     );
-    this.rebuildIndex();
+
+    // Skip expensive quadtree rebuild during resize
+    if (!this.isDraggingOrInteracting) {
+      this.rebuildIndex();
+    }
     this.scheduleRender();
   }
 
@@ -622,13 +644,24 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this._boxes.set(
       BoxStateUtils.updateBoxPosition(this._boxes(), boxId, normalized.x, normalized.y)
     );
-    this.rebuildIndex();
+
+    // Skip expensive quadtree rebuild during drag, rebuild on pointer up
+    if (!this.isDraggingOrInteracting) {
+      this.rebuildIndex();
+    }
     this.scheduleRender();
   }
 
   private startLoop() {
-    const loop = () => {
+    const loop = (currentTime: number) => {
       this.raf = requestAnimationFrame(loop);
+
+      // Frame rate limiting
+      const elapsed = currentTime - this.lastFrameTime;
+      if (elapsed < this.FRAME_TIME) return;
+
+      this.lastFrameTime = currentTime - (elapsed % this.FRAME_TIME);
+
       if (!this.dirty()) return;
       this.renderFrame();
       this.dirty.set(false);
@@ -727,14 +760,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
     let results: Box[];
 
-    if (this.quadtree) {
-      results = this.quadtree.queryRange(
-        bounds.minX,
-        bounds.minY,
-        bounds.maxX - bounds.minX,
-        bounds.maxY - bounds.minY
-      ) as Box[];
-    } else {
+    // During drag/resize/rotate, quadtree is stale - use all boxes instead
+    if (this.isDraggingOrInteracting || !this.quadtree) {
       results = this._boxes().filter((raw) => {
         if (!this.bgCanvas) return false;
         const wb = BoxUtils.normalizeBoxToWorld(raw, this.bgCanvas.width, this.bgCanvas.height);
@@ -748,6 +775,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           wb.y - halfH > bounds.maxY
         );
       });
+    } else {
+      results = this.quadtree.queryRange(
+        bounds.minX,
+        bounds.minY,
+        bounds.maxX - bounds.minX,
+        bounds.maxY - bounds.minY
+      ) as Box[];
     }
 
     // Deduplicate
@@ -870,9 +904,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private updateCursor() {
     if (this.isCreateMode) {
-      this.canvasRef.nativeElement.style.cursor = CreationUtils.getCreateCursor();
+      this.setCursor(CreationUtils.getCreateCursor());
     } else {
-      this.canvasRef.nativeElement.style.cursor = 'default';
+      this.setCursor('default');
+    }
+  }
+
+  private setCursor(cursor: string) {
+    if (this.currentCursor !== cursor) {
+      this.currentCursor = cursor;
+      this.canvasRef.nativeElement.style.cursor = cursor;
     }
   }
 }
