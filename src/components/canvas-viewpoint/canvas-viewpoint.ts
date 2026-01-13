@@ -766,7 +766,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       bounds,
       this.isDraggingOrInteracting,
       this.bgCanvas.width,
-      this.bgCanvas.height
+      this.bgCanvas.height,
+      this.showNametags
     );
   }
 

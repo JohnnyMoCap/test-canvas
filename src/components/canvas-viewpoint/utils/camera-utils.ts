@@ -1,4 +1,5 @@
 import { Camera } from '../core/types';
+import { QuadtreeUtils } from './quadtree-utils';
 
 /**
  * Camera manipulation and constraints utilities
@@ -85,6 +86,18 @@ export class CameraUtils {
       maxY = Math.max(maxY, wy);
     }
 
-    return { minX, minY, maxX, maxY };
+    // Add margin to prevent pop-in at edges (in world space)
+    // Margin accounts for the maximum AABB extension from nametags
+    // Use the larger of width/height to ensure full coverage
+    const margin =
+      Math.max(QuadtreeUtils.ESTIMATED_NAMETAG_WIDTH, QuadtreeUtils.ESTIMATED_NAMETAG_HEIGHT) /
+      camera.zoom;
+
+    return {
+      minX: minX - margin,
+      minY: minY - margin,
+      maxX: maxX + margin,
+      maxY: maxY + margin,
+    };
   }
 }
