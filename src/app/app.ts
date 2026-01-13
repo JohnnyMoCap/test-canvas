@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
 import { Box } from '../intefaces/boxes.interface';
+import { HistoryService } from '../services/history.service';
 
 @Component({
   selector: 'app-root',
@@ -10,6 +11,11 @@ import { Box } from '../intefaces/boxes.interface';
   standalone: true,
 })
 export class App {
+  constructor(private historyService: HistoryService) {
+    // Initialize history service with example boxes
+    this.historyService.initialize(this.exampleBoxes);
+  }
+
   exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();

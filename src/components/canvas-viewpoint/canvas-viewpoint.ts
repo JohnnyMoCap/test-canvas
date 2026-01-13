@@ -31,6 +31,9 @@ import { PerformanceConfig } from './core/performance-config';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 
+import { HistoryService } from '../../services/history.service';
+import { HotkeyService } from '../../services/hotkey.service';
+
 @Component({
   selector: 'app-canvas-viewport',
   templateUrl: './canvas-viewpoint.html',
@@ -42,11 +45,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
   /** Public Inputs */
-  @Input({ required: false }) set boxes(value: Box[] | undefined) {
-    this._boxes.set(value ?? []);
-    this.rebuildIndex();
-    this.scheduleRender();
-  }
   @Input() backgroundUrl?: string;
 
   showNametags = true;
@@ -74,9 +72,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   // Signals
-  private _boxes = signal<Box[]>([]);
-  boxesSignal = this._boxes;
   camera = signal<Camera>({ zoom: 1, x: 0, y: 0, rotation: 0 });
+
+  // Local mutable copy of boxes for real-time interactions
+  // Synced from historyService.boxes, but can be mutated during drag/resize/rotate
+  private localBoxes = signal<Box[]>([]);
 
   // Canvas state
   private raf = 0;
@@ -88,6 +88,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Interaction state
   private isPointerDown = false;
   private lastPointer = { x: 0, y: 0 };
+  private lastMouseScreen: { x: number; y: number } | null = null; // Track mouse in screen coords for paste
   private hoveredBoxId: string | null = null;
   private selectedBoxId: string | null = null;
   private isDraggingBox = false;
@@ -101,19 +102,48 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private isDraggingOrInteracting = false; // Flag to defer expensive operations
   private currentCursor = 'default'; // Track current cursor to avoid unnecessary updates
 
+  // History tracking
+  private interactionStartState: {
+    boxId: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    rotation: number;
+  } | null = null;
+  private clipboard: Box | null = null;
+
   // Caches
   private bgCanvas?: HTMLCanvasElement;
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private quadtree?: Quadtree<Box>;
   private minZoom = 0;
+  private canvasAspectRatio = 1.5; // Default aspect ratio (width:height = 1.5:1)
 
-  constructor(private ngZone: NgZone) {
+  constructor(
+    private ngZone: NgZone,
+    private historyService: HistoryService,
+    private hotkeyService: HotkeyService
+  ) {
+    // Sync local boxes from history service visibleBoxes (source of truth with filters applied)
+    effect(() => {
+      const boxes = this.historyService.visibleBoxes();
+      this.localBoxes.set([...boxes]); // Create mutable copy
+      this.rebuildIndex();
+    });
+
+    // Trigger render on camera or local box changes
     effect(() => {
       const _ = this.camera();
-      const __ = this._boxes();
-      this.dirty.set(true);
+      const __ = this.localBoxes();
       this.scheduleRender();
     });
+
+    // Setup hotkey handlers
+    this.hotkeyService.on('UNDO', () => this.handleUndo());
+    this.hotkeyService.on('REDO', () => this.handleRedo());
+    this.hotkeyService.on('COPY', () => this.handleCopy());
+    this.hotkeyService.on('PASTE', () => this.handlePaste());
   }
 
   ngAfterViewInit(): void {
@@ -132,7 +162,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => this.startLoop());
 
     const ro = new ResizeObserver(() => this.onResize());
-    ro.observe(canvas);
+    ro.observe(canvas.parentElement!);
   }
 
   ngOnDestroy(): void {
@@ -171,7 +201,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       BoxCreationUtils.generateTempId(this.nextTempId++)
     );
 
-    this._boxes.set(BoxStateUtils.addBox(this._boxes(), newBox));
+    this.historyService.recordAdd(newBox);
     this.rebuildIndex();
     this.scheduleRender();
 
@@ -258,13 +288,21 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     // Check rotation knob
     if (this.selectedBoxId) {
-      const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
+      const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
       if (box && this.bgCanvas) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb && InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, this.camera())) {
           this.isRotating = true;
           this.rotationStartAngle = Math.atan2(worldPos.y - wb.y, worldPos.x - wb.x);
           this.boxStartRotation = wb.rotation;
+          this.interactionStartState = {
+            boxId: this.selectedBoxId,
+            x: box.x,
+            y: box.y,
+            w: box.w,
+            h: box.h,
+            rotation: box.rotation || 0,
+          };
           (e.target as Element).setPointerCapture?.(e.pointerId);
           return;
         }
@@ -280,6 +318,14 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           if (corner) {
             this.isResizing = true;
             this.resizeCorner = corner;
+            this.interactionStartState = {
+              boxId: this.selectedBoxId,
+              x: box.x,
+              y: box.y,
+              w: box.w,
+              h: box.h,
+              rotation: box.rotation || 0,
+            };
             this.dragStartWorld = worldPos;
             this.boxStartPos = { x: wb.x, y: wb.y };
             (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -292,7 +338,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Check box/nametag click
     const candidates = this.quadtree
       ? (this.quadtree.queryRange(worldPos.x - 1, worldPos.y - 1, 2, 2) as Box[])
-      : this._boxes();
+      : this.localBoxes();
 
     let clickedBoxId: string | null = null;
     for (let i = candidates.length - 1; i >= 0; i--) {
@@ -330,10 +376,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.selectedBoxId = clickedBoxId;
       this.isDraggingBox = true;
       this.dragStartWorld = worldPos;
-      const box = this._boxes().find((b) => String(getBoxId(b)) === clickedBoxId);
+      const box = this.localBoxes().find((b) => String(getBoxId(b)) === clickedBoxId);
       if (box && this.bgCanvas) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb) this.boxStartPos = { x: wb.x, y: wb.y };
+        this.interactionStartState = {
+          boxId: clickedBoxId,
+          x: box.x,
+          y: box.y,
+          w: box.w,
+          h: box.h,
+          rotation: box.rotation || 0,
+        };
       }
       this.scheduleRender();
     } else {
@@ -367,7 +421,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       );
 
       if (newBox) {
-        this._boxes.set(BoxStateUtils.addBox(this._boxes(), newBox));
+        this.historyService.recordAdd(newBox);
         this.rebuildIndex();
       }
 
@@ -377,6 +431,30 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         currentPoint: null,
       };
       this.scheduleRender();
+    }
+
+    // Record history delta for completed interaction
+    if (this.interactionStartState) {
+      const box = this.localBoxes().find(
+        (b) => String(getBoxId(b)) === this.interactionStartState!.boxId
+      );
+      if (box) {
+        const start = this.interactionStartState;
+
+        // Determine operation type and record
+        if (this.isRotating) {
+          this.historyService.recordRotate(start.boxId, start.rotation, box.rotation || 0);
+        } else if (this.isResizing) {
+          this.historyService.recordResize(
+            start.boxId,
+            { x: start.x, y: start.y, w: start.w, h: start.h },
+            { x: box.x, y: box.y, w: box.w, h: box.h }
+          );
+        } else if (this.isDraggingBox) {
+          this.historyService.recordMove(start.boxId, start.x, start.y, box.x, box.y);
+        }
+      }
+      this.interactionStartState = null;
     }
 
     this.isPointerDown = false;
@@ -406,6 +484,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       canvas.height,
       this.camera()
     );
+
+    // Track mouse screen position for paste functionality
+    this.lastMouseScreen = { x: e.clientX, y: e.clientY };
 
     // Handle creation preview
     if (this.createState.isCreating && this.createState.startPoint) {
@@ -440,7 +521,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     if (this.selectedBoxId && !this.isPointerDown && this.bgCanvas) {
-      const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
+      const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
       if (box) {
         const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
         if (wb) {
@@ -496,7 +577,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const foundBoxId = HoverDetectionUtils.detectHoveredBox(
       wx,
       wy,
-      this._boxes(),
+      this.localBoxes(),
       this.quadtree,
       this.bgCanvas.width,
       this.bgCanvas.height,
@@ -516,7 +597,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private handleRotation(wx: number, wy: number) {
     if (!this.selectedBoxId || !this.bgCanvas) return;
 
-    const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
+    const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
     if (!box) return;
 
     const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
@@ -526,9 +607,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const deltaAngle = currentAngle - this.rotationStartAngle;
     const newRotation = this.boxStartRotation + deltaAngle;
 
-    this._boxes.set(
-      BoxStateUtils.updateBoxRotation(this._boxes(), this.selectedBoxId, newRotation)
-    );
+    // Mutate local copy directly for smooth visual feedback
+    box.rotation = newRotation;
+    this.localBoxes.set([...this.localBoxes()]); // Trigger signal update
 
     // Skip expensive quadtree rebuild during rotation
     if (!this.isDraggingOrInteracting) {
@@ -540,7 +621,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private handleResize(wx: number, wy: number) {
     if (!this.selectedBoxId || !this.resizeCorner || !this.bgCanvas) return;
 
-    const box = this._boxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
+    const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
     if (!box) return;
 
     const wb = BoxUtils.normalizeBoxToWorld(box, this.bgCanvas.width, this.bgCanvas.height);
@@ -591,16 +672,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.height
     );
 
-    this._boxes.set(
-      BoxStateUtils.updateBoxGeometry(
-        this._boxes(),
-        this.selectedBoxId,
-        normalizedPos.x,
-        normalizedPos.y,
-        normalizedDims.w,
-        normalizedDims.h
-      )
-    );
+    // Mutate local copy directly for smooth visual feedback
+    box.x = normalizedPos.x;
+    box.y = normalizedPos.y;
+    box.w = normalizedDims.w;
+    box.h = normalizedDims.h;
+    this.localBoxes.set([...this.localBoxes()]); // Trigger signal update
 
     // Skip expensive quadtree rebuild during resize
     if (!this.isDraggingOrInteracting) {
@@ -619,9 +696,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.bgCanvas.height
     );
 
-    this._boxes.set(
-      BoxStateUtils.updateBoxPosition(this._boxes(), boxId, normalized.x, normalized.y)
-    );
+    const box = this.localBoxes().find((b) => String(getBoxId(b)) === boxId);
+    if (box) {
+      // Mutate local copy directly for smooth visual feedback
+      box.x = normalized.x;
+      box.y = normalized.y;
+      this.localBoxes.set([...this.localBoxes()]); // Trigger signal update
+    }
 
     // Skip expensive quadtree rebuild during drag, rebuild on pointer up
     if (!this.isDraggingOrInteracting) {
@@ -680,7 +761,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
     if (!this.bgCanvas) return [];
     return QuadtreeUtils.queryVisible(
-      this._boxes(),
+      this.localBoxes(),
       this.quadtree,
       bounds,
       this.isDraggingOrInteracting,
@@ -694,6 +775,15 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
 
     this.bgCanvas = result.canvas;
+
+    // Update canvas aspect ratio based on the loaded photo
+    if (this.bgCanvas.width > 0 && this.bgCanvas.height > 0) {
+      this.canvasAspectRatio = this.bgCanvas.width / this.bgCanvas.height;
+    }
+
+    // Resize canvas to apply new aspect ratio
+    this.onResize();
+
     this.minZoom = result.minZoom;
     this.camera.set({ zoom: this.minZoom, x: 0, y: 0, rotation: 0 });
     this.rebuildIndex();
@@ -702,9 +792,32 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private onResize() {
     const canvas = this.canvasRef.nativeElement;
-    const rect = canvas.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width * this.devicePixelRatio));
-    const h = Math.max(1, Math.floor(rect.height * this.devicePixelRatio));
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    console.log(rect);
+
+    // Calculate canvas size based on aspect ratio
+    // Fill as much space as possible within the container while maintaining aspect ratio
+    const containerWidth = rect.width * this.devicePixelRatio;
+    const containerHeight = rect.height * this.devicePixelRatio;
+
+    let w: number, h: number;
+
+    // Check which dimension is the limiting factor
+    const containerAspectRatio = containerWidth / containerHeight;
+
+    if (containerAspectRatio > this.canvasAspectRatio) {
+      // Container is wider than canvas aspect ratio - height is limiting factor
+      h = Math.max(1, Math.floor(containerHeight));
+      w = Math.max(1, Math.floor(h * this.canvasAspectRatio));
+    } else {
+      // Container is taller than canvas aspect ratio - width is limiting factor
+      w = Math.max(1, Math.floor(containerWidth));
+      h = Math.max(1, Math.floor(w / this.canvasAspectRatio));
+    }
+
     canvas.width = w;
     canvas.height = h;
 
@@ -728,7 +841,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.quadtree = QuadtreeUtils.rebuildQuadtree(
-      this._boxes(),
+      this.localBoxes(),
       this.bgCanvas.width,
       this.bgCanvas.height,
       this.showNametags
@@ -761,5 +874,86 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.currentCursor = cursor;
       this.canvasRef.nativeElement.style.cursor = cursor;
     }
+  }
+
+  private handleUndo(): void {
+    this.historyService.undo();
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
+
+  private handleRedo(): void {
+    this.historyService.redo();
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
+
+  private handleCopy(): void {
+    if (!this.selectedBoxId) return;
+    const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.selectedBoxId);
+    if (box) {
+      this.clipboard = { ...box };
+    }
+  }
+
+  private handlePaste(): void {
+    if (!this.clipboard || !this.bgCanvas) return;
+
+    let newX: number;
+    let newY: number;
+
+    // Check if current mouse position is over the canvas
+    if (this.lastMouseScreen) {
+      const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+      const isOverCanvas =
+        this.lastMouseScreen.x >= rect.left &&
+        this.lastMouseScreen.x <= rect.right &&
+        this.lastMouseScreen.y >= rect.top &&
+        this.lastMouseScreen.y <= rect.bottom;
+
+      if (isOverCanvas) {
+        // Mouse is over canvas - convert current position to world coordinates
+        const canvas = this.canvasRef.nativeElement;
+        const mx = (this.lastMouseScreen.x - rect.left) * this.devicePixelRatio;
+        const my = (this.lastMouseScreen.y - rect.top) * this.devicePixelRatio;
+        const worldPos = CoordinateTransform.screenToWorld(
+          mx,
+          my,
+          canvas.width,
+          canvas.height,
+          this.camera()
+        );
+
+        const normalizedMouse = BoxUtils.worldToNormalized(
+          worldPos.x,
+          worldPos.y,
+          this.bgCanvas.width,
+          this.bgCanvas.height
+        );
+        newX = normalizedMouse.x;
+        newY = normalizedMouse.y;
+      } else {
+        // Mouse is outside canvas - use fallback with visible offset
+        newX = this.clipboard.x + 0.05; // 5% offset for visibility
+        newY = this.clipboard.y + 0.05;
+      }
+    } else {
+      // No mouse position tracked - use fallback with visible offset
+      newX = this.clipboard.x + 0.05;
+      newY = this.clipboard.y + 0.05;
+    }
+
+    const newBox: Box = {
+      ...this.clipboard,
+      tempId: BoxCreationUtils.generateTempId(this.nextTempId++),
+      id: undefined, // Clear id so it gets a new one on save
+      x: newX,
+      y: newY,
+    };
+
+    this.historyService.recordAdd(newBox);
+    this.selectedBoxId = String(getBoxId(newBox));
+    this.rebuildIndex();
+    this.scheduleRender();
   }
 }
