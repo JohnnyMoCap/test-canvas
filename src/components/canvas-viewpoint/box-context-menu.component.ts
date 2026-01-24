@@ -43,7 +43,10 @@ import { BoxType, BOX_TYPES } from './core/creation-state';
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         min-width: 200px;
         z-index: 10000;
-        font-family: system-ui, -apple-system, sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         font-size: 14px;
       }
 
@@ -110,8 +113,6 @@ export class BoxContextMenuComponent {
   boxTypes = Object.values(BOX_TYPES);
 
   onSelectType(type: BoxType) {
-    console.log(type);
-
     this.selectType.emit(type);
     this.close.emit();
   }

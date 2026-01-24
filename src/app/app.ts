@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
 import { Box } from '../intefaces/boxes.interface';
 import { HistoryService } from '../services/history.service';
@@ -16,7 +16,7 @@ export class App {
     this.historyService.initialize(this.exampleBoxes);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
+  exampleBoxes: Box[] = Array.from({ length: 1000 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 
@@ -46,5 +46,5 @@ export class App {
 
 const predefinedColors = Array.from(
   { length: 50 },
-  (_, i) => `hsl(${Math.floor((i / 50) * 360)}, 70%, 50%)`
+  (_, i) => `hsl(${Math.floor((i / 50) * 360)}, 70%, 50%)`,
 );

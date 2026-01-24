@@ -108,7 +108,7 @@ export class HistoryService {
     beforeX: number,
     beforeY: number,
     afterX: number,
-    afterY: number
+    afterY: number,
   ): void {
     // Skip if no actual change
     if (beforeX === afterX && beforeY === afterY) return;
@@ -131,7 +131,7 @@ export class HistoryService {
   recordResize(
     boxId: string | number,
     before: { x: number; y: number; w: number; h: number },
-    after: { x: number; y: number; w: number; h: number }
+    after: { x: number; y: number; w: number; h: number },
   ): void {
     // Skip if no actual change
     if (
@@ -295,7 +295,7 @@ export class HistoryService {
   }
 
   /**
-   * Applies a delta forward (for redo)
+   * Applies a delta forward
    */
   private applyDeltaForward(delta: BoxDelta, boxes: Box[]): Box[] {
     switch (delta.type) {
@@ -312,7 +312,7 @@ export class HistoryService {
       case 'ROTATE':
       case 'CHANGE_CLASS':
         // Apply after state
-        return boxes.map((b) => (getBoxId(b) === delta.boxId ? { ...b, ...delta.after } : b));
+        return boxes.map((b) => (getBoxId(b) == delta.boxId ? { ...b, ...delta.after } : b));
 
       default:
         return boxes;
