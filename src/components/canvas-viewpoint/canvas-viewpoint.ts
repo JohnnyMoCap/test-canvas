@@ -28,7 +28,7 @@ import { LifecycleManager } from './utils/lifecycle-manager';
 import { PointerEventHandler } from './utils/pointer-event-handler';
 import { BoxManipulator } from './utils/box-manipulator';
 import { ClipboardManager } from './utils/clipboard-manager';
-import { CursorManager } from './utils/cursor-manager';
+import { EventContext } from './utils/event-context';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 import { HistoryService } from '../../services/history.service';
@@ -47,7 +47,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   // State management
   private state: StateManager;
-  private cursorManager = new CursorManager();
+  private eventContext: EventContext;
 
   // Signals
   camera = signal<Camera>({ zoom: 1, x: 0, y: 0, rotation: 0 });
@@ -70,11 +70,88 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Initialize state manager
     this.state = new StateManager(ContextMenuUtils.close());
 
+    // Create event context
+    this.eventContext = {
+      getBoxes: () => this.localBoxes(),
+      getCamera: () => this.camera(),
+
+      onCreateStart: (worldX, worldY) => {
+        this.state.createState.set({
+          isCreating: true,
+          startPoint: { x: worldX, y: worldY },
+          currentPoint: { x: worldX, y: worldY },
+        });
+        this.scheduleRender();
+      },
+
+      onCreatePreview: (worldX, worldY) => {
+        this.state.createState.set({
+          ...this.state.createState(),
+          currentPoint: { x: worldX, y: worldY },
+        });
+        this.scheduleRender();
+      },
+
+      onCreateComplete: (startX, startY, endX, endY) => {
+        this.handleCreateComplete(startX, startY, endX, endY);
+      },
+
+      onBoxInteractionStart: (boxId, isRotating, isResizing, isDragging) => {
+        this.scheduleRender();
+      },
+
+      onRotate: (worldX, worldY) => {
+        this.handleRotation(worldX, worldY);
+      },
+
+      onResize: (worldX, worldY) => {
+        this.handleResize(worldX, worldY);
+      },
+
+      onDrag: (worldX, worldY) => {
+        this.updateBoxPosition(this.state.selectedBoxId()!, worldX, worldY);
+      },
+
+      onInteractionComplete: (boxId, startState, box, isRotating, isResizing, isDragging) => {
+        this.recordInteractionHistory(startState, box, isRotating, isResizing, isDragging);
+      },
+
+      onCameraPanStart: () => {
+        this.scheduleRender();
+      },
+
+      onCameraPan: (dx, dy) => {
+        this.handleCameraPan(dx, dy);
+      },
+
+      onZoom: (newCamera, worldX, worldY) => {
+        this.camera.set(this.clampCamera(newCamera));
+        this.detectHover(worldX, worldY);
+      },
+
+      onContextMenuOpen: (x, y, worldX, worldY) => {
+        this.state.contextMenuState.set(ContextMenuUtils.open(x, y, worldX, worldY));
+      },
+
+      onHoverDetection: (worldX, worldY) => {
+        this.detectHover(worldX, worldY);
+      },
+
+      onUpdateCursor: (cursor) => {
+        this.state.setCursor(cursor);
+      },
+
+      onRebuildIndex: () => {
+        this.rebuildIndex();
+      },
+    };
+
     this.setupEffects();
     this.setupHotkeys();
   }
 
   ngAfterViewInit(): void {
+    this.state.setCanvas(this.canvasRef.nativeElement);
     this.initializeCanvas();
     this.setupResizeObserver();
     if (this.backgroundUrl) this.loadBackground(this.backgroundUrl);
@@ -86,13 +163,20 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     LifecycleManager.stopRenderLoop(this.state.raf());
   }
 
-  // ========== PUBLIC API ==========
+  // ========================================
+  // PUBLIC API
+  // ========================================
 
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
     this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });
     this.scheduleRender();
   }
+
+  // ========================================
+  // FEATURE: BOX CREATION
+  // ========================================
+  // Related: box-creation-utils.ts, creation-utils.ts
 
   toggleCreateMode() {
     this.state.toggleCreateMode();
@@ -101,6 +185,32 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.scheduleRender();
     }
   }
+
+  private handleCreateComplete(startX: number, startY: number, endX: number, endY: number): void {
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
+    const newBox = BoxCreationUtils.createBoxFromDrag(
+      startX,
+      startY,
+      endX,
+      endY,
+      bgc.width,
+      bgc.height,
+      BoxCreationUtils.generateTempId(this.state.nextTempId()),
+    );
+    this.state.nextTempId.set(this.state.nextTempId() + 1);
+
+    if (newBox) {
+      this.historyService.recordAdd(newBox);
+      this.rebuildIndex();
+    }
+  }
+
+  // ========================================
+  // FEATURE: CONTEXT MENU
+  // ========================================
+  // Related: context-menu-utils.ts
 
   onContextMenuSelect(type: BoxType) {
     const wp = this.state.contextMenuState();
@@ -129,19 +239,17 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.contextMenuState.set(ContextMenuUtils.close());
   }
 
-  // ========== EVENT HANDLERS ==========
+  // ========================================
+  // INFRASTRUCTURE: Event Routing
+  // ========================================
 
   onWheel(e: WheelEvent) {
     PointerEventHandler.handleWheel(
       e,
       this.canvasRef.nativeElement,
-      this.camera(),
       this.state.devicePixelRatio(),
       this.state.minZoom(),
-      (newCamera, worldX, worldY) => {
-        this.camera.set(this.clampCamera(newCamera));
-        this.detectHover(worldX, worldY);
-      },
+      this.eventContext,
     );
   }
 
@@ -150,31 +258,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       e,
       this.canvasRef.nativeElement,
       this.state,
-      this.camera(),
-      this.localBoxes(),
       this.quadtree,
       this.nametagMetricsCache,
       this.state.ctx(),
-      (x, y, worldX, worldY) => {
-        this.state.contextMenuState.set(ContextMenuUtils.open(x, y, worldX, worldY));
-      },
-      (worldX, worldY) => {
-        this.state.createState.set({
-          isCreating: true,
-          startPoint: { x: worldX, y: worldY },
-          currentPoint: { x: worldX, y: worldY },
-        });
-        this.scheduleRender();
-      },
-      (boxId, isRotating, isResizing, isDragging) => {
-        this.scheduleRender();
-      },
-      () => {
-        this.scheduleRender();
-      },
-      (cursor) => {
-        this.cursorManager.setCursor(this.canvasRef.nativeElement, cursor);
-      },
+      this.eventContext,
     );
   }
 
@@ -182,16 +269,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     PointerEventHandler.handlePointerUp(
       e,
       this.state,
-      this.localBoxes(),
-      (startX, startY, endX, endY) => {
-        this.handleCreateComplete(startX, startY, endX, endY);
-      },
-      (boxId, startState, box, isRotating, isResizing, isDragging) => {
-        this.recordInteractionHistory(startState, box, isRotating, isResizing, isDragging);
-      },
-      () => {
-        this.rebuildIndex();
-      },
+      this.eventContext,
     );
     this.scheduleRender();
   }
@@ -201,40 +279,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       e,
       this.canvasRef.nativeElement,
       this.state,
-      this.camera(),
-      this.localBoxes(),
       this.quadtree,
       this.nametagMetricsCache,
       this.state.ctx(),
-      (worldX, worldY) => {
-        this.state.createState.set({
-          ...this.state.createState(),
-          currentPoint: { x: worldX, y: worldY },
-        });
-        this.scheduleRender();
-      },
-      (worldX, worldY) => {
-        this.handleRotation(worldX, worldY);
-      },
-      (worldX, worldY) => {
-        this.handleResize(worldX, worldY);
-      },
-      (worldX, worldY) => {
-        this.updateBoxPosition(this.state.selectedBoxId()!, worldX, worldY);
-      },
-      (dx, dy) => {
-        this.handleCameraPan(dx, dy);
-      },
-      (worldX, worldY) => {
-        this.detectHover(worldX, worldY);
-      },
-      (cursor) => {
-        this.cursorManager.setCursor(this.canvasRef.nativeElement, cursor);
-      },
+      this.eventContext,
     );
   }
 
-  // ========== PRIVATE SETUP METHODS ==========
+  // ========================================
+  // INFRASTRUCTURE: Setup & Lifecycle
+  // ========================================
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
@@ -286,28 +340,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  // ========== INTERACTION HANDLERS ==========
-
-  private handleCreateComplete(startX: number, startY: number, endX: number, endY: number): void {
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-
-    const newBox = BoxCreationUtils.createBoxFromDrag(
-      startX,
-      startY,
-      endX,
-      endY,
-      bgc.width,
-      bgc.height,
-      BoxCreationUtils.generateTempId(this.state.nextTempId()),
-    );
-    this.state.nextTempId.set(this.state.nextTempId() + 1);
-
-    if (newBox) {
-      this.historyService.recordAdd(newBox);
-      this.rebuildIndex();
-    }
-  }
+  // ========================================
+  // FEATURE: BOX INTERACTION (Rotate/Resize/Drag)
+  // ========================================
+  // Related: box-manipulator.ts, interaction-utils.ts
 
   private recordInteractionHistory(
     startState: { x: number; y: number; w: number; h: number; rotation: number },
@@ -339,6 +375,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // ========================================
+  // FEATURE: CAMERA (Pan/Zoom)
+  // ========================================
+  // Related: camera-utils.ts
+
   private handleCameraPan(dx: number, dy: number): void {
     const cam = this.camera();
     const worldDelta = CoordinateTransform.screenDeltaToWorld(dx, dy, cam);
@@ -346,7 +387,20 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.camera.set(this.clampCamera(updatedCam));
   }
 
-  // ========== BOX MANIPULATION ==========
+  private clampCamera(cam: Camera): Camera {
+    if (!this.state.bgCanvas()) return cam;
+    const canvas = this.canvasRef.nativeElement;
+    return CameraUtils.clampCamera(
+      cam,
+      canvas.width,
+      canvas.height,
+      this.state.bgCanvas()!.width,
+      this.state.bgCanvas()!.height,
+      this.state.minZoom(),
+    );
+  }
+
+  // Box transformation methods
 
   private handleRotation(wx: number, wy: number) {
     const bgc = this.state.bgCanvas();
@@ -406,7 +460,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
-  // ========== DETECTION ==========
+  // ========================================
+  // FEATURE: SELECTION & HOVER
+  // ========================================
+  // Related: hover-detection-utils.ts
 
   private detectHover(wx: number, wy: number) {
     const bgc = this.state.bgCanvas();
@@ -433,11 +490,14 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     if (this.state.updateHoverState(foundBoxId)) {
       this.scheduleRender();
-      this.cursorManager.setCursor(this.canvasRef.nativeElement, foundBoxId ? 'move' : 'default');
+      this.state.setCursor(foundBoxId ? 'move' : 'default');
     }
   }
 
-  // ========== RENDERING ==========
+  // ========================================
+  // FEATURE: RENDERING
+  // ========================================
+  // Related: frame-renderer.ts, render-utils.ts
 
   private scheduleRender() {
     this.dirty.set(true);
@@ -489,7 +549,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     return this.localBoxes();
   }
 
-  // ========== BACKGROUND & LAYOUT ==========
+  // ========================================
+  // INFRASTRUCTURE: Background & Layout
+  // ========================================
 
   private async loadBackground(url: string) {
     const canvas = this.canvasRef.nativeElement;
@@ -553,8 +615,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
-  // ========== INDEX & CAMERA ==========
-
   private rebuildIndex() {
     this.quadtree = LifecycleManager.rebuildIndex(
       this.localBoxes(),
@@ -563,30 +623,22 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private clampCamera(cam: Camera): Camera {
-    if (!this.state.bgCanvas()) return cam;
-    const canvas = this.canvasRef.nativeElement;
-    return CameraUtils.clampCamera(
-      cam,
-      canvas.width,
-      canvas.height,
-      this.state.bgCanvas()!.width,
-      this.state.bgCanvas()!.height,
-      this.state.minZoom(),
-    );
-  }
-
-  // ========== CURSOR & UI ==========
+  // ========================================
+  // UI & CURSOR
+  // ========================================
 
   private updateCursor() {
     if (this.state.isCreateMode()) {
-      this.cursorManager.setCursor(this.canvasRef.nativeElement, CreationUtils.getCreateCursor());
+      this.state.setCursor(CreationUtils.getCreateCursor());
     } else {
-      this.cursorManager.setCursor(this.canvasRef.nativeElement, 'default');
+      this.state.setCursor('default');
     }
   }
 
-  // ========== HOTKEY HANDLERS ==========
+  // ========================================
+  // FEATURE: CLIPBOARD (Copy/Paste)
+  // ========================================
+  // Related: clipboard-manager.ts
 
   private handleUndo(): void {
     this.historyService.undo();
@@ -630,7 +682,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     this.historyService.recordAdd(newBox);
     this.state.selectedBoxId.set(String(getBoxId(newBox)));
-    this.cursorManager.setCursor(this.canvasRef.nativeElement, 'move');
+    this.state.setCursor('move');
     this.rebuildIndex();
     this.scheduleRender();
   }

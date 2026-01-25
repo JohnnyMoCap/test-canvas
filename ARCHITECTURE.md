@@ -1,5 +1,15 @@
 # Canvas Application Architecture
 
+## Recent Updates
+
+**January 25, 2026**: Completed state management consolidation refactor
+- Merged CursorManager into StateManager
+- Introduced EventContext pattern for cleaner event handling
+- Added feature boundary comments throughout codebase
+- See [ADR-001](docs/ADR-001-state-management-consolidation.md) for details
+
+---
+
 ## Single Source of Truth: HistoryService.visibleBoxes
 
 The application uses a centralized state management pattern where **HistoryService.visibleBoxes** is the single source of truth for all rendered box data.

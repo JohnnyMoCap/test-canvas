@@ -9,13 +9,23 @@ import { ContextMenuState } from './context-menu-utils';
  */
 
 export class StateManager {
-  // Canvas state
+  // ========================================
+  // CANVAS & RENDERING
+  // ========================================
+  
+  private canvasElement = signal<HTMLCanvasElement | null>(null);
   raf = signal(0);
   ctx = signal<CanvasRenderingContext2D | undefined>(undefined);
   devicePixelRatio = signal(1);
   lastFrameTime = signal(0);
+  bgCanvas = signal<HTMLCanvasElement | undefined>(undefined);
+  minZoom = signal(0);
+  canvasAspectRatio = signal(1.5);
 
-  // Creation mode
+  // ========================================
+  // FEATURE: BOX CREATION
+  // ========================================
+  
   isCreateMode = signal(false);
   createState = signal<CreateBoxState>({
     isCreating: false,
@@ -24,27 +34,37 @@ export class StateManager {
   });
   nextTempId = signal(1);
 
-  // Context menu
+  // ========================================
+  // FEATURE: CONTEXT MENU
+  // ========================================
+  
   contextMenuState = signal<ContextMenuState | null>(null);
 
-  // Interaction state
-  isPointerDown = signal(false);
-  lastPointer = signal({ x: 0, y: 0 });
-  lastMouseScreen = signal<{ x: number; y: number } | null>(null);
+  // ========================================
+  // FEATURE: SELECTION & HOVER
+  // ========================================
+  
   hoveredBoxId = signal<string | null>(null);
   selectedBoxId = signal<string | null>(null);
+
+  // ========================================
+  // FEATURE: BOX INTERACTION (Rotate/Resize/Drag)
+  // ========================================
+  
+  isPointerDown = signal(false);
   isDraggingBox = signal(false);
   dragStartWorld = signal({ x: 0, y: 0 });
   boxStartPos = signal({ x: 0, y: 0 });
+  
   isResizing = signal(false);
   resizeCorner = signal<ResizeCorner | null>(null);
+  
   isRotating = signal(false);
   rotationStartAngle = signal(0);
   boxStartRotation = signal(0);
+  
   isDraggingOrInteracting = signal(false);
-  currentCursor = signal('default');
-
-  // History tracking
+  
   interactionStartState = signal<{
     boxId: string;
     x: number;
@@ -54,19 +74,26 @@ export class StateManager {
     rotation: number;
   } | null>(null);
 
-  // Clipboard
+  // ========================================
+  // FEATURE: CLIPBOARD
+  // ========================================
+  
   clipboard = signal<Box | null>(null);
 
-  // Background
-  bgCanvas = signal<HTMLCanvasElement | undefined>(undefined);
-  minZoom = signal(0);
-  canvasAspectRatio = signal(1.5);
-
-  // Display options
+  // ========================================
+  // UI STATE
+  // ========================================
+  
+  currentCursor = signal('default');
+  lastPointer = signal({ x: 0, y: 0 });
+  lastMouseScreen = signal<{ x: number; y: number } | null>(null);
   showNametags = signal(true);
   debugShowQuadtree = signal(true);
 
-  // Computed/derived state
+  // ========================================
+  // COMPUTED STATE
+  // ========================================
+  
   isAnyInteractionActive = computed(
     () => this.isRotating() || this.isResizing() || this.isDraggingBox(),
   );
@@ -74,6 +101,10 @@ export class StateManager {
   constructor(contextMenuState: ContextMenuState) {
     this.contextMenuState.set(contextMenuState);
   }
+
+  // ========================================
+  // FEATURE: BOX CREATION - Methods
+  // ========================================
 
   /**
    * Reset creation state
@@ -95,6 +126,10 @@ export class StateManager {
       this.resetCreationState();
     }
   }
+
+  // ========================================
+  // FEATURE: BOX INTERACTION - Methods
+  // ========================================
 
   /**
    * Reset all interaction states
@@ -122,18 +157,27 @@ export class StateManager {
     this.interactionStartState.set({ boxId, x, y, w, h, rotation });
   }
 
-  /**
-   * Check if any interaction is active
-   */
-  // isAnyInteractionActive is now a computed signal
+  // ========================================
+  // UI - Methods
+  // ========================================
 
   /**
-   * Update cursor
+   * Set canvas element reference (call during ngAfterViewInit)
    */
-  setCursor(canvas: HTMLCanvasElement, cursor: string): void {
+  setCanvas(canvas: HTMLCanvasElement): void {
+    this.canvasElement.set(canvas);
+  }
+
+  /**
+   * Update cursor (now works without passing canvas every time)
+   */
+  setCursor(cursor: string): void {
     if (this.currentCursor() !== cursor) {
       this.currentCursor.set(cursor);
-      canvas.style.cursor = cursor;
+      const canvas = this.canvasElement();
+      if (canvas) {
+        canvas.style.cursor = cursor;
+      }
     }
   }
 
@@ -143,6 +187,10 @@ export class StateManager {
   updateMouseScreenPosition(x: number, y: number): void {
     this.lastMouseScreen.set({ x, y });
   }
+
+  // ========================================
+  // FEATURE: SELECTION & HOVER - Methods
+  // ========================================
 
   /**
    * Update hover state

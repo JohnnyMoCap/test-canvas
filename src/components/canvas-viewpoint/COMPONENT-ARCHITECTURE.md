@@ -1,5 +1,17 @@
 # Canvas Viewpoint - Component Architecture
 
+## Recent Updates (January 25, 2026)
+
+### State Management Consolidation
+- **Removed**: `cursor-manager.ts` - merged into StateManager
+- **Added**: `event-context.ts` - groups callbacks to reduce parameter count
+- **Improved**: StateManager now manages canvas reference directly
+- **Result**: Simpler, more maintainable event handling
+
+See [ADR-001](../../docs/ADR-001-state-management-consolidation.md) for full details.
+
+---
+
 ## Component Responsibilities
 
 ### Main Component (canvas-viewpoint.ts)
@@ -29,16 +41,18 @@
 
 **state-manager.ts** - Single source of truth for component state
 
-- Tracks all interaction states
-- Manages flags and references
+- Tracks all interaction states (rotation, resizing, dragging, etc.)
+- Manages cursor state and DOM updates
+- Manages canvas element reference
 - Provides state mutation methods
-- Encapsulates state logic
+- Organized by feature with clear boundaries
 
-**cursor-manager.ts** - Cursor state and DOM updates
+**event-context.ts** - Event callback interface
 
-- Prevents redundant cursor updates
-- Tracks current cursor state
-- Provides cursor change interface
+- Groups related callbacks logically
+- Reduces coupling between PointerEventHandler and component
+- Makes event handlers more testable
+- Provides stable API for event routing
 
 ### Lifecycle & Rendering
 
