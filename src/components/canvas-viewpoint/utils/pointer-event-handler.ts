@@ -1,344 +1,626 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { Quadtree } from '../core/quadtree';
-import { Camera, ResizeCorner } from '../core/types';
-import { CoordinateTransform } from './coordinate-transform';
-import { BoxUtils } from './box-utils';
-import { NametagUtils } from './nametag-utils';
-import { InteractionUtils } from './interaction-utils';
-import { HoverDetectionUtils } from './hover-detection-utils';
-import { ContextMenuUtils } from './context-menu-utils';
-import { BoxCreationUtils } from './box-creation-utils';
+import { Camera, TextMetrics } from '../core/types';
+import { CoordinateTransform } from '../utils/coordinate-transform';
+import { BoxUtils } from '../utils/box-utils';
 import { StateManager } from './state-manager';
-import { EventContext } from './event-context';
+import { HistoryService } from '../../../services/history.service';
+import { HoverHandler } from '../handlers/hover.handler';
+import { BoxManipulationHandler } from '../handlers/box-manipulation.handler';
+import { BoxCreationHandler } from '../handlers/box-creation.handler';
+import { CameraHandler } from '../handlers/camera.handler';
+import { ContextMenuHandler } from '../handlers/context-menu.handler';
 
 /**
- * Handles all pointer event logic including mouse/touch interactions
- * 
- * Routes pointer events to appropriate features based on interaction context.
- * Uses EventContext to decouple from component implementation details.
+ * Routes pointer events to appropriate handlers based on state
+ * Layer 2: Event Router
  */
 export class PointerEventHandler {
   /**
    * Handle pointer down event
-   * 
-   * PRIORITY ORDER:
-   * 1. Context menu (click outside closes, right-click opens)
-   * 2. Box creation mode (if enabled)
-   * 3. Box interaction (rotation knob, resize corners)
-   * 4. Box selection (click on box)
-   * 5. Camera pan (click on empty space)
+   * Routes to handlers based on priority: context menu > creation > interaction > selection > camera
    */
   static handlePointerDown(
     event: PointerEvent,
     canvas: HTMLCanvasElement,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    boxes: Box[],
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
-    nametagMetricsCache: Map<string, any>,
+    nametagMetricsCache: Map<string, TextMetrics>,
     ctx: CanvasRenderingContext2D | undefined,
-    context: EventContext,
+    historyService: HistoryService,
   ): void {
-    const camera = context.getCamera();
-    const boxes = context.getBoxes();
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
+    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
 
-    // ========== FEATURE: Context Menu ==========
-    
+    // PRIORITY 1: Context Menu
+    if (this.handleContextMenu(event, worldPos, state)) return;
+
+    // PRIORITY 2: Box Creation
+    if (this.handleCreateMode(event, worldPos, canvas, state)) return;
+
+    // PRIORITY 3-5: Box Interaction (Rotation, Resize, Drag) for selected box
+    if (
+      this.handleSelectedBoxInteraction(
+        event,
+        worldPos,
+        canvas,
+        imageWidth,
+        imageHeight,
+        camera,
+        boxes,
+        state,
+      )
+    )
+      return;
+
+    // PRIORITY 6: Selection (clicking on unselected box)
+    if (
+      this.handleBoxSelection(
+        worldPos,
+        boxes,
+        quadtree,
+        imageWidth,
+        imageHeight,
+        camera,
+        state,
+        nametagMetricsCache,
+        ctx,
+      )
+    )
+      return;
+
+    // PRIORITY 7: Camera Pan
+    this.handleCameraPanStart(event, state);
+  }
+
+  private static handleContextMenu(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    state: StateManager,
+  ): boolean {
     // Don't handle if clicking on context menu
     if (
       state.contextMenuState()?.visible &&
-      ContextMenuUtils.isWithinMenu(event.target as HTMLElement)
+      ContextMenuHandler.isWithinMenu(event.target as HTMLElement)
     ) {
-      return;
+      return true;
     }
 
     // Close context menu if clicking outside
     if (state.contextMenuState()?.visible) {
-      state.contextMenuState.set(ContextMenuUtils.close());
-      return;
+      ContextMenuHandler.close(state.contextMenuState);
+      return true;
     }
 
-    // Handle right-click for context menu
+    // Handle right-click to open context menu
     if (event.button === 2) {
       event.preventDefault();
-      context.onContextMenuOpen(event.clientX, event.clientY, worldPos.x, worldPos.y);
-      return;
+      ContextMenuHandler.open(
+        event.clientX,
+        event.clientY,
+        worldPos.x,
+        worldPos.y,
+        state.contextMenuState,
+      );
+      return true;
     }
 
-    // ========== FEATURE: Box Creation ==========
-    
-    // Handle create mode
-    if (state.isCreateMode() && event.button === 0) {
-      context.onCreateStart(worldPos.x, worldPos.y);
-      (event.target as Element).setPointerCapture?.(event.pointerId);
-      return;
-    }
-
-    // Disable normal interactions in create mode
-    if (state.isCreateMode()) return;
-
-    // ========== FEATURE: Box Interaction - Rotation ==========
-    
-    // Check rotation knob
-    if (state.selectedBoxId()) {
-      const box = boxes.find((b) => String(getBoxId(b)) == state.selectedBoxId());
-      const bgc = state.bgCanvas();
-      if (box && bgc) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
-        if (wb && InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, camera)) {
-          state.isRotating.set(true);
-          state.rotationStartAngle.set(Math.atan2(worldPos.y - wb.y, worldPos.x - wb.x));
-          state.boxStartRotation.set(wb.rotation);
-          state.startInteraction(
-            state.selectedBoxId()!,
-            box.x,
-            box.y,
-            box.w,
-            box.h,
-            box.rotation || 0,
-          );
-          context.onBoxInteractionStart(state.selectedBoxId()!, true, false, false);
-          context.onUpdateCursor('grabbing');
-          (event.target as Element).setPointerCapture?.(event.pointerId);
-          return;
-        }
-
-        // ========== FEATURE: Box Interaction - Resize ==========
-        
-        // Check corner handles
-        if (wb) {
-          const corner = InteractionUtils.detectCornerHandle(worldPos.x, worldPos.y, wb, camera);
-          if (corner) {
-            state.isResizing.set(true);
-            state.resizeCorner.set(corner);
-            state.startInteraction(
-              state.selectedBoxId()!,
-              box.x,
-              box.y,
-              box.w,
-              box.h,
-              box.rotation || 0,
-            );
-            state.dragStartWorld.set(worldPos);
-            state.boxStartPos.set({ x: wb.x, y: wb.y });
-            context.onBoxInteractionStart(state.selectedBoxId()!, false, true, false, corner);
-            (event.target as Element).setPointerCapture?.(event.pointerId);
-            return;
-          }
-        }
-      }
-    }
-
-    // ========== FEATURE: Selection ==========
-    
-    // Check box/nametag click
-    const candidates = quadtree
-      ? (quadtree.queryRange(worldPos.x - 1, worldPos.y - 1, 2, 2) as Box[])
-      : boxes;
-
-    let clickedBoxId: string | null = null;
-    for (let i = candidates.length - 1; i >= 0; i--) {
-      const rawBox = candidates[i];
-      const bgc = state.bgCanvas();
-      if (!bgc) continue;
-      const worldBox = BoxUtils.normalizeBoxToWorld(rawBox, bgc.width, bgc.height);
-      if (!worldBox) continue;
-
-      if (
-        state.showNametags() &&
-        NametagUtils.pointInNametag(
-          worldPos.x,
-          worldPos.y,
-          worldBox,
-          camera,
-          nametagMetricsCache,
-          ctx,
-        )
-      ) {
-        clickedBoxId = String(getBoxId(rawBox));
-        break;
-      }
-
-      if (CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) {
-        clickedBoxId = String(getBoxId(rawBox));
-        break;
-      }
-    }
-
-    if (clickedBoxId) {
-      state.selectedBoxId.set(clickedBoxId);
-      state.isDraggingBox.set(true);
-      state.dragStartWorld.set(worldPos);
-      const box = boxes.find((b) => String(getBoxId(b)) === clickedBoxId);
-      const bgc = state.bgCanvas();
-      if (box && bgc) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
-        if (wb) state.boxStartPos.set({ x: wb.x, y: wb.y });
-        state.startInteraction(clickedBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
-      }
-      context.onBoxInteractionStart(clickedBoxId, false, false, true);
-    } else {
-      // ========== FEATURE: Camera Pan (fallback) ==========
-      
-      if (state.selectedBoxId) {
-        state.selectedBoxId.set(null);
-      }
-      state.isPointerDown.set(true);
-      context.onCameraPanStart();
-    }
-
-    state.lastPointer.set({ x: event.clientX, y: event.clientY });
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    return false;
   }
 
-  /**
-   * Handle pointer up event
-   */
-  static handlePointerUp(
+  private static handleCreateMode(
     event: PointerEvent,
+    worldPos: { x: number; y: number },
+    canvas: HTMLCanvasElement,
     state: StateManager,
-    context: EventContext,
-  ): void {
-    const boxes = context.getBoxes();
-    const createState = state.createState();
-    // Handle create mode
-    if (createState?.isCreating && createState?.startPoint && createState?.currentPoint) {
-      context.onCreateComplete(
-        createState?.startPoint.x,
-        createState?.startPoint.y,
-        createState?.currentPoint.x,
-        createState?.currentPoint.y,
-      );
-      state.resetCreationState();
+  ): boolean {
+    if (!state.isCreateMode()) return false;
+
+    if (event.button === 0) {
+      BoxCreationHandler.startCreate(worldPos.x, worldPos.y, state.createState);
+      canvas.setPointerCapture(event.pointerId);
+      return true;
     }
 
-    // Record history delta for completed interaction
-    const startState = state.interactionStartState();
-    if (startState) {
-      const box = boxes.find((b) => String(getBoxId(b)) === startState?.boxId);
+    return true; // Block other interactions in create mode
+  }
+
+  private static handleSelectedBoxInteraction(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    canvas: HTMLCanvasElement,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    boxes: Box[],
+    state: StateManager,
+  ): boolean {
+    const selectedBoxId = state.selectedBoxId();
+    console.log(selectedBoxId);
+
+    if (!selectedBoxId) return false;
+
+    const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
+    if (!box) return false;
+
+    const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+    if (!worldBox) return false;
+
+    // Try rotation
+    if (this.handleRotationStart(event, worldPos, worldBox, canvas, box, camera, state))
+      return true;
+
+    // Try resize
+    if (this.handleResizeStart(event, worldPos, worldBox, canvas, box, camera, state)) return true;
+
+    // Try drag
+    if (this.handleDragStart(event, worldPos, worldBox, canvas, box, state)) return true;
+
+    return false;
+  }
+
+  private static handleRotationStart(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    canvas: HTMLCanvasElement,
+    box: Box,
+    camera: Camera,
+    state: StateManager,
+  ): boolean {
+    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, worldBox, camera)) return false;
+
+    state.startRotating(
+      Math.atan2(worldPos.y - worldBox.y, worldPos.x - worldBox.x),
+      worldBox.rotation,
+    );
+    state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
+    BoxManipulationHandler.startRotation(
+      worldPos.x,
+      worldPos.y,
+      worldBox,
+      state.rotationStartAngle,
+      state.boxStartRotation,
+      state.currentCursor,
+      canvas,
+    );
+    canvas.setPointerCapture(event.pointerId);
+    return true;
+  }
+
+  private static handleResizeStart(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    canvas: HTMLCanvasElement,
+    box: Box,
+    camera: Camera,
+    state: StateManager,
+  ): boolean {
+    const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, worldBox, camera);
+    if (!corner) return false;
+
+    state.startResizing(corner);
+    state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
+    state.updateLastPointer(worldPos.x, worldPos.y);
+    BoxManipulationHandler.startResize(corner, worldBox, state.currentCursor, canvas);
+    canvas.setPointerCapture(event.pointerId);
+    return true;
+  }
+
+  private static handleDragStart(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    canvas: HTMLCanvasElement,
+    box: Box,
+    state: StateManager,
+  ): boolean {
+    if (!CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) return false;
+
+    state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
+    state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
+    BoxManipulationHandler.startDrag(
+      worldPos.x,
+      worldPos.y,
+      worldBox,
+      state.dragStartWorld,
+      state.boxStartPos,
+      state.currentCursor,
+      canvas,
+    );
+    canvas.setPointerCapture(event.pointerId);
+    return true;
+  }
+
+  private static handleBoxSelection(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    quadtree: Quadtree<Box> | undefined,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    state: StateManager,
+    nametagMetricsCache: Map<string, TextMetrics>,
+    ctx: CanvasRenderingContext2D | undefined,
+  ): boolean {
+    const hoveredBoxId = HoverHandler.detectHoveredBox(
+      worldPos.x,
+      worldPos.y,
+      boxes,
+      quadtree,
+      imageWidth,
+      imageHeight,
+      camera,
+      state.showNametags(),
+      nametagMetricsCache,
+      ctx,
+    );
+
+    if (hoveredBoxId) {
+      state.updateSelectedBox(hoveredBoxId);
+
+      // Prepare for potential drag - find the box and initialize drag state
+      const box = boxes.find((b) => String(getBoxId(b)) === hoveredBoxId);
       if (box) {
-        context.onInteractionComplete(
-          startState?.boxId,
-          startState,
-          box,
-          state.isRotating(),
-          state.isResizing(),
-          state.isDraggingBox(),
-        );
+        const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+        if (worldBox && CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) {
+          // Start interaction state so the box can be immediately dragged
+          state.startInteraction(hoveredBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
+          state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
+        }
       }
+
+      return true;
     }
 
-    state.resetInteractionStates();
+    return false;
+  }
 
-    // Rebuild quadtree after interaction ends
-    if (state.isDraggingOrInteracting) {
-      state.isDraggingOrInteracting.set(false);
-      context.onRebuildIndex();
-    }
-
-    (event.target as Element).releasePointerCapture?.(event.pointerId);
+  private static handleCameraPanStart(event: PointerEvent, state: StateManager): void {
+    state.updateSelectedBox(null);
+    CameraHandler.startPan(state.lastPointer, event.clientX, event.clientY);
+    state.updatePointerDown(true);
   }
 
   /**
    * Handle pointer move event
+   * Routes to handlers based on current state
    */
   static handlePointerMove(
     event: PointerEvent,
     canvas: HTMLCanvasElement,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    boxes: Box[],
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
-    nametagMetricsCache: Map<string, any>,
+    nametagMetricsCache: Map<string, TextMetrics>,
     ctx: CanvasRenderingContext2D | undefined,
-    context: EventContext,
+    onBoxesUpdate: (boxes: Box[]) => void,
+    onCameraUpdate: (camera: Camera) => void,
   ): void {
-    const camera = context.getCamera();
-    const boxes = context.getBoxes();
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
+    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
 
-    // Track mouse screen position
     state.updateMouseScreenPosition(event.clientX, event.clientY);
 
-    // ========== FEATURE: Box Creation - Preview ==========
-    
-    // Handle creation preview
-    if (state.createState()?.isCreating && state.createState()?.startPoint) {
-      context.onCreatePreview(worldPos.x, worldPos.y);
+    // Handle active interactions
+    if (this.handleCreatePreview(worldPos, state)) return;
+    if (this.handleRotation(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
+    if (this.handleResize(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
+    if (this.handleDrag(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
+    if (
+      this.handleCameraPan(
+        event,
+        camera,
+        canvasWidth,
+        canvasHeight,
+        imageWidth,
+        imageHeight,
+        state,
+        onCameraUpdate,
+      )
+    )
       return;
+
+    // Handle hover detection
+    this.handleHoverDetection(
+      worldPos,
+      boxes,
+      quadtree,
+      imageWidth,
+      imageHeight,
+      camera,
+      canvas,
+      state,
+      nametagMetricsCache,
+      ctx,
+    );
+  }
+
+  private static handleCreatePreview(
+    worldPos: { x: number; y: number },
+    state: StateManager,
+  ): boolean {
+    if (!state.createState().isCreating) return false;
+
+    BoxCreationHandler.updatePreview(worldPos.x, worldPos.y, state.createState);
+    return true;
+  }
+
+  private static handleRotation(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    imageWidth: number,
+    imageHeight: number,
+    state: StateManager,
+    onBoxesUpdate: (boxes: Box[]) => void,
+  ): boolean {
+    if (!state.isRotating()) return false;
+
+    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    if (!box) return true;
+
+    const rotatedBox = BoxManipulationHandler.rotate(
+      worldPos.x,
+      worldPos.y,
+      box,
+      imageWidth,
+      imageHeight,
+      state.rotationStartAngle(),
+      state.boxStartRotation(),
+    );
+    const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, rotatedBox);
+    onBoxesUpdate(updatedBoxes);
+    return true;
+  }
+
+  private static handleResize(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    imageWidth: number,
+    imageHeight: number,
+    state: StateManager,
+    onBoxesUpdate: (boxes: Box[]) => void,
+  ): boolean {
+    if (!state.isResizing() || !state.resizeCorner()) return false;
+
+    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    if (!box) return true;
+
+    const resizedBox = BoxManipulationHandler.resize(
+      worldPos.x,
+      worldPos.y,
+      box,
+      imageWidth,
+      imageHeight,
+      state.resizeCorner()!,
+    );
+    const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, resizedBox);
+    onBoxesUpdate(updatedBoxes);
+    return true;
+  }
+
+  private static handleDrag(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    imageWidth: number,
+    imageHeight: number,
+    state: StateManager,
+    onBoxesUpdate: (boxes: Box[]) => void,
+  ): boolean {
+    if (!state.isDraggingBox()) return false;
+
+    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    if (!box) return true;
+
+    const draggedBox = BoxManipulationHandler.drag(
+      worldPos.x,
+      worldPos.y,
+      box,
+      imageWidth,
+      imageHeight,
+      state.dragStartWorld(),
+      state.boxStartPos(),
+    );
+    const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, draggedBox);
+    onBoxesUpdate(updatedBoxes);
+    return true;
+  }
+
+  private static handleCameraPan(
+    event: PointerEvent,
+    camera: Camera,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    state: StateManager,
+    onCameraUpdate: (camera: Camera) => void,
+  ): boolean {
+    if (!state.isPointerDown()) return false;
+
+    const dx = event.clientX - state.lastPointer().x;
+    const dy = event.clientY - state.lastPointer().y;
+    const newCamera = CameraHandler.pan(
+      dx,
+      dy,
+      camera,
+      canvasWidth,
+      canvasHeight,
+      imageWidth,
+      imageHeight,
+      state.minZoom(),
+    );
+    onCameraUpdate(newCamera);
+    state.updateLastPointer(event.clientX, event.clientY);
+    return true;
+  }
+
+  private static handleHoverDetection(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    quadtree: Quadtree<Box> | undefined,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    canvas: HTMLCanvasElement,
+    state: StateManager,
+    nametagMetricsCache: Map<string, TextMetrics>,
+    ctx: CanvasRenderingContext2D | undefined,
+  ): void {
+    const hoveredBoxId = HoverHandler.detectHoveredBox(
+      worldPos.x,
+      worldPos.y,
+      boxes,
+      quadtree,
+      imageWidth,
+      imageHeight,
+      camera,
+      state.showNametags(),
+      nametagMetricsCache,
+      ctx,
+    );
+
+    const hoverChanged = state.updateHoverState(hoveredBoxId);
+    if (hoverChanged) {
+      HoverHandler.updateCursorForHover(
+        worldPos.x,
+        worldPos.y,
+        hoveredBoxId,
+        state.selectedBoxId(),
+        boxes,
+        imageWidth,
+        imageHeight,
+        camera,
+        state.isCreateMode(),
+        state.currentCursor,
+        canvas,
+      );
     }
+  }
 
-    // Disable normal interactions in create mode
-    if (state.isCreateMode()) return;
+  /**
+   * Handle pointer up event
+   * Completes interactions and saves to history
+   */
+  static handlePointerUp(
+    event: PointerEvent,
+    canvas: HTMLCanvasElement,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    boxes: Box[],
+    state: StateManager,
+    historyService: HistoryService,
+    onBoxesUpdate: (boxes: Box[]) => void,
+    onRebuildIndex: () => void,
+  ): void {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (event.clientX - rect.left) * state.devicePixelRatio();
+    const my = (event.clientY - rect.top) * state.devicePixelRatio();
+    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
 
-    // ========== FEATURE: Box Interaction - Active States ==========
-    
-    if (state.isRotating() && state.selectedBoxId()) {
-      state.isDraggingOrInteracting.set(true);
-      context.onRotate(worldPos.x, worldPos.y);
+    // Complete interactions
+    if (
+      this.completeBoxCreation(
+        worldPos,
+        imageWidth,
+        imageHeight,
+        boxes,
+        state,
+        historyService,
+        onBoxesUpdate,
+        onRebuildIndex,
+      )
+    )
       return;
+    if (this.completeBoxManipulation(boxes, state, historyService, onRebuildIndex)) return;
+
+    // Complete camera pan
+    this.completeCameraPan(state);
+  }
+
+  private static completeBoxCreation(
+    worldPos: { x: number; y: number },
+    imageWidth: number,
+    imageHeight: number,
+    boxes: Box[],
+    state: StateManager,
+    historyService: HistoryService,
+    onBoxesUpdate: (boxes: Box[]) => void,
+    onRebuildIndex: () => void,
+  ): boolean {
+    if (!state.createState().isCreating || !state.createState().startPoint) return false;
+
+    const start = state.createState().startPoint!;
+    const newBox = BoxCreationHandler.completeCreate(
+      start.x,
+      start.y,
+      worldPos.x,
+      worldPos.y,
+      imageWidth,
+      imageHeight,
+      state.getNextTempId(),
+      historyService,
+    );
+
+    if (newBox) {
+      onBoxesUpdate([...boxes, newBox]);
+      state.updateSelectedBox(newBox.tempId!);
+      onRebuildIndex();
     }
 
-    if (state.isResizing() && state.selectedBoxId() && state.resizeCorner()) {
-      state.isDraggingOrInteracting.set(true);
-      context.onResize(worldPos.x, worldPos.y);
-      return;
+    BoxCreationHandler.resetCreateState(state.createState);
+    return true;
+  }
+
+  private static completeBoxManipulation(
+    boxes: Box[],
+    state: StateManager,
+    historyService: HistoryService,
+    onRebuildIndex: () => void,
+  ): boolean {
+    if (!state.isAnyInteractionActive()) return false;
+
+    const interactionStart = state.interactionStartState();
+    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+
+    if (interactionStart && box) {
+      BoxManipulationHandler.completeManipulation(
+        state.selectedBoxId()!,
+        interactionStart,
+        box,
+        state.isRotating(),
+        state.isResizing(),
+        state.isDraggingBox(),
+        historyService,
+      );
+      onRebuildIndex();
     }
 
-    if (state.isDraggingBox() && state.selectedBoxId()) {
-      const dx = worldPos.x - state.dragStartWorld().x;
-      const dy = worldPos.y - state.dragStartWorld().y;
-      const newX = state.boxStartPos().x + dx;
-      const newY = state.boxStartPos().y + dy;
-      state.isDraggingOrInteracting.set(true);
-      context.onDrag(newX, newY);
-      return;
-    }
+    state.resetInteractionStates();
+    return true;
+  }
 
-    // ========== FEATURE: Cursor Updates ==========
-    
-    const bgc = state.bgCanvas();
-    // Handle cursor updates when hovering over selected box
-    if (state.selectedBoxId() && !state.isPointerDown() && bgc) {
-      const box = boxes.find((b) => String(getBoxId(b)) == state.selectedBoxId());
-      if (box) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
-        if (wb) {
-          if (InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, camera)) {
-            context.onUpdateCursor('grab');
-          } else {
-            const corner = InteractionUtils.detectCornerHandle(worldPos.x, worldPos.y, wb, camera);
-            if (corner) {
-              context.onUpdateCursor(InteractionUtils.getResizeCursor(corner, wb));
-            } else {
-              context.onUpdateCursor(state.hoveredBoxId() ? 'move' : 'default');
-            }
-          }
-        }
-      }
-    }
-
-    // ========== FEATURE: Hover Detection ==========
-    
-    // Hover detection
-    if (!state.isPointerDown() && !state.isDraggingBox()) {
-      context.onHoverDetection(worldPos.x, worldPos.y);
-    }
-
-    // ========== FEATURE: Camera Pan ==========
-    
-    // Camera panning
-    if (state.isPointerDown()) {
-      const dx = (event.clientX - state.lastPointer().x) * state.devicePixelRatio();
-      const dy = (event.clientY - state.lastPointer().y) * state.devicePixelRatio();
-      state.lastPointer.set({ x: event.clientX, y: event.clientY });
-      context.onCameraPan(dx, dy);
-    } else {
-      state.lastPointer.set({ x: event.clientX, y: event.clientY });
-    }
+  private static completeCameraPan(state: StateManager): void {
+    state.updatePointerDown(false);
   }
 
   /**
@@ -347,39 +629,33 @@ export class PointerEventHandler {
   static handleWheel(
     event: WheelEvent,
     canvas: HTMLCanvasElement,
-    devicePixelRatio: number,
-    minZoom: number,
-    context: EventContext,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    state: StateManager,
+    onCameraUpdate: (camera: Camera) => void,
   ): void {
-    const camera = context.getCamera();
     event.preventDefault();
-    const delta = -event.deltaY;
-    const zoomFactor = Math.exp(delta * 0.0015);
+
     const rect = canvas.getBoundingClientRect();
-    const cx = (event.clientX - rect.left) * devicePixelRatio;
-    const cy = (event.clientY - rect.top) * devicePixelRatio;
+    const mx = (event.clientX - rect.left) * state.devicePixelRatio();
+    const my = (event.clientY - rect.top) * state.devicePixelRatio();
+    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
 
-    const worldBefore = CoordinateTransform.screenToWorld(
-      cx,
-      cy,
-      canvas.width,
-      canvas.height,
+    const newCamera = CameraHandler.zoom(
+      event.deltaY,
+      worldPos.x,
+      worldPos.y,
       camera,
-    );
-    const newZoom = Math.min(16, Math.max(minZoom || 0.0001, camera.zoom * zoomFactor));
-    const newCam = { ...camera, zoom: newZoom };
-    const worldAfter = CoordinateTransform.screenToWorld(
-      cx,
-      cy,
-      canvas.width,
-      canvas.height,
-      newCam,
+      canvasWidth,
+      canvasHeight,
+      imageWidth,
+      imageHeight,
+      state.minZoom(),
     );
 
-    const dx = worldAfter.x - worldBefore.x;
-    const dy = worldAfter.y - worldBefore.y;
-
-    const updatedCam = { ...newCam, x: camera.x - dx, y: camera.y - dy };
-    context.onZoom(updatedCam, worldBefore.x, worldBefore.y);
+    onCameraUpdate(newCamera);
   }
 }

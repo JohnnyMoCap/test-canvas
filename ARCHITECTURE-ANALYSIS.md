@@ -7,6 +7,7 @@
 The current architecture has responsibilities scattered across too many places:
 
 #### State is Everywhere
+
 - **StateManager** holds 30+ signals for various states
 - **CanvasViewportComponent** has its own signals (`camera`, `localBoxes`, `dirty`)
 - **CursorManager** duplicates cursor tracking (also in StateManager)
@@ -14,12 +15,12 @@ The current architecture has responsibilities scattered across too many places:
 - No clear ownership - who owns what?
 
 #### Business Logic Split
+
 - **Box manipulation logic** split between:
   - `BoxManipulator` (rotate, resize, move calculations)
   - `InteractionUtils` (detection logic)
   - `PointerEventHandler` (coordination)
   - `CanvasViewportComponent` (actual updates)
-  
 - **Cursor management** split between:
   - `CursorManager` (setter)
   - `StateManager` (tracking)
@@ -28,30 +29,47 @@ The current architecture has responsibilities scattered across too many places:
   - `CanvasViewportComponent` (callback wiring)
 
 #### Callback Hell
+
 The `PointerEventHandler` methods take 8-13 callback parameters each:
+
 ```typescript
 handlePointerDown(
-  event, canvas, state, camera, boxes, quadtree, cache, ctx,
-  onContextMenuOpen,      // callback 1
-  onCreateStart,          // callback 2
-  onBoxInteractionStart,  // callback 3
-  onCameraPanStart,       // callback 4
-  onUpdateCursor,         // callback 5
-)
+  event,
+  canvas,
+  state,
+  camera,
+  boxes,
+  quadtree,
+  cache,
+  ctx,
+  onContextMenuOpen, // callback 1
+  onCreateStart, // callback 2
+  onBoxInteractionStart, // callback 3
+  onCameraPanStart, // callback 4
+  onUpdateCursor, // callback 5
+);
 
 handlePointerMove(
-  event, canvas, state, camera, boxes, quadtree, cache, ctx,
-  onCreatePreview,    // callback 1
-  onRotate,           // callback 2
-  onResize,           // callback 3
-  onDrag,             // callback 4
-  onCameraPan,        // callback 5
-  onHoverDetection,   // callback 6
-  onUpdateCursor,     // callback 7
-)
+  event,
+  canvas,
+  state,
+  camera,
+  boxes,
+  quadtree,
+  cache,
+  ctx,
+  onCreatePreview, // callback 1
+  onRotate, // callback 2
+  onResize, // callback 3
+  onDrag, // callback 4
+  onCameraPan, // callback 5
+  onHoverDetection, // callback 6
+  onUpdateCursor, // callback 7
+);
 ```
 
 **Why this is bad:**
+
 - Hard to trace where actions happen
 - Need to look in 3+ files to understand one feature
 - Callbacks make testing difficult
@@ -60,12 +78,14 @@ handlePointerMove(
 ### 2. **Utils vs Managers vs Handlers**
 
 There's no clear distinction:
+
 - **Utils** (coordinate-transform, box-utils) - Pure functions ✅ Good
 - **Managers** (state-manager, cursor-manager, lifecycle-manager, clipboard-manager) - Stateful classes
 - **Handlers** (pointer-event-handler) - Stateless static methods with callbacks
 - **Manipulators** (box-manipulator) - Pure static methods
 
 **Confusion:**
+
 - Why is `StateManager` a class but `PointerEventHandler` all static?
 - Why is `CursorManager` separate from `StateManager`?
 - Why does `ClipboardManager` exist when clipboard is in StateManager?
@@ -73,6 +93,7 @@ There's no clear distinction:
 ### 3. **Tight Coupling Through Callbacks**
 
 The component must wire up every single action:
+
 ```typescript
 onPointerMove(e: PointerEvent) {
   PointerEventHandler.handlePointerMove(
@@ -86,6 +107,7 @@ onPointerMove(e: PointerEvent) {
 ```
 
 This means the component must:
+
 - Know about ALL possible actions
 - Implement handlers for each
 - Wire them all up correctly
@@ -94,6 +116,7 @@ This means the component must:
 ### 4. **State Mutation Inconsistency**
 
 State updates happen in multiple ways:
+
 ```typescript
 // Direct signal mutation
 this.state.isRotating.set(true);
@@ -114,6 +137,7 @@ this.cursorManager.setCursor(canvas, cursor);
 ## Proposed Architecture: Feature-Based Modules
 
 ### Core Principle
+
 **Group code by feature, not by technical role**
 
 Instead of having all "utils" together, group everything needed for a feature together.
@@ -172,12 +196,14 @@ src/components/canvas-viewpoint/
 #### 1. **Feature Controllers Own Their Domain**
 
 Each controller is a cohesive unit that owns:
+
 - State (via ViewportState)
 - Logic
 - Event handling
 - Side effects
 
 **Example: BoxInteractionController**
+
 ```typescript
 export class BoxInteractionController {
   constructor(
@@ -251,7 +277,7 @@ export class BoxInteractionController {
     const box = this.state.selectedBox!;
     const angle = Math.atan2(worldPos.y - box.y, worldPos.x - box.x);
     const delta = angle - this.state.rotationStart;
-    
+
     box.rotation = this.state.startSnapshot!.rotation + delta;
     this.state.markDirty();
   }
@@ -259,7 +285,7 @@ export class BoxInteractionController {
   private commitInteraction() {
     const before = this.state.startSnapshot!;
     const after = this.state.selectedBox!;
-    
+
     if (this.state.interactionMode === 'rotating') {
       this.historyService.recordRotate(after.id, before.rotation, after.rotation);
     }
@@ -276,35 +302,37 @@ export class ViewportState {
   boxes = signal<Box[]>([]);
   selectedBoxId = signal<string | null>(null);
   hoveredBoxId = signal<string | null>(null);
-  
+
   // Camera
   camera = signal<Camera>({ zoom: 1, x: 0, y: 0, rotation: 0 });
-  
+
   // Interaction mode (replaces many boolean flags)
-  interactionMode = signal<'none' | 'rotating' | 'resizing' | 'dragging' | 'panning' | 'creating'>('none');
-  
+  interactionMode = signal<'none' | 'rotating' | 'resizing' | 'dragging' | 'panning' | 'creating'>(
+    'none',
+  );
+
   // Interaction context (only set when interactionMode !== 'none')
   rotationStart = signal<number>(0);
   resizeCorner = signal<ResizeCorner | null>(null);
   dragStart = signal<Point>({ x: 0, y: 0 });
   startSnapshot = signal<Box | null>(null);
-  
+
   // UI
   cursor = signal<string>('default');
   contextMenu = signal<ContextMenuState | null>(null);
-  
+
   // Canvas
   canvas = signal<HTMLCanvasElement | null>(null);
   ctx = signal<CanvasRenderingContext2D | null>(null);
-  
+
   // Computed
   selectedBox = computed(() => {
     const id = this.selectedBoxId();
-    return this.boxes().find(b => b.id === id) || null;
+    return this.boxes().find((b) => b.id === id) || null;
   });
-  
+
   isInteracting = computed(() => this.interactionMode() !== 'none');
-  
+
   // Actions (encapsulate common patterns)
   setCursor(cursor: string) {
     if (this.cursor() !== cursor) {
@@ -314,11 +342,11 @@ export class ViewportState {
       }
     }
   }
-  
+
   selectBox(id: string | null) {
     this.selectedBoxId.set(id);
   }
-  
+
   markDirty() {
     // Trigger render
   }
@@ -341,17 +369,17 @@ export class InputRouter {
     private contextMenu: ContextMenuController,
   ) {
     this.controllers = [
-      this.contextMenu,    // Highest priority
+      this.contextMenu, // Highest priority
       this.creation,
       this.boxInteraction,
       this.selection,
-      this.camera,         // Lowest priority (fallback)
+      this.camera, // Lowest priority (fallback)
     ];
   }
 
   onPointerDown(event: PointerEvent, canvas: HTMLCanvasElement): void {
     const worldPos = this.toWorldPos(event, canvas);
-    
+
     // Try each controller in priority order
     for (const controller of this.controllers) {
       if (controller.handlePointerDown?.(worldPos, event)) {
@@ -362,14 +390,14 @@ export class InputRouter {
 
   onPointerMove(event: PointerEvent, canvas: HTMLCanvasElement): void {
     const worldPos = this.toWorldPos(event, canvas);
-    
+
     // Update active interaction
     for (const controller of this.controllers) {
       if (controller.handlePointerMove?.(worldPos, event)) {
         return; // Handled
       }
     }
-    
+
     // Update cursor (priority order)
     for (const controller of this.controllers) {
       const cursor = controller.updateCursor?.(worldPos);
@@ -378,23 +406,25 @@ export class InputRouter {
         return;
       }
     }
-    
+
     this.state.setCursor('default');
   }
 
   onPointerUp(event: PointerEvent): void {
     // Notify all controllers
-    this.controllers.forEach(c => c.handlePointerUp?.(event));
+    this.controllers.forEach((c) => c.handlePointerUp?.(event));
   }
-  
+
   private toWorldPos(event: PointerEvent, canvas: HTMLCanvasElement): Point {
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * window.devicePixelRatio;
     const my = (event.clientY - rect.top) * window.devicePixelRatio;
     return CoordinateTransform.screenToWorld(
-      mx, my,
-      canvas.width, canvas.height,
-      this.state.camera()
+      mx,
+      my,
+      canvas.width,
+      canvas.height,
+      this.state.camera(),
     );
   }
 }
@@ -413,27 +443,27 @@ interface FeatureController {
 @Component({ ... })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl') canvasRef!: ElementRef<HTMLCanvasElement>;
-  
+
   // Single state instance
   private state: ViewportState;
-  
+
   // Feature controllers
   private inputRouter: InputRouter;
   private renderController: RenderController;
-  
+
   constructor(
     private historyService: HistoryService,
     private hotkeyService: HotkeyService,
   ) {
     this.state = new ViewportState();
-    
+
     // Initialize features
     const boxInteraction = new BoxInteractionController(this.state, historyService);
     const camera = new CameraController(this.state);
     const selection = new SelectionController(this.state);
     const creation = new CreationController(this.state, historyService);
     const contextMenu = new ContextMenuController(this.state, historyService);
-    
+
     this.inputRouter = new InputRouter(
       this.state,
       boxInteraction,
@@ -442,41 +472,41 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       creation,
       contextMenu,
     );
-    
+
     this.renderController = new RenderController(this.state);
-    
+
     this.setupEffects();
   }
-  
+
   ngAfterViewInit() {
     const canvas = this.canvasRef.nativeElement;
     this.state.canvas.set(canvas);
     this.state.ctx.set(canvas.getContext('2d'));
     this.renderController.start();
   }
-  
+
   ngOnDestroy() {
     this.renderController.stop();
   }
-  
+
   // Simple event delegation
   onPointerDown(e: PointerEvent) {
     this.inputRouter.onPointerDown(e, this.canvasRef.nativeElement);
   }
-  
+
   onPointerMove(e: PointerEvent) {
     this.inputRouter.onPointerMove(e, this.canvasRef.nativeElement);
   }
-  
+
   onPointerUp(e: PointerEvent) {
     this.inputRouter.onPointerUp(e);
   }
-  
+
   onWheel(e: WheelEvent) {
     // Could be part of CameraController
     this.inputRouter.onWheel(e, this.canvasRef.nativeElement);
   }
-  
+
   private setupEffects() {
     // Sync boxes from history
     effect(() => {
@@ -485,7 +515,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.state.boxes.set([...boxes]);
       }
     });
-    
+
     // Trigger render on state changes
     effect(() => {
       const _ = this.state.camera();
@@ -501,18 +531,21 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 ## Migration Path
 
 ### Phase 1: Consolidate State (Week 1)
+
 1. Merge `CursorManager` into `StateManager` → `ViewportState`
 2. Move component-level signals to `ViewportState`
 3. Replace boolean flags with `interactionMode` enum
 4. Update all references
 
 ### Phase 2: Create InputRouter (Week 2)
+
 1. Create `InputRouter` class
 2. Move coordinate conversion from `PointerEventHandler` to `InputRouter`
 3. Keep callbacks initially but route through InputRouter
 4. Test thoroughly
 
 ### Phase 3: Extract First Feature Controller (Week 2-3)
+
 1. Start with simplest: `ContextMenuController`
 2. Move logic from component + PointerEventHandler
 3. Implement `FeatureController` interface
@@ -520,6 +553,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 5. Remove old code paths
 
 ### Phase 4: Extract Remaining Controllers (Week 3-4)
+
 1. `CreationController`
 2. `BoxInteractionController` (rotate, resize, drag)
 3. `CameraController`
@@ -527,6 +561,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 5. Each: extract → test → remove old code
 
 ### Phase 5: Cleanup (Week 4)
+
 1. Remove `PointerEventHandler`
 2. Reorganize file structure
 3. Update documentation
@@ -537,44 +572,51 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 ## Benefits
 
 ### 1. **Clear Ownership**
+
 - Each feature has ONE controller that owns its logic
 - State is centralized in `ViewportState`
 - No more hunting through 5 files to understand rotation
 
 ### 2. **Easy to Find Code**
+
 - Want to change rotation? → `features/box-interaction/`
 - Want to change cursor logic? → Each controller's `updateCursor()`
 - Want to add zoom constraints? → `features/camera/`
 
 ### 3. **Testable**
+
 ```typescript
 describe('BoxInteractionController', () => {
   it('should rotate box on drag', () => {
     const state = new ViewportState();
     const history = new MockHistoryService();
     const controller = new BoxInteractionController(state, history);
-    
+
     state.boxes.set([{ id: '1', x: 0, y: 0, rotation: 0 }]);
     state.selectBox('1');
-    
+
     controller.handlePointerDown({ x: 10, y: 0 }, boxes);
     controller.handlePointerMove({ x: 0, y: 10 });
-    
+
     expect(state.boxes()[0].rotation).toBeCloseTo(Math.PI / 2);
   });
 });
 ```
 
 ### 4. **Extensible**
+
 Add new feature:
+
 1. Create controller implementing `FeatureController`
 2. Add to `InputRouter.controllers`
 3. Done - no touching existing code
 
 ### 5. **No Callback Hell**
+
 Controllers call state/services directly. No 13-parameter functions.
 
 ### 6. **Priority System**
+
 Input router tries controllers in order. Context menu gets first chance to handle events.
 
 ---
@@ -582,6 +624,7 @@ Input router tries controllers in order. Context menu gets first chance to handl
 ## Comparison
 
 ### Current (Finding rotation logic)
+
 1. Look in `canvas-viewpoint.ts` → `onPointerDown`
 2. See it calls `PointerEventHandler.handlePointerDown`
 3. Look in `pointer-event-handler.ts` → find rotation detection
@@ -596,6 +639,7 @@ Input router tries controllers in order. Context menu gets first chance to handl
 **10 steps across 5 files!**
 
 ### Proposed
+
 1. Look in `features/box-interaction/box-interaction.controller.ts`
 2. See `handlePointerDown` → detection
 3. See `startRotation` → initialization
@@ -609,19 +653,24 @@ Input router tries controllers in order. Context menu gets first chance to handl
 ## Decision Points
 
 ### Should we do this?
+
 **Pros:**
+
 - Much easier to understand and maintain
 - Better testability
 - Easier onboarding for new developers
 - Scales better for new features
 
 **Cons:**
+
 - Significant refactor (4 weeks estimate)
 - Risk of introducing bugs
 - Need comprehensive testing
 
 ### Alternative: Incremental Improvements
+
 If full refactor is too risky:
+
 1. Merge StateManager + CursorManager
 2. Reduce callback parameters (pass state object instead)
 3. Add comments showing feature boundaries

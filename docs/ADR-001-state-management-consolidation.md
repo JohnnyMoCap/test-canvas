@@ -1,39 +1,53 @@
 # ADR 001: State Management Consolidation
 
 ## Status
+
 Implemented - January 25, 2026
 
 ## Context
+
 The canvas viewport component had fragmented state management across multiple classes which led to several issues:
 
 ### Problems
+
 1. **Duplicated cursor state**: Both `StateManager` and `CursorManager` tracked cursor state independently
 2. **Excessive callback parameters**: Event handlers required 8-13 callback parameters, making them difficult to use and maintain
 3. **Hard to trace features**: Business logic was split across multiple files with no clear ownership
 4. **Unstable APIs**: Adding new features required updating many function signatures
 
 ### Example of the Problem
+
 ```typescript
 // Before: 13 callback parameters!
 PointerEventHandler.handlePointerDown(
-  event, canvas, state, camera, boxes, quadtree, cache, ctx,
+  event,
+  canvas,
+  state,
+  camera,
+  boxes,
+  quadtree,
+  cache,
+  ctx,
   onContextMenuOpen,
   onCreateStart,
   onBoxInteractionStart,
   onCameraPanStart,
   onUpdateCursor,
-)
+);
 ```
 
 ## Decision
+
 We implemented a three-phase consolidation:
 
 ### Phase 1: Merge CursorManager into StateManager
+
 - **Eliminated**: `cursor-manager.ts` (30 lines of duplicate code)
 - **Added**: Canvas reference tracking in StateManager
 - **Improved**: `setCursor()` no longer requires passing canvas element every time
 
 **Before:**
+
 ```typescript
 private cursorManager = new CursorManager();
 // ...
@@ -41,6 +55,7 @@ this.cursorManager.setCursor(this.canvasRef.nativeElement, 'move');
 ```
 
 **After:**
+
 ```typescript
 // In ngAfterViewInit
 this.state.setCanvas(this.canvasRef.nativeElement);
@@ -49,11 +64,13 @@ this.state.setCursor('move');
 ```
 
 ### Phase 2: Introduce EventContext Interface
+
 - **Created**: `event-context.ts` - Groups related callbacks logically
 - **Reduced**: PointerEventHandler parameters from 14 to 7
 - **Simplified**: Component event handlers from 33 lines to 9 lines each
 
 **Before:**
+
 ```typescript
 onPointerMove(e: PointerEvent) {
   PointerEventHandler.handlePointerMove(
@@ -70,6 +87,7 @@ onPointerMove(e: PointerEvent) {
 ```
 
 **After:**
+
 ```typescript
 onPointerMove(e: PointerEvent) {
   PointerEventHandler.handlePointerMove(
@@ -87,9 +105,11 @@ onPointerMove(e: PointerEvent) {
 The `eventContext` object is created once in the constructor and contains all callback implementations.
 
 ### Phase 3: Add Feature Boundary Comments
+
 Added clear section markers to indicate feature boundaries:
 
 **StateManager** - Organized by feature:
+
 ```typescript
 // ========================================
 // FEATURE: BOX INTERACTION (Rotate/Resize/Drag)
@@ -100,10 +120,11 @@ isDraggingBox = signal(false);
 ```
 
 **PointerEventHandler** - Documents priority order:
+
 ```typescript
 /**
  * Handle pointer down event
- * 
+ *
  * PRIORITY ORDER:
  * 1. Context menu
  * 2. Box creation mode
@@ -114,6 +135,7 @@ isDraggingBox = signal(false);
 ```
 
 **CanvasViewportComponent** - Features clearly separated:
+
 ```typescript
 // ========================================
 // FEATURE: BOX CREATION
@@ -127,6 +149,7 @@ private handleCreateComplete() { ... }
 ## Consequences
 
 ### Positive ✅
+
 1. **20% fewer lines of code** - Removed 30 lines from CursorManager deletion, reduced ~100 lines in component
 2. **Single source of truth for cursor** - No more synchronization issues
 3. **More stable API** - Adding features doesn't require changing 10+ function signatures
@@ -135,11 +158,13 @@ private handleCreateComplete() { ... }
 6. **Better cross-referencing** - Comments link to related utility files
 
 ### Negative ⚠️
+
 1. **One-time migration effort** - Took ~6 hours to implement all phases
 2. **EventContext adds indirection** - Extra hop for callbacks (negligible performance impact)
 3. **Learning curve** - Team needs to understand the new pattern
 
 ### Neutral ℹ️
+
 1. **State still centralized** - StateManager still large, but now better organized
 2. **Not fully feature-based** - Controllers not extracted yet (future improvement)
 3. **Room for improvement** - Can migrate toward controller pattern in future
@@ -147,13 +172,16 @@ private handleCreateComplete() { ... }
 ## Implementation Details
 
 ### Files Created
+
 - `src/components/canvas-viewpoint/utils/event-context.ts` (50 lines)
 - `docs/ADR-001-state-management-consolidation.md` (this file)
 
 ### Files Deleted
+
 - `src/components/canvas-viewpoint/utils/cursor-manager.ts`
 
 ### Files Modified
+
 - `src/components/canvas-viewpoint/utils/state-manager.ts`
   - Added `setCanvas()` and improved `setCursor()`
   - Added feature grouping comments (~70 lines of documentation)
@@ -167,6 +195,7 @@ private handleCreateComplete() { ... }
   - Added feature boundary comments
 
 ### Testing Performed
+
 - [x] All cursor states work correctly (grab, grabbing, resize cursors, move, default)
 - [x] Box creation works
 - [x] Box rotation works

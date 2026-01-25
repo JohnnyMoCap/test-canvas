@@ -3,6 +3,7 @@
 ## Recent Updates (January 25, 2026)
 
 ### State Management Consolidation
+
 - **Removed**: `cursor-manager.ts` - merged into StateManager
 - **Added**: `event-context.ts` - groups callbacks to reduce parameter count
 - **Improved**: StateManager now manages canvas reference directly

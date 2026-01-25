@@ -113,6 +113,7 @@ export class BoxManipulator {
    */
   static updateBoxInArray(boxes: Box[], updatedBox: Box): Box[] {
     const boxId = String(getBoxId(updatedBox));
-    return boxes.map((b) => (String(getBoxId(b)) === boxId ? updatedBox : b));
+    const boxesRes = boxes.map((b) => (String(getBoxId(b)) === boxId ? updatedBox : b));
+    return boxesRes;
   }
 }

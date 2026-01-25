@@ -3,6 +3,7 @@
 ## Recent Updates
 
 **January 25, 2026**: Completed state management consolidation refactor
+
 - Merged CursorManager into StateManager
 - Introduced EventContext pattern for cleaner event handling
 - Added feature boundary comments throughout codebase

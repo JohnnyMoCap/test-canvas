@@ -16,7 +16,7 @@ export class App {
     this.historyService.initialize(this.exampleBoxes);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 1000 }, (_, i) => {
+  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 

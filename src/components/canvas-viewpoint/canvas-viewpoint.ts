@@ -19,16 +19,12 @@ import { BoxCreationUtils } from './utils/box-creation-utils';
 import { ContextMenuUtils } from './utils/context-menu-utils';
 import { BackgroundUtils } from './utils/background-utils';
 import { FrameRenderer } from './utils/frame-renderer';
-import { HoverDetectionUtils } from './utils/hover-detection-utils';
 import { CreationUtils } from './utils/creation-utils';
 
-// New utility imports
 import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
 import { PointerEventHandler } from './utils/pointer-event-handler';
-import { BoxManipulator } from './utils/box-manipulator';
 import { ClipboardManager } from './utils/clipboard-manager';
-import { EventContext } from './utils/event-context';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 import { HistoryService } from '../../services/history.service';
@@ -47,7 +43,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   // State management
   private state: StateManager;
-  private eventContext: EventContext;
 
   // Signals
   camera = signal<Camera>({ zoom: 1, x: 0, y: 0, rotation: 0 });
@@ -70,82 +65,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Initialize state manager
     this.state = new StateManager(ContextMenuUtils.close());
 
-    // Create event context
-    this.eventContext = {
-      getBoxes: () => this.localBoxes(),
-      getCamera: () => this.camera(),
-
-      onCreateStart: (worldX, worldY) => {
-        this.state.createState.set({
-          isCreating: true,
-          startPoint: { x: worldX, y: worldY },
-          currentPoint: { x: worldX, y: worldY },
-        });
-        this.scheduleRender();
-      },
-
-      onCreatePreview: (worldX, worldY) => {
-        this.state.createState.set({
-          ...this.state.createState(),
-          currentPoint: { x: worldX, y: worldY },
-        });
-        this.scheduleRender();
-      },
-
-      onCreateComplete: (startX, startY, endX, endY) => {
-        this.handleCreateComplete(startX, startY, endX, endY);
-      },
-
-      onBoxInteractionStart: (boxId, isRotating, isResizing, isDragging) => {
-        this.scheduleRender();
-      },
-
-      onRotate: (worldX, worldY) => {
-        this.handleRotation(worldX, worldY);
-      },
-
-      onResize: (worldX, worldY) => {
-        this.handleResize(worldX, worldY);
-      },
-
-      onDrag: (worldX, worldY) => {
-        this.updateBoxPosition(this.state.selectedBoxId()!, worldX, worldY);
-      },
-
-      onInteractionComplete: (boxId, startState, box, isRotating, isResizing, isDragging) => {
-        this.recordInteractionHistory(startState, box, isRotating, isResizing, isDragging);
-      },
-
-      onCameraPanStart: () => {
-        this.scheduleRender();
-      },
-
-      onCameraPan: (dx, dy) => {
-        this.handleCameraPan(dx, dy);
-      },
-
-      onZoom: (newCamera, worldX, worldY) => {
-        this.camera.set(this.clampCamera(newCamera));
-        this.detectHover(worldX, worldY);
-      },
-
-      onContextMenuOpen: (x, y, worldX, worldY) => {
-        this.state.contextMenuState.set(ContextMenuUtils.open(x, y, worldX, worldY));
-      },
-
-      onHoverDetection: (worldX, worldY) => {
-        this.detectHover(worldX, worldY);
-      },
-
-      onUpdateCursor: (cursor) => {
-        this.state.setCursor(cursor);
-      },
-
-      onRebuildIndex: () => {
-        this.rebuildIndex();
-      },
-    };
-
     this.setupEffects();
     this.setupHotkeys();
   }
@@ -155,7 +74,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.initializeCanvas();
     this.setupResizeObserver();
     if (this.backgroundUrl) this.loadBackground(this.backgroundUrl);
-    this.rebuildIndex();
     this.startRenderLoop();
   }
 
@@ -163,47 +81,17 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     LifecycleManager.stopRenderLoop(this.state.raf());
   }
 
-  // ========================================
-  // PUBLIC API
-  // ========================================
-
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
     this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });
     this.scheduleRender();
   }
 
-  // ========================================
-  // FEATURE: BOX CREATION
-  // ========================================
-  // Related: box-creation-utils.ts, creation-utils.ts
-
   toggleCreateMode() {
     this.state.toggleCreateMode();
     this.updateCursor();
     if (!this.state.isCreateMode) {
       this.scheduleRender();
-    }
-  }
-
-  private handleCreateComplete(startX: number, startY: number, endX: number, endY: number): void {
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-
-    const newBox = BoxCreationUtils.createBoxFromDrag(
-      startX,
-      startY,
-      endX,
-      endY,
-      bgc.width,
-      bgc.height,
-      BoxCreationUtils.generateTempId(this.state.nextTempId()),
-    );
-    this.state.nextTempId.set(this.state.nextTempId() + 1);
-
-    if (newBox) {
-      this.historyService.recordAdd(newBox);
-      this.rebuildIndex();
     }
   }
 
@@ -230,6 +118,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.nextTempId.set(this.state.nextTempId() + 1);
 
     this.historyService.recordAdd(newBox);
+    console.log('adding from context');
+
     this.rebuildIndex();
     this.scheduleRender();
     this.closeContextMenu();
@@ -244,51 +134,111 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // ========================================
 
   onWheel(e: WheelEvent) {
+    const canvas = this.canvasRef.nativeElement;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
     PointerEventHandler.handleWheel(
       e,
-      this.canvasRef.nativeElement,
-      this.state.devicePixelRatio(),
-      this.state.minZoom(),
-      this.eventContext,
+      canvas,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.camera(),
+      this.state,
+      (newCamera) => {
+        this.camera.set(newCamera);
+        this.scheduleRender();
+      },
     );
   }
 
   onPointerDown(e: PointerEvent) {
+    const canvas = this.canvasRef.nativeElement;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
     PointerEventHandler.handlePointerDown(
       e,
-      this.canvasRef.nativeElement,
+      canvas,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.camera(),
+      this.localBoxes(),
       this.state,
       this.quadtree,
       this.nametagMetricsCache,
       this.state.ctx(),
-      this.eventContext,
+      this.historyService,
     );
+    this.scheduleRender();
   }
 
   onPointerUp(e: PointerEvent) {
+    const canvas = this.canvasRef.nativeElement;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
     PointerEventHandler.handlePointerUp(
       e,
+      canvas,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.camera(),
+      this.localBoxes(),
       this.state,
-      this.eventContext,
+      this.historyService,
+      (boxes) => {
+        this.localBoxes.set(boxes);
+        this.scheduleRender();
+      },
+      () => {
+        console.log('on pointer up');
+
+        this.rebuildIndex();
+      },
     );
     this.scheduleRender();
   }
 
   onPointerMove(e: PointerEvent) {
+    const canvas = this.canvasRef.nativeElement;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
     PointerEventHandler.handlePointerMove(
       e,
-      this.canvasRef.nativeElement,
+      canvas,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.camera(),
+      this.localBoxes(),
       this.state,
       this.quadtree,
       this.nametagMetricsCache,
       this.state.ctx(),
-      this.eventContext,
+      (boxes) => {
+        this.localBoxes.set(boxes);
+        this.scheduleRender();
+      },
+      (newCamera) => {
+        this.camera.set(newCamera);
+        this.scheduleRender();
+      },
     );
+    this.scheduleRender();
   }
 
-  // ========================================
-  // INFRASTRUCTURE: Setup & Lifecycle
-  // ========================================
+  //TODOS: cursor is a bit wrong sometimes?
+  //TODOS: initial outline not rendering
+  //TODOs: fix the ctrl z ctrl y
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
@@ -296,7 +246,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const boxes = this.historyService.visibleBoxes();
       // Don't overwrite local changes during drag/rotate/resize
       if (!this.state.isDraggingOrInteracting()) {
+        //TODO: find a more computation friendly way to do this
+        if (JSON.stringify(boxes) === JSON.stringify(this.localBoxes())) {
+          return;
+        }
         this.localBoxes.set([...boxes]);
+        console.log('box sync effect');
+
         this.rebuildIndex();
       }
     });
@@ -400,100 +356,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  // Box transformation methods
-
-  private handleRotation(wx: number, wy: number) {
-    const bgc = this.state.bgCanvas();
-    if (!this.state.selectedBoxId || !bgc) return;
-
-    const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.state.selectedBoxId());
-    if (!box) return;
-
-    const updatedBox = BoxManipulator.rotateBox(
-      box,
-      wx,
-      wy,
-      bgc.width,
-      bgc.height,
-      this.state.rotationStartAngle(),
-      this.state.boxStartRotation(),
-    );
-
-    this.localBoxes.set(
-      this.localBoxes().map((b) =>
-        String(getBoxId(b)) === this.state.selectedBoxId() ? updatedBox : b,
-      ),
-    );
-    this.scheduleRender();
-  }
-
-  private handleResize(wx: number, wy: number) {
-    const bgc = this.state.bgCanvas();
-    const resizeCorner = this.state.resizeCorner();
-    if (!this.state.selectedBoxId() || !resizeCorner || !bgc) return;
-
-    const box = this.localBoxes().find((b) => String(getBoxId(b)) === this.state.selectedBoxId());
-    if (!box) return;
-
-    const updatedBox = BoxManipulator.resizeBox(box, wx, wy, bgc.width, bgc.height, resizeCorner);
-
-    this.localBoxes.set(
-      this.localBoxes().map((b) =>
-        String(getBoxId(b)) === this.state.selectedBoxId() ? updatedBox : b,
-      ),
-    );
-    this.scheduleRender();
-  }
-
-  private updateBoxPosition(boxId: string, worldX: number, worldY: number) {
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-
-    const box = this.localBoxes().find((b) => String(getBoxId(b)) === boxId);
-    if (!box) return;
-
-    const updatedBox = BoxManipulator.moveBox(box, worldX, worldY, bgc.width, bgc.height);
-
-    this.localBoxes.set(
-      this.localBoxes().map((b) => (String(getBoxId(b)) === boxId ? updatedBox : b)),
-    );
-    this.scheduleRender();
-  }
-
-  // ========================================
-  // FEATURE: SELECTION & HOVER
-  // ========================================
-  // Related: hover-detection-utils.ts
-
-  private detectHover(wx: number, wy: number) {
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-    if (this.state.isCreateMode()) {
-      if (this.state.updateHoverState(null)) {
-        this.scheduleRender();
-      }
-      return;
-    }
-
-    const foundBoxId = HoverDetectionUtils.detectHoveredBox(
-      wx,
-      wy,
-      this.localBoxes(),
-      this.quadtree,
-      bgc.width,
-      bgc.height,
-      this.camera(),
-      this.state.showNametags(),
-      this.nametagMetricsCache,
-      this.state.ctx(),
-    );
-
-    if (this.state.updateHoverState(foundBoxId)) {
-      this.scheduleRender();
-      this.state.setCursor(foundBoxId ? 'move' : 'default');
-    }
-  }
-
   // ========================================
   // FEATURE: RENDERING
   // ========================================
@@ -568,7 +430,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     this.onResize();
     this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0, rotation: 0 });
-    this.rebuildIndex();
     this.scheduleRender();
   }
 
@@ -616,6 +477,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private rebuildIndex() {
+    console.log('rebuilding');
+
     this.quadtree = LifecycleManager.rebuildIndex(
       this.localBoxes(),
       this.state.bgCanvas(),
