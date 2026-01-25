@@ -36,23 +36,24 @@ export class PointerEventHandler {
       resizeCorner?: ResizeCorner,
     ) => void,
     onCameraPanStart: () => void,
+    onUpdateCursor: (cursor: string) => void,
   ): void {
     const rect = canvas.getBoundingClientRect();
-    const mx = (event.clientX - rect.left) * state.devicePixelRatio;
-    const my = (event.clientY - rect.top) * state.devicePixelRatio;
+    const mx = (event.clientX - rect.left) * state.devicePixelRatio();
+    const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
 
     // Don't handle if clicking on context menu
     if (
-      state.contextMenuState.visible &&
+      state.contextMenuState()?.visible &&
       ContextMenuUtils.isWithinMenu(event.target as HTMLElement)
     ) {
       return;
     }
 
     // Close context menu if clicking outside
-    if (state.contextMenuState.visible) {
-      state.contextMenuState = ContextMenuUtils.close();
+    if (state.contextMenuState()?.visible) {
+      state.contextMenuState.set(ContextMenuUtils.close());
       return;
     }
 
@@ -64,33 +65,35 @@ export class PointerEventHandler {
     }
 
     // Handle create mode
-    if (state.isCreateMode && event.button === 0) {
+    if (state.isCreateMode() && event.button === 0) {
       onCreateStart(worldPos.x, worldPos.y);
       (event.target as Element).setPointerCapture?.(event.pointerId);
       return;
     }
 
     // Disable normal interactions in create mode
-    if (state.isCreateMode) return;
+    if (state.isCreateMode()) return;
 
     // Check rotation knob
-    if (state.selectedBoxId) {
-      const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId);
-      if (box && state.bgCanvas) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, state.bgCanvas.width, state.bgCanvas.height);
+    if (state.selectedBoxId()) {
+      const box = boxes.find((b) => String(getBoxId(b)) == state.selectedBoxId());
+      const bgc = state.bgCanvas();
+      if (box && bgc) {
+        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
         if (wb && InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, camera)) {
-          state.isRotating = true;
-          state.rotationStartAngle = Math.atan2(worldPos.y - wb.y, worldPos.x - wb.x);
-          state.boxStartRotation = wb.rotation;
+          state.isRotating.set(true);
+          state.rotationStartAngle.set(Math.atan2(worldPos.y - wb.y, worldPos.x - wb.x));
+          state.boxStartRotation.set(wb.rotation);
           state.startInteraction(
-            state.selectedBoxId,
+            state.selectedBoxId()!,
             box.x,
             box.y,
             box.w,
             box.h,
             box.rotation || 0,
           );
-          onBoxInteractionStart(state.selectedBoxId, true, false, false);
+          onBoxInteractionStart(state.selectedBoxId()!, true, false, false);
+          onUpdateCursor('grabbing');
           (event.target as Element).setPointerCapture?.(event.pointerId);
           return;
         }
@@ -99,19 +102,19 @@ export class PointerEventHandler {
         if (wb) {
           const corner = InteractionUtils.detectCornerHandle(worldPos.x, worldPos.y, wb, camera);
           if (corner) {
-            state.isResizing = true;
-            state.resizeCorner = corner;
+            state.isResizing.set(true);
+            state.resizeCorner.set(corner);
             state.startInteraction(
-              state.selectedBoxId,
+              state.selectedBoxId()!,
               box.x,
               box.y,
               box.w,
               box.h,
               box.rotation || 0,
             );
-            state.dragStartWorld = worldPos;
-            state.boxStartPos = { x: wb.x, y: wb.y };
-            onBoxInteractionStart(state.selectedBoxId, false, true, false, corner);
+            state.dragStartWorld.set(worldPos);
+            state.boxStartPos.set({ x: wb.x, y: wb.y });
+            onBoxInteractionStart(state.selectedBoxId()!, false, true, false, corner);
             (event.target as Element).setPointerCapture?.(event.pointerId);
             return;
           }
@@ -127,16 +130,13 @@ export class PointerEventHandler {
     let clickedBoxId: string | null = null;
     for (let i = candidates.length - 1; i >= 0; i--) {
       const rawBox = candidates[i];
-      if (!state.bgCanvas) continue;
-      const worldBox = BoxUtils.normalizeBoxToWorld(
-        rawBox,
-        state.bgCanvas.width,
-        state.bgCanvas.height,
-      );
+      const bgc = state.bgCanvas();
+      if (!bgc) continue;
+      const worldBox = BoxUtils.normalizeBoxToWorld(rawBox, bgc.width, bgc.height);
       if (!worldBox) continue;
 
       if (
-        state.showNametags &&
+        state.showNametags() &&
         NametagUtils.pointInNametag(
           worldPos.x,
           worldPos.y,
@@ -157,25 +157,26 @@ export class PointerEventHandler {
     }
 
     if (clickedBoxId) {
-      state.selectedBoxId = clickedBoxId;
-      state.isDraggingBox = true;
-      state.dragStartWorld = worldPos;
+      state.selectedBoxId.set(clickedBoxId);
+      state.isDraggingBox.set(true);
+      state.dragStartWorld.set(worldPos);
       const box = boxes.find((b) => String(getBoxId(b)) === clickedBoxId);
-      if (box && state.bgCanvas) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, state.bgCanvas.width, state.bgCanvas.height);
-        if (wb) state.boxStartPos = { x: wb.x, y: wb.y };
+      const bgc = state.bgCanvas();
+      if (box && bgc) {
+        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
+        if (wb) state.boxStartPos.set({ x: wb.x, y: wb.y });
         state.startInteraction(clickedBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
       }
       onBoxInteractionStart(clickedBoxId, false, false, true);
     } else {
       if (state.selectedBoxId) {
-        state.selectedBoxId = null;
+        state.selectedBoxId.set(null);
       }
-      state.isPointerDown = true;
+      state.isPointerDown.set(true);
       onCameraPanStart();
     }
 
-    state.lastPointer = { x: event.clientX, y: event.clientY };
+    state.lastPointer.set({ x: event.clientX, y: event.clientY });
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
@@ -197,32 +198,30 @@ export class PointerEventHandler {
     ) => void,
     onRebuildIndex: () => void,
   ): void {
+    const createState = state.createState();
     // Handle create mode
-    if (
-      state.createState.isCreating &&
-      state.createState.startPoint &&
-      state.createState.currentPoint
-    ) {
+    if (createState?.isCreating && createState?.startPoint && createState?.currentPoint) {
       onCreateComplete(
-        state.createState.startPoint.x,
-        state.createState.startPoint.y,
-        state.createState.currentPoint.x,
-        state.createState.currentPoint.y,
+        createState?.startPoint.x,
+        createState?.startPoint.y,
+        createState?.currentPoint.x,
+        createState?.currentPoint.y,
       );
       state.resetCreationState();
     }
 
     // Record history delta for completed interaction
-    if (state.interactionStartState) {
-      const box = boxes.find((b) => String(getBoxId(b)) === state.interactionStartState!.boxId);
+    const startState = state.interactionStartState();
+    if (startState) {
+      const box = boxes.find((b) => String(getBoxId(b)) === startState?.boxId);
       if (box) {
         onInteractionComplete(
-          state.interactionStartState.boxId,
-          state.interactionStartState,
+          startState?.boxId,
+          startState,
           box,
-          state.isRotating,
-          state.isResizing,
-          state.isDraggingBox,
+          state.isRotating(),
+          state.isResizing(),
+          state.isDraggingBox(),
         );
       }
     }
@@ -231,7 +230,7 @@ export class PointerEventHandler {
 
     // Rebuild quadtree after interaction ends
     if (state.isDraggingOrInteracting) {
-      state.isDraggingOrInteracting = false;
+      state.isDraggingOrInteracting.set(false);
       onRebuildIndex();
     }
 
@@ -259,49 +258,50 @@ export class PointerEventHandler {
     onUpdateCursor: (cursor: string) => void,
   ): void {
     const rect = canvas.getBoundingClientRect();
-    const mx = (event.clientX - rect.left) * state.devicePixelRatio;
-    const my = (event.clientY - rect.top) * state.devicePixelRatio;
+    const mx = (event.clientX - rect.left) * state.devicePixelRatio();
+    const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
 
     // Track mouse screen position
     state.updateMouseScreenPosition(event.clientX, event.clientY);
 
     // Handle creation preview
-    if (state.createState.isCreating && state.createState.startPoint) {
+    if (state.createState()?.isCreating && state.createState()?.startPoint) {
       onCreatePreview(worldPos.x, worldPos.y);
       return;
     }
 
     // Disable normal interactions in create mode
-    if (state.isCreateMode) return;
+    if (state.isCreateMode()) return;
 
-    if (state.isRotating && state.selectedBoxId) {
-      state.isDraggingOrInteracting = true;
+    if (state.isRotating() && state.selectedBoxId()) {
+      state.isDraggingOrInteracting.set(true);
       onRotate(worldPos.x, worldPos.y);
       return;
     }
 
-    if (state.isResizing && state.selectedBoxId && state.resizeCorner) {
-      state.isDraggingOrInteracting = true;
+    if (state.isResizing() && state.selectedBoxId() && state.resizeCorner()) {
+      state.isDraggingOrInteracting.set(true);
       onResize(worldPos.x, worldPos.y);
       return;
     }
 
-    if (state.isDraggingBox && state.selectedBoxId) {
-      const dx = worldPos.x - state.dragStartWorld.x;
-      const dy = worldPos.y - state.dragStartWorld.y;
-      const newX = state.boxStartPos.x + dx;
-      const newY = state.boxStartPos.y + dy;
-      state.isDraggingOrInteracting = true;
+    if (state.isDraggingBox() && state.selectedBoxId()) {
+      const dx = worldPos.x - state.dragStartWorld().x;
+      const dy = worldPos.y - state.dragStartWorld().y;
+      const newX = state.boxStartPos().x + dx;
+      const newY = state.boxStartPos().y + dy;
+      state.isDraggingOrInteracting.set(true);
       onDrag(newX, newY);
       return;
     }
 
+    const bgc = state.bgCanvas();
     // Handle cursor updates when hovering over selected box
-    if (state.selectedBoxId && !state.isPointerDown && state.bgCanvas) {
-      const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId);
+    if (state.selectedBoxId() && !state.isPointerDown() && bgc) {
+      const box = boxes.find((b) => String(getBoxId(b)) == state.selectedBoxId());
       if (box) {
-        const wb = BoxUtils.normalizeBoxToWorld(box, state.bgCanvas.width, state.bgCanvas.height);
+        const wb = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
         if (wb) {
           if (InteractionUtils.detectRotationKnob(worldPos.x, worldPos.y, wb, camera)) {
             onUpdateCursor('grab');
@@ -310,7 +310,7 @@ export class PointerEventHandler {
             if (corner) {
               onUpdateCursor(InteractionUtils.getResizeCursor(corner, wb));
             } else {
-              onUpdateCursor(state.hoveredBoxId ? 'pointer' : 'default');
+              onUpdateCursor(state.hoveredBoxId() ? 'move' : 'default');
             }
           }
         }
@@ -318,18 +318,18 @@ export class PointerEventHandler {
     }
 
     // Hover detection
-    if (!state.isPointerDown && !state.isDraggingBox) {
+    if (!state.isPointerDown() && !state.isDraggingBox()) {
       onHoverDetection(worldPos.x, worldPos.y);
     }
 
     // Camera panning
-    if (state.isPointerDown) {
-      const dx = (event.clientX - state.lastPointer.x) * state.devicePixelRatio;
-      const dy = (event.clientY - state.lastPointer.y) * state.devicePixelRatio;
-      state.lastPointer = { x: event.clientX, y: event.clientY };
+    if (state.isPointerDown()) {
+      const dx = (event.clientX - state.lastPointer().x) * state.devicePixelRatio();
+      const dy = (event.clientY - state.lastPointer().y) * state.devicePixelRatio();
+      state.lastPointer.set({ x: event.clientX, y: event.clientY });
       onCameraPan(dx, dy);
     } else {
-      state.lastPointer = { x: event.clientX, y: event.clientY };
+      state.lastPointer.set({ x: event.clientX, y: event.clientY });
     }
   }
 
