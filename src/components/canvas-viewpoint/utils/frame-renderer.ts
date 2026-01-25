@@ -2,7 +2,6 @@ import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { Camera, TextMetrics } from '../core/types';
 import { BOX_TYPES } from '../core/creation-state';
 import { CreateBoxState } from '../core/creation-state';
-import { CameraUtils } from './camera-utils';
 import { BoxUtils } from './box-utils';
 import { RenderUtils } from './render-utils';
 import { NametagUtils } from './nametag-utils';
@@ -30,7 +29,7 @@ export class FrameRenderer {
     nametagMetricsCache: Map<string, TextMetrics>,
     createState: CreateBoxState,
     debugShowQuadtree: boolean,
-    quadtree: Quadtree<Box> | undefined
+    quadtree: Quadtree<Box> | undefined,
   ): void {
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -80,7 +79,7 @@ export class FrameRenderer {
         createState.startPoint.x,
         createState.startPoint.y,
         createState.currentPoint.x,
-        createState.currentPoint.y
+        createState.currentPoint.y,
       );
       CreationUtils.drawCreationPreview(ctx, previewBox, BOX_TYPES.finding.defaultColor, camera);
     }

@@ -237,7 +237,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //TODOS: cursor is a bit wrong sometimes?
-  //TODOS: initial outline not rendering
   //TODOs: fix the ctrl z ctrl y
 
   private setupEffects(): void {
@@ -294,53 +293,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.dirty.set(false);
       },
     );
-  }
-
-  // ========================================
-  // FEATURE: BOX INTERACTION (Rotate/Resize/Drag)
-  // ========================================
-  // Related: box-manipulator.ts, interaction-utils.ts
-
-  private recordInteractionHistory(
-    startState: { x: number; y: number; w: number; h: number; rotation: number },
-    box: Box,
-    isRotating: boolean,
-    isResizing: boolean,
-    isDragging: boolean,
-  ): void {
-    if (isRotating) {
-      this.historyService.recordRotate(
-        this.state.interactionStartState()!.boxId,
-        startState.rotation,
-        box.rotation || 0,
-      );
-    } else if (isResizing) {
-      this.historyService.recordResize(
-        this.state.interactionStartState()!.boxId,
-        { x: startState.x, y: startState.y, w: startState.w, h: startState.h },
-        { x: box.x, y: box.y, w: box.w, h: box.h },
-      );
-    } else if (isDragging) {
-      this.historyService.recordMove(
-        this.state.interactionStartState()!.boxId,
-        startState.x,
-        startState.y,
-        box.x,
-        box.y,
-      );
-    }
-  }
-
-  // ========================================
-  // FEATURE: CAMERA (Pan/Zoom)
-  // ========================================
-  // Related: camera-utils.ts
-
-  private handleCameraPan(dx: number, dy: number): void {
-    const cam = this.camera();
-    const worldDelta = CoordinateTransform.screenDeltaToWorld(dx, dy, cam);
-    const updatedCam = { ...cam, x: cam.x - worldDelta.x, y: cam.y - worldDelta.y };
-    this.camera.set(this.clampCamera(updatedCam));
   }
 
   private clampCamera(cam: Camera): Camera {
@@ -419,7 +371,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const canvas = this.canvasRef.nativeElement;
     const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
 
-    this.state.bgCanvas.set(result.canvas);
+    this.state.updateBgCanvas(result.canvas);
     this.state.minZoom.set(result.minZoom);
 
     if (this.state.bgCanvas()!.width > 0 && this.state.bgCanvas()!.height > 0) {
@@ -430,6 +382,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     this.onResize();
     this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0, rotation: 0 });
+    this.rebuildIndex();
     this.scheduleRender();
   }
 

@@ -19,7 +19,7 @@ export class QuadtreeUtils {
     boxes: Box[],
     imageWidth: number,
     imageHeight: number,
-    showNametags: boolean
+    showNametags: boolean,
   ): Quadtree<Box> | undefined {
     if (boxes.length === 0) {
       return undefined;
@@ -85,7 +85,7 @@ export class QuadtreeUtils {
     isDraggingOrInteracting: boolean,
     imageWidth: number,
     imageHeight: number,
-    showNametags: boolean
+    showNametags: boolean,
   ): Box[] {
     let results: Box[];
 
@@ -121,7 +121,7 @@ export class QuadtreeUtils {
         bounds.minX,
         bounds.minY,
         bounds.maxX - bounds.minX,
-        bounds.maxY - bounds.minY
+        bounds.maxY - bounds.minY,
       ) as Box[];
     }
 
