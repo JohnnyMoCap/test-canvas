@@ -234,6 +234,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //TODOS: cursor is a bit wrong sometimes?
+  //TODO: add css brightness and contrast controls
+  //TODO: add measurment tool - add to reset tool on id change etc
+  //TODO: add outside list of boxes (test semi render?) and clicking inside scrolls to it, when clicking in the list zoom into the box.
+  //TODO: add from outside box class change
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
