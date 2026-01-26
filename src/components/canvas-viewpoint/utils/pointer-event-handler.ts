@@ -144,7 +144,6 @@ export class PointerEventHandler {
     state: StateManager,
   ): boolean {
     const selectedBoxId = state.selectedBoxId();
-    console.log(selectedBoxId);
 
     if (!selectedBoxId) return false;
 

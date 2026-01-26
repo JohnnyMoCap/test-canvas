@@ -34,9 +34,6 @@ export class HistoryService {
   private _redoStack = signal<BoxDelta[]>([]);
   private _boxes = signal<Box[]>([]);
 
-  // Public signals - boxes is the source of truth
-  boxes = this._boxes.asReadonly();
-
   // Filtered boxes with all filters applied (hide, etc.) - THE SOURCE OF TRUTH for rendering
   visibleBoxes = computed(() => {
     const allBoxes = this._boxes();
@@ -86,7 +83,7 @@ export class HistoryService {
    * Records a DELETE operation
    */
   recordDelete(boxId: string | number): void {
-    const box = this._boxes().find((b) => getBoxId(b) === boxId);
+    const box = this._boxes().find((b) => getBoxId(b) == boxId);
     if (!box) return;
 
     const delta: BoxDelta = {
@@ -287,7 +284,7 @@ export class HistoryService {
       case 'ROTATE':
       case 'CHANGE_CLASS':
         // Revert to before state
-        return boxes.map((b) => (getBoxId(b) === delta.boxId ? { ...b, ...delta.before } : b));
+        return boxes.map((b) => (getBoxId(b) == delta.boxId ? { ...b, ...delta.before } : b));
 
       default:
         return boxes;

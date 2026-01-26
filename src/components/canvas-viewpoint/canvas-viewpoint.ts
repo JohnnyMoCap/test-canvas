@@ -118,7 +118,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.nextTempId.set(this.state.nextTempId() + 1);
 
     this.historyService.recordAdd(newBox);
-    console.log('adding from context');
 
     this.rebuildIndex();
     this.scheduleRender();
@@ -198,8 +197,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.scheduleRender();
       },
       () => {
-        console.log('on pointer up');
-
         this.rebuildIndex();
       },
     );
@@ -237,12 +234,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //TODOS: cursor is a bit wrong sometimes?
-  //TODOs: fix the ctrl z ctrl y
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
     effect(() => {
       const boxes = this.historyService.visibleBoxes();
+
       // Don't overwrite local changes during drag/rotate/resize
       if (!this.state.isDraggingOrInteracting()) {
         //TODO: find a more computation friendly way to do this
@@ -250,7 +247,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           return;
         }
         this.localBoxes.set([...boxes]);
-        console.log('box sync effect');
 
         this.rebuildIndex();
       }
@@ -430,8 +426,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private rebuildIndex() {
-    console.log('rebuilding');
-
     this.quadtree = LifecycleManager.rebuildIndex(
       this.localBoxes(),
       this.state.bgCanvas(),
