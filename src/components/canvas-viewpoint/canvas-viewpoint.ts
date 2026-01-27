@@ -280,6 +280,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   //TODO: handle background changes happening some time AFTER the component is initialized, along with changes to the component with a whole different photo, label, etc
   //TODO: test delete box hotkey
+  //TODO: fix interaction with nametag, hover works? but not dragging?
+  //TODO: read only mode
+  //TODO: change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
+  //TODO: CTRL + click will only move and avoid selecting / interacting with boxes
 
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly
