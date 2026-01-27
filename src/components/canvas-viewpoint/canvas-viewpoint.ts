@@ -108,8 +108,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this.state.setCanvas(this.canvasRef.nativeElement);
     this.initializeCanvas();
-    this.setupResizeObserver();
-    if (this.backgroundUrl) this.loadBackground(this.backgroundUrl);
+    this.setupPageResizeObserver();
+    if (this.backgroundUrl) this.loadBackground(this.backgroundUrl); //TODO: change this to properly handle late additions to the page.
     this.startRenderLoop();
   }
 
@@ -126,8 +126,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   toggleCreateMode() {
     this.state.toggleCreateMode();
-    this.updateCursor();
-    if (!this.state.isCreateMode) {
+    if (!this.state.isCreateMode()) {
       this.scheduleRender();
     }
     this.createModeChange.emit(this.state.isCreateMode());
@@ -279,41 +278,48 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODOS: cursor is a bit wrong sometimes?
   //TODO: add measurment tool - add to reset tool on id change etc
 
-  //TODO: READ AND VERIFY MAGIC WORKS AND FOLLOWS THE STRUCTURE
+  //TODO: handle background changes happening some time AFTER the component is initialized, along with changes to the component with a whole different photo, label, etc
+  //TODO: test delete box hotkey
 
-  //TODO: bug, there may be some funky state updates going on here
+  //TODO: READ AND VERIFY EVERYTHING
+  //TODO: read documentation and create more, and write in code comments properly
+
+  // ========================================
+  // INFRASTRUCTURE: Setup & Initialization
+  // ========================================
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
     effect(() => {
+      if (this.state.isDraggingOrInteracting()) return;
       const boxes = this.historyService.visibleBoxes();
-
-      // Don't overwrite local changes during drag/rotate/resize
-      if (!this.state.isDraggingOrInteracting()) {
-        //TODO: find a more computation friendly way to do this
-        if (JSON.stringify(boxes) === JSON.stringify(this.localBoxes())) {
-          return;
-        }
-        this.localBoxes.set([...boxes]);
-
-        this.rebuildIndex();
+      //TODO: find a more computation friendly way to do this
+      if (JSON.stringify(boxes) === JSON.stringify(this.localBoxes())) {
+        return;
       }
+      this.localBoxes.set([...boxes]);
+      this.rebuildIndex();
     });
 
     // Trigger render on camera or box changes
     effect(() => {
       const _ = this.camera();
-      const __ = this.localBoxes();
+      const __ = this.localBoxes(); //move this to boxes effect?
       this.scheduleRender();
     });
 
     // Reactive cursor updates
     effect(() => {
-      const cursor = this.state.currentCursor();
       const canvas = this.canvasRef.nativeElement;
-      if (canvas) {
-        canvas.style.cursor = cursor;
+      if (!canvas) return;
+      const cursor = this.state.currentCursor();
+
+      if (this.state.isCreateMode() || this.state.isMagicMode()) {
+        canvas.style.cursor = CreationUtils.getCreateCursor();
+        return;
       }
+
+      canvas.style.cursor = cursor;
     });
   }
 
@@ -322,6 +328,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.hotkeyService.on('REDO', () => this.handleRedo());
     this.hotkeyService.on('COPY', () => this.handleCopy());
     this.hotkeyService.on('PASTE', () => this.handlePaste());
+    this.hotkeyService.on('DELETE', () => this.handleDelete());
   }
 
   private initializeCanvas(): void {
@@ -333,9 +340,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private setupResizeObserver(): void {
+  private setupPageResizeObserver(): void {
     const canvas = this.canvasRef.nativeElement;
-    LifecycleManager.setupResizeObserver(canvas.parentElement!, () => this.onResize());
+    LifecycleManager.setupPageResizeObserver(canvas.parentElement!, () => this.onResize());
   }
 
   private startRenderLoop(): void {
@@ -347,19 +354,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.renderFrame();
         this.dirty.set(false);
       },
-    );
-  }
-
-  private clampCamera(cam: Camera): Camera {
-    if (!this.state.bgCanvas()) return cam;
-    const canvas = this.canvasRef.nativeElement;
-    return CameraUtils.clampCamera(
-      cam,
-      canvas.width,
-      canvas.height,
-      this.state.bgCanvas()!.width,
-      this.state.bgCanvas()!.height,
-      this.state.minZoom(),
     );
   }
 
@@ -441,6 +435,19 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  private clampCamera(cam: Camera): Camera {
+    if (!this.state.bgCanvas()) return cam;
+    const canvas = this.canvasRef.nativeElement;
+    return CameraUtils.clampCamera(
+      cam,
+      canvas.width,
+      canvas.height,
+      this.state.bgCanvas()!.width,
+      this.state.bgCanvas()!.height,
+      this.state.minZoom(),
+    );
+  }
+
   private onResize() {
     const canvas = this.canvasRef.nativeElement;
     const container = canvas.parentElement;
@@ -493,18 +500,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   // ========================================
-  // UI & CURSOR
-  // ========================================
-
-  private updateCursor() {
-    if (this.state.isCreateMode()) {
-      this.state.setCursor(CreationUtils.getCreateCursor());
-    } else {
-      this.state.setCursor('default');
-    }
-  }
-
-  // ========================================
   // FEATURE: CLIPBOARD (Copy/Paste)
   // ========================================
   // Related: clipboard-manager.ts
@@ -552,6 +547,15 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.historyService.recordAdd(newBox);
     this.state.updateSelectedBox(String(getBoxId(newBox)));
     this.state.setCursor('move');
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
+
+  private handleDelete(): void {
+    const selected = this.state.selectedBoxId();
+    if (!selected) return;
+    this.historyService.recordDelete(selected);
+    this.state.updateSelectedBox(null);
     this.rebuildIndex();
     this.scheduleRender();
   }

@@ -3,7 +3,7 @@ import { Injectable, signal, computed, effect, DestroyRef, inject } from '@angul
 /**
  * Hotkey command types
  */
-export type HotkeyCommand = 'UNDO' | 'REDO' | 'COPY' | 'PASTE' | 'HIDE';
+export type HotkeyCommand = 'UNDO' | 'REDO' | 'COPY' | 'PASTE' | 'HIDE' | 'DELETE';
 
 /**
  * Callback type for hotkey handlers
@@ -180,6 +180,7 @@ export class HotkeyService {
       { keys: 'Ctrl+C', command: 'COPY', description: 'Copy selected box' },
       { keys: 'Ctrl+V', command: 'PASTE', description: 'Paste copied box' },
       { keys: 'H', command: 'HIDE', description: 'Hide/show selected boxes' },
+      { keys: 'Delete', command: 'DELETE', description: 'Delete selected box' },
     ];
   }
 }

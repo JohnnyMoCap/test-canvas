@@ -43,7 +43,7 @@ export class LifecycleManager {
   /**
    * Setup resize observer for canvas
    */
-  static setupResizeObserver(element: HTMLElement, onResize: () => void): ResizeObserver {
+  static setupPageResizeObserver(element: HTMLElement, onResize: () => void): ResizeObserver {
     const ro = new ResizeObserver(onResize);
     ro.observe(element);
     return ro;
