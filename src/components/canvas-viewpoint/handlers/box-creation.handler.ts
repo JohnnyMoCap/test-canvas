@@ -14,16 +14,12 @@ export class BoxCreationHandler {
   /**
    * Start creating a box via drag-to-create
    */
-  static startCreate(
-    worldX: number,
-    worldY: number,
-    createStateSignal: WritableSignal<CreateBoxState>,
-  ): void {
-    createStateSignal.set({
+  static startCreate(worldX: number, worldY: number): CreateBoxState {
+    return {
       isCreating: true,
       startPoint: { x: worldX, y: worldY },
       currentPoint: { x: worldX, y: worldY },
-    });
+    };
   }
 
   /**
@@ -32,15 +28,15 @@ export class BoxCreationHandler {
   static updatePreview(
     worldX: number,
     worldY: number,
-    createStateSignal: WritableSignal<CreateBoxState>,
-  ): void {
-    const current = createStateSignal();
-    if (current.isCreating && current.startPoint) {
-      createStateSignal.set({
-        ...current,
+    currentState: CreateBoxState,
+  ): CreateBoxState {
+    if (currentState.isCreating && currentState.startPoint) {
+      return {
+        ...currentState,
         currentPoint: { x: worldX, y: worldY },
-      });
+      };
     }
+    return currentState;
   }
 
   /**
@@ -110,11 +106,11 @@ export class BoxCreationHandler {
   /**
    * Reset creation state
    */
-  static resetCreateState(createStateSignal: WritableSignal<CreateBoxState>): void {
-    createStateSignal.set({
+  static resetCreateState(): CreateBoxState {
+    return {
       isCreating: false,
       startPoint: null,
       currentPoint: null,
-    });
+    };
   }
 }

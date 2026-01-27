@@ -1,4 +1,3 @@
-import { WritableSignal } from '@angular/core';
 import { ContextMenuState, ContextMenuUtils } from '../utils/context-menu-utils';
 
 /**
@@ -9,23 +8,15 @@ export class ContextMenuHandler {
   /**
    * Open context menu at specified position
    */
-  static open(
-    screenX: number,
-    screenY: number,
-    worldX: number,
-    worldY: number,
-    contextMenuStateSignal: WritableSignal<ContextMenuState | null>,
-  ): void {
-    const state = ContextMenuUtils.open(screenX, screenY, worldX, worldY);
-    contextMenuStateSignal.set(state);
+  static open(screenX: number, screenY: number, worldX: number, worldY: number): ContextMenuState {
+    return ContextMenuUtils.open(screenX, screenY, worldX, worldY);
   }
 
   /**
    * Close context menu
    */
-  static close(contextMenuStateSignal: WritableSignal<ContextMenuState | null>): void {
-    const state = ContextMenuUtils.close();
-    contextMenuStateSignal.set(state);
+  static close(): ContextMenuState {
+    return ContextMenuUtils.close();
   }
 
   /**

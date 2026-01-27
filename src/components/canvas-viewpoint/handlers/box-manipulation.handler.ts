@@ -17,15 +17,9 @@ export class BoxManipulationHandler {
     worldX: number,
     worldY: number,
     box: { x: number; y: number; w: number; h: number; rotation: number },
-    rotationStartAngleSignal: WritableSignal<number>,
-    boxStartRotationSignal: WritableSignal<number>,
-    cursorSignal: WritableSignal<string>,
-    canvasElement: HTMLCanvasElement | null,
-  ): void {
+  ): { angle: number; boxRotation: number } {
     const angle = Math.atan2(worldY - box.y, worldX - box.x);
-    rotationStartAngleSignal.set(angle);
-    boxStartRotationSignal.set(box.rotation);
-    CursorManager.updateForRotation(cursorSignal, canvasElement);
+    return { angle, boxRotation: box.rotation };
   }
 
   /**
@@ -52,15 +46,13 @@ export class BoxManipulationHandler {
   }
 
   /**
-   * Start box resize
+   * Start box resize - returns nothing, just for cursor update
    */
   static startResize(
     corner: ResizeCorner,
     box: { x: number; y: number; w: number; h: number; rotation: number },
-    cursorSignal: WritableSignal<string>,
-    canvasElement: HTMLCanvasElement | null,
   ): void {
-    CursorManager.updateForResize(cursorSignal, canvasElement, corner, box);
+    // Just a marker method - actual logic handled by caller
   }
 
   /**
@@ -84,14 +76,11 @@ export class BoxManipulationHandler {
     worldX: number,
     worldY: number,
     box: { x: number; y: number; w: number; h: number },
-    dragStartWorldSignal: WritableSignal<{ x: number; y: number }>,
-    boxStartPosSignal: WritableSignal<{ x: number; y: number }>,
-    cursorSignal: WritableSignal<string>,
-    canvasElement: HTMLCanvasElement | null,
-  ): void {
-    dragStartWorldSignal.set({ x: worldX, y: worldY });
-    boxStartPosSignal.set({ x: box.x, y: box.y });
-    CursorManager.updateForDrag(cursorSignal, canvasElement);
+  ): { dragStart: { x: number; y: number }; boxStart: { x: number; y: number } } {
+    return {
+      dragStart: { x: worldX, y: worldY },
+      boxStart: { x: box.x, y: box.y },
+    };
   }
 
   /**

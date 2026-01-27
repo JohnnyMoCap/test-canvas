@@ -1,4 +1,3 @@
-import { WritableSignal } from '@angular/core';
 import { Camera } from '../core/types';
 import { CameraUtils } from '../utils/camera-utils';
 
@@ -10,12 +9,8 @@ export class CameraHandler {
   /**
    * Start camera pan
    */
-  static startPan(
-    lastPointerSignal: WritableSignal<{ x: number; y: number }>,
-    x: number,
-    y: number,
-  ): void {
-    lastPointerSignal.set({ x, y });
+  static startPan(x: number, y: number): { x: number; y: number } {
+    return { x, y };
   }
 
   /**

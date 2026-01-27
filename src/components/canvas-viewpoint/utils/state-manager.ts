@@ -13,65 +13,87 @@ export class StateManager {
   // CANVAS & RENDERING
   // ========================================
 
-  private canvasElement = signal<HTMLCanvasElement | null>(null);
-  raf = signal(0);
-  ctx = signal<CanvasRenderingContext2D | undefined>(undefined);
-  devicePixelRatio = signal(1);
-  lastFrameTime = signal(0);
-  bgCanvas = signal<HTMLCanvasElement | undefined>(undefined);
-  minZoom = signal(0);
-  canvasAspectRatio = signal(1.5);
+  private _canvasElement = signal<HTMLCanvasElement | null>(null);
+  private _raf = signal(0);
+  private _ctx = signal<CanvasRenderingContext2D | undefined>(undefined);
+  private _devicePixelRatio = signal(1);
+  private _lastFrameTime = signal(0);
+  private _bgCanvas = signal<HTMLCanvasElement | undefined>(undefined);
+  private _minZoom = signal(0);
+  private _canvasAspectRatio = signal(1.5);
+
+  readonly canvasElement = this._canvasElement.asReadonly();
+  readonly raf = this._raf.asReadonly();
+  readonly ctx = this._ctx.asReadonly();
+  readonly devicePixelRatio = this._devicePixelRatio.asReadonly();
+  readonly lastFrameTime = this._lastFrameTime.asReadonly();
+  readonly bgCanvas = this._bgCanvas.asReadonly();
+  readonly minZoom = this._minZoom.asReadonly();
+  readonly canvasAspectRatio = this._canvasAspectRatio.asReadonly();
 
   // ========================================
   // FEATURE: BOX CREATION
   // ========================================
 
-  isCreateMode = signal(false);
-  createState = signal<CreateBoxState>({
+  private _isCreateMode = signal(false);
+  private _createState = signal<CreateBoxState>({
     isCreating: false,
     startPoint: null,
     currentPoint: null,
   });
-  nextTempId = signal(1);
+  private _nextTempId = signal(1);
+
+  readonly isCreateMode = this._isCreateMode.asReadonly();
+  readonly createState = this._createState.asReadonly();
+  readonly nextTempId = this._nextTempId.asReadonly();
 
   // ========================================
   // FEATURE: MAGIC DETECTION
   // ========================================
 
-  isMagicMode = signal(false);
-  magicTolerance = signal(30);
-  debugMagicDetection = signal(false);
+  private _isMagicMode = signal(false);
+  private _magicTolerance = signal(30);
+  private _debugMagicDetection = signal(false);
+
+  readonly isMagicMode = this._isMagicMode.asReadonly();
+  readonly magicTolerance = this._magicTolerance.asReadonly();
+  readonly debugMagicDetection = this._debugMagicDetection.asReadonly();
 
   // ========================================
   // FEATURE: CONTEXT MENU
   // ========================================
 
-  contextMenuState = signal<ContextMenuState | null>(null);
+  private _contextMenuState = signal<ContextMenuState | null>(null);
+
+  readonly contextMenuState = this._contextMenuState.asReadonly();
 
   // ========================================
   // FEATURE: SELECTION & HOVER
   // ========================================
 
-  hoveredBoxId = signal<string | null>(null);
-  selectedBoxId = signal<string | null>(null);
+  private _hoveredBoxId = signal<string | null>(null);
+  private _selectedBoxId = signal<string | null>(null);
+
+  readonly hoveredBoxId = this._hoveredBoxId.asReadonly();
+  readonly selectedBoxId = this._selectedBoxId.asReadonly();
 
   // ========================================
   // FEATURE: BOX INTERACTION (Rotate/Resize/Drag)
   // ========================================
 
-  isPointerDown = signal(false);
-  isDraggingBox = signal(false);
-  dragStartWorld = signal({ x: 0, y: 0 });
-  boxStartPos = signal({ x: 0, y: 0 });
+  private _isPointerDown = signal(false);
+  private _isDraggingBox = signal(false);
+  private _dragStartWorld = signal({ x: 0, y: 0 });
+  private _boxStartPos = signal({ x: 0, y: 0 });
 
-  isResizing = signal(false);
-  resizeCorner = signal<ResizeCorner | null>(null);
+  private _isResizing = signal(false);
+  private _resizeCorner = signal<ResizeCorner | null>(null);
 
-  isRotating = signal(false);
-  rotationStartAngle = signal(0);
-  boxStartRotation = signal(0);
+  private _isRotating = signal(false);
+  private _rotationStartAngle = signal(0);
+  private _boxStartRotation = signal(0);
 
-  interactionStartState = signal<{
+  private _interactionStartState = signal<{
     boxId: string;
     x: number;
     y: number;
@@ -80,23 +102,44 @@ export class StateManager {
     rotation: number;
   } | null>(null);
 
+  readonly isPointerDown = this._isPointerDown.asReadonly();
+  readonly isDraggingBox = this._isDraggingBox.asReadonly();
+  readonly dragStartWorld = this._dragStartWorld.asReadonly();
+  readonly boxStartPos = this._boxStartPos.asReadonly();
+  readonly isResizing = this._isResizing.asReadonly();
+  readonly resizeCorner = this._resizeCorner.asReadonly();
+  readonly isRotating = this._isRotating.asReadonly();
+  readonly rotationStartAngle = this._rotationStartAngle.asReadonly();
+  readonly boxStartRotation = this._boxStartRotation.asReadonly();
+  readonly interactionStartState = this._interactionStartState.asReadonly();
+
   // ========================================
   // FEATURE: CLIPBOARD
   // ========================================
 
-  clipboard = signal<Box | null>(null);
+  private _clipboard = signal<Box | null>(null);
+
+  readonly clipboard = this._clipboard.asReadonly();
 
   // ========================================
   // UI STATE
   // ========================================
 
-  currentCursor = signal('default');
-  lastPointer = signal({ x: 0, y: 0 });
-  lastMouseScreen = signal<{ x: number; y: number } | null>(null);
-  showNametags = signal(true);
-  debugShowQuadtree = signal(true);
-  brightness = signal(100);
-  contrast = signal(100);
+  private _currentCursor = signal('default');
+  private _lastPointer = signal({ x: 0, y: 0 });
+  private _lastMouseScreen = signal<{ x: number; y: number } | null>(null);
+  private _showNametags = signal(true);
+  private _debugShowQuadtree = signal(true);
+  private _brightness = signal(100);
+  private _contrast = signal(100);
+
+  readonly currentCursor = this._currentCursor.asReadonly();
+  readonly lastPointer = this._lastPointer.asReadonly();
+  readonly lastMouseScreen = this._lastMouseScreen.asReadonly();
+  readonly showNametags = this._showNametags.asReadonly();
+  readonly debugShowQuadtree = this._debugShowQuadtree.asReadonly();
+  readonly brightness = this._brightness.asReadonly();
+  readonly contrast = this._contrast.asReadonly();
 
   // ========================================
   // COMPUTED STATE
@@ -111,7 +154,7 @@ export class StateManager {
   );
 
   constructor(contextMenuState: ContextMenuState) {
-    this.contextMenuState.set(contextMenuState);
+    this._contextMenuState.set(contextMenuState);
   }
 
   // ========================================
@@ -122,7 +165,7 @@ export class StateManager {
    * Reset creation state
    */
   resetCreationState(): void {
-    this.createState.set({
+    this._createState.set({
       isCreating: false,
       startPoint: null,
       currentPoint: null,
@@ -133,7 +176,7 @@ export class StateManager {
    * Toggle create mode
    */
   toggleCreateMode(): void {
-    this.isCreateMode.update((v) => !v);
+    this._isCreateMode.update((v) => !v);
     if (!this.isCreateMode()) {
       this.resetCreationState();
     }
@@ -147,7 +190,7 @@ export class StateManager {
    * Toggle magic mode
    */
   toggleMagicMode(): void {
-    this.isMagicMode.update((v) => !v);
+    this._isMagicMode.update((v) => !v);
     // Set cursor after signal updates
     const newCursor = this.isMagicMode() ? 'crosshair' : 'default';
     this.setCursor(newCursor);
@@ -161,12 +204,12 @@ export class StateManager {
    * Reset all interaction states
    */
   resetInteractionStates(): void {
-    this.isPointerDown.set(false);
-    this.isDraggingBox.set(false);
-    this.isResizing.set(false);
-    this.isRotating.set(false);
-    this.resizeCorner.set(null);
-    this.interactionStartState.set(null);
+    this._isPointerDown.set(false);
+    this._isDraggingBox.set(false);
+    this._isResizing.set(false);
+    this._isRotating.set(false);
+    this._resizeCorner.set(null);
+    this._interactionStartState.set(null);
   }
 
   /**
@@ -180,7 +223,7 @@ export class StateManager {
     h: number,
     rotation: number,
   ): void {
-    this.interactionStartState.set({ boxId, x, y, w, h, rotation });
+    this._interactionStartState.set({ boxId, x, y, w, h, rotation });
   }
 
   // ========================================
@@ -191,19 +234,15 @@ export class StateManager {
    * Set canvas element reference (call during ngAfterViewInit)
    */
   setCanvas(canvas: HTMLCanvasElement): void {
-    this.canvasElement.set(canvas);
+    this._canvasElement.set(canvas);
   }
 
   /**
-   * Update cursor (now works without passing canvas every time)
+   * Update cursor (reactive updates handled by component effect)
    */
   setCursor(cursor: string): void {
     if (this.currentCursor() !== cursor) {
-      this.currentCursor.set(cursor);
-      const canvas = this.canvasElement();
-      if (canvas) {
-        canvas.style.cursor = cursor;
-      }
+      this._currentCursor.set(cursor);
     }
   }
 
@@ -211,7 +250,7 @@ export class StateManager {
    * Track mouse screen position
    */
   updateMouseScreenPosition(x: number, y: number): void {
-    this.lastMouseScreen.set({ x, y });
+    this._lastMouseScreen.set({ x, y });
   }
 
   // ========================================
@@ -223,7 +262,7 @@ export class StateManager {
    */
   updateHoverState(boxId: string | null): boolean {
     if (this.hoveredBoxId() !== boxId) {
-      this.hoveredBoxId.set(boxId);
+      this._hoveredBoxId.set(boxId);
       return true; // State changed
     }
     return false; // No change
@@ -233,7 +272,7 @@ export class StateManager {
    * Update selected box
    */
   updateSelectedBox(boxId: string | null): void {
-    this.selectedBoxId.set(boxId);
+    this._selectedBoxId.set(boxId);
   }
 
   // ========================================
@@ -252,7 +291,7 @@ export class StateManager {
    * Update minimum zoom
    */
   updateMinZoom(minZoom: number): void {
-    this.minZoom.set(minZoom);
+    this._minZoom.set(minZoom);
   }
 
   // ========================================
@@ -263,62 +302,62 @@ export class StateManager {
    * Update pointer down state
    */
   updatePointerDown(isDown: boolean): void {
-    this.isPointerDown.set(isDown);
+    this._isPointerDown.set(isDown);
   }
 
   /**
    * Start dragging box
    */
   startDragging(worldX: number, worldY: number, boxX: number, boxY: number): void {
-    this.isDraggingBox.set(true);
-    this.dragStartWorld.set({ x: worldX, y: worldY });
-    this.boxStartPos.set({ x: boxX, y: boxY });
+    this._isDraggingBox.set(true);
+    this._dragStartWorld.set({ x: worldX, y: worldY });
+    this._boxStartPos.set({ x: boxX, y: boxY });
   }
 
   /**
    * Stop dragging box
    */
   stopDragging(): void {
-    this.isDraggingBox.set(false);
+    this._isDraggingBox.set(false);
   }
 
   /**
    * Start resizing box
    */
   startResizing(corner: ResizeCorner): void {
-    this.isResizing.set(true);
-    this.resizeCorner.set(corner);
+    this._isResizing.set(true);
+    this._resizeCorner.set(corner);
   }
 
   /**
    * Stop resizing box
    */
   stopResizing(): void {
-    this.isResizing.set(false);
-    this.resizeCorner.set(null);
+    this._isResizing.set(false);
+    this._resizeCorner.set(null);
   }
 
   /**
    * Start rotating box
    */
   startRotating(startAngle: number, boxRotation: number): void {
-    this.isRotating.set(true);
-    this.rotationStartAngle.set(startAngle);
-    this.boxStartRotation.set(boxRotation);
+    this._isRotating.set(true);
+    this._rotationStartAngle.set(startAngle);
+    this._boxStartRotation.set(boxRotation);
   }
 
   /**
    * Stop rotating box
    */
   stopRotating(): void {
-    this.isRotating.set(false);
+    this._isRotating.set(false);
   }
 
   /**
    * Update last pointer position
    */
   updateLastPointer(x: number, y: number): void {
-    this.lastPointer.set({ x, y });
+    this._lastPointer.set({ x, y });
   }
 
   // ========================================
@@ -329,7 +368,7 @@ export class StateManager {
    * Update clipboard
    */
   updateClipboard(box: Box | null): void {
-    this.clipboard.set(box);
+    this._clipboard.set(box);
   }
 
   // ========================================
@@ -340,7 +379,7 @@ export class StateManager {
    * Update context menu state
    */
   updateContextMenu(state: ContextMenuState | null): void {
-    this.contextMenuState.set(state);
+    this._contextMenuState.set(state);
   }
 
   // ========================================
@@ -351,7 +390,7 @@ export class StateManager {
    * Update create mode
    */
   updateCreateMode(isCreateMode: boolean): void {
-    this.isCreateMode.set(isCreateMode);
+    this._isCreateMode.set(isCreateMode);
     if (!isCreateMode) {
       this.resetCreationState();
     }
@@ -361,7 +400,7 @@ export class StateManager {
    * Update create state
    */
   updateCreateState(state: CreateBoxState): void {
-    this.createState.set(state);
+    this._createState.set(state);
   }
 
   /**
@@ -369,7 +408,7 @@ export class StateManager {
    */
   getNextTempId(): number {
     const current = this.nextTempId();
-    this.nextTempId.set(current + 1);
+    this._nextTempId.set(current + 1);
     return current;
   }
 
@@ -381,55 +420,83 @@ export class StateManager {
    * Update show nametags
    */
   updateShowNametags(show: boolean): void {
-    this.showNametags.set(show);
+    this._showNametags.set(show);
   }
 
   /**
    * Update debug show quadtree
    */
   updateDebugShowQuadtree(show: boolean): void {
-    this.debugShowQuadtree.set(show);
+    this._debugShowQuadtree.set(show);
   }
 
   /**
    * Update device pixel ratio
    */
   updateDevicePixelRatio(ratio: number): void {
-    this.devicePixelRatio.set(ratio);
+    this._devicePixelRatio.set(ratio);
   }
 
   /**
    * Update canvas context
    */
   updateContext(ctx: CanvasRenderingContext2D | undefined): void {
-    this.ctx.set(ctx);
+    this._ctx.set(ctx);
   }
 
   /**
    * Update background canvas
    */
   updateBgCanvas(bgCanvas: HTMLCanvasElement | undefined): void {
-    this.bgCanvas.set(bgCanvas);
+    this._bgCanvas.set(bgCanvas);
   }
 
   /**
    * Update canvas aspect ratio
    */
   updateCanvasAspectRatio(ratio: number): void {
-    this.canvasAspectRatio.set(ratio);
+    this._canvasAspectRatio.set(ratio);
   }
 
   /**
    * Update last frame time
    */
   updateLastFrameTime(time: number): void {
-    this.lastFrameTime.set(time);
+    this._lastFrameTime.set(time);
   }
 
   /**
    * Update RAF ID
    */
   updateRaf(id: number): void {
-    this.raf.set(id);
+    this._raf.set(id);
+  }
+
+  /**
+   * Update magic tolerance
+   */
+  updateMagicTolerance(tolerance: number): void {
+    this._magicTolerance.set(tolerance);
+  }
+
+  /**
+   * Update debug magic detection
+   */
+  updateDebugMagicDetection(debug: boolean): void {
+    this._debugMagicDetection.set(debug);
+  }
+
+  /**
+   * Update brightness
+   */
+  updateBrightness(brightness: number): void {
+    this._brightness.set(brightness);
+  }
+
+  /**
+   * Update contrast
+   */
+  updateContrast(contrast: number): void {
+    this._contrast.set(contrast);
   }
 }

@@ -53,22 +53,22 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
   @Input() set magicToleranceInput(value: number) {
     if (value !== this.state.magicTolerance()) {
-      this.state.magicTolerance.set(value);
+      this.state.updateMagicTolerance(value);
     }
   }
   @Input() set debugMagicInput(value: boolean) {
     if (value !== this.state.debugMagicDetection()) {
-      this.state.debugMagicDetection.set(value);
+      this.state.updateDebugMagicDetection(value);
     }
   }
   @Input() set brightnessInput(value: number) {
     if (value !== this.state.brightness()) {
-      this.state.brightness.set(value);
+      this.state.updateBrightness(value);
     }
   }
   @Input() set contrastInput(value: number) {
     if (value !== this.state.contrast()) {
-      this.state.contrast.set(value);
+      this.state.updateContrast(value);
     }
   }
   @Output() zoomChange = new EventEmitter<number>();
@@ -157,8 +157,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       bgc.height,
       BoxCreationUtils.generateTempId(this.state.nextTempId()),
     );
-    //TODO: change to work like our normal incrememnt stuff
-    this.state.nextTempId.set(this.state.nextTempId() + 1);
+    this.state.getNextTempId();
 
     this.historyService.recordAdd(newBox);
 
@@ -168,7 +167,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   closeContextMenu() {
-    this.state.contextMenuState.set(ContextMenuUtils.close());
+    this.state.updateContextMenu(ContextMenuUtils.close());
   }
 
   // ========================================
@@ -281,9 +280,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: add measurment tool - add to reset tool on id change etc
 
   //TODO: READ AND VERIFY MAGIC WORKS AND FOLLOWS THE STRUCTURE
-  //TODO: remove the stupid form crap, its there just for the tolorance
-
-  //TODO: bug, the blue is still the fucking canvas, its not allowed. the canvas is ONLY the image.
 
   //TODO: bug, there may be some funky state updates going on here
 
@@ -310,6 +306,15 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const __ = this.localBoxes();
       this.scheduleRender();
     });
+
+    // Reactive cursor updates
+    effect(() => {
+      const cursor = this.state.currentCursor();
+      const canvas = this.canvasRef.nativeElement;
+      if (canvas) {
+        canvas.style.cursor = cursor;
+      }
+    });
   }
 
   private setupHotkeys(): void {
@@ -321,9 +326,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private initializeCanvas(): void {
     const canvas = this.canvasRef.nativeElement;
-    this.state.devicePixelRatio.set(window.devicePixelRatio || 1);
+    this.state.updateDevicePixelRatio(window.devicePixelRatio || 1);
     this.onResize();
-    this.state.ctx.set(LifecycleManager.initializeCanvas(canvas, this.state.devicePixelRatio()));
+    this.state.updateContext(
+      LifecycleManager.initializeCanvas(canvas, this.state.devicePixelRatio()),
+    );
   }
 
   private setupResizeObserver(): void {
@@ -420,10 +427,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
 
     this.state.updateBgCanvas(result.canvas);
-    this.state.minZoom.set(result.minZoom);
+    this.state.updateMinZoom(result.minZoom);
 
     if (this.state.bgCanvas()!.width > 0 && this.state.bgCanvas()!.height > 0) {
-      this.state.canvasAspectRatio.set(
+      this.state.updateCanvasAspectRatio(
         this.state.bgCanvas()!.width / this.state.bgCanvas()!.height,
       );
     }
@@ -459,7 +466,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     canvas.height = h;
 
     if (this.state.bgCanvas()) {
-      this.state.minZoom.set(
+      this.state.updateMinZoom(
         BackgroundUtils.recalculateMinZoom(
           w,
           h,
@@ -517,7 +524,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private handleCopy(): void {
     const selected = this.state.selectedBoxId();
     if (!selected) return;
-    this.state.clipboard.set(ClipboardManager.copyBox(selected, this.localBoxes()));
+    this.state.updateClipboard(ClipboardManager.copyBox(selected, this.localBoxes()));
   }
 
   private handlePaste(): void {
@@ -540,10 +547,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.nextTempId(),
     );
 
-    this.state.nextTempId.set(this.state.nextTempId() + 1);
+    this.state.getNextTempId();
 
     this.historyService.recordAdd(newBox);
-    this.state.selectedBoxId.set(String(getBoxId(newBox)));
+    this.state.updateSelectedBox(String(getBoxId(newBox)));
     this.state.setCursor('move');
     this.rebuildIndex();
     this.scheduleRender();

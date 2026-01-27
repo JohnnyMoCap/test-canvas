@@ -1,4 +1,3 @@
-import { WritableSignal } from '@angular/core';
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { Camera, ResizeCorner, TextMetrics } from '../core/types';
 import { Quadtree } from '../core/quadtree';
@@ -6,6 +5,7 @@ import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { CursorManager } from '../cursor/cursor-manager';
+import { CursorStyles } from '../cursor/cursor-styles';
 
 /**
  * Handler for hover detection and interaction point detection
@@ -134,12 +134,11 @@ export class HoverHandler {
     imageHeight: number,
     camera: Camera,
     isCreateMode: boolean,
-    cursorSignal: WritableSignal<string>,
-    canvasElement: HTMLCanvasElement | null,
+    setCursorFn: (cursor: string) => void,
   ): void {
     // In create mode, always use crosshair
     if (isCreateMode) {
-      CursorManager.updateForCreateMode(cursorSignal, canvasElement);
+      setCursorFn('crosshair');
       return;
     }
 
@@ -151,31 +150,32 @@ export class HoverHandler {
         if (worldBox) {
           // Check rotation knob first
           if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
-            CursorManager.updateForRotationKnob(cursorSignal, canvasElement);
+            setCursorFn('grab');
             return;
           }
 
           // Check corner handles
           const corner = this.detectCornerHandle(wx, wy, worldBox, camera);
           if (corner) {
-            CursorManager.updateForResize(cursorSignal, canvasElement, corner, worldBox);
+            const cursor = CursorStyles.getResizeCursor(corner, worldBox);
+            setCursorFn(cursor);
             return;
           }
         }
       }
 
       // Hovering over box but not on interaction points
-      CursorManager.updateForHover(cursorSignal, canvasElement);
+      setCursorFn('move');
       return;
     }
 
     // Hovering over any box
     if (hoveredBoxId) {
-      CursorManager.updateForHover(cursorSignal, canvasElement);
+      setCursorFn('move');
       return;
     }
 
     // No hover
-    CursorManager.updateToDefault(cursorSignal, canvasElement);
+    setCursorFn('default');
   }
 }

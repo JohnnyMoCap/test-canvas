@@ -127,7 +127,7 @@ export class PointerEventHandler {
     );
 
     if (newBox) {
-      state.nextTempId.set(state.nextTempId() + 1);
+      state.getNextTempId();
     }
 
     // Stay in magic mode to allow multiple detections
@@ -151,19 +151,15 @@ export class PointerEventHandler {
 
     // Close context menu if clicking outside
     if (state.contextMenuState()?.visible) {
-      ContextMenuHandler.close(state.contextMenuState);
+      state.updateContextMenu(ContextMenuHandler.close());
       return true;
     }
 
     // Handle right-click to open context menu
     if (event.button === 2) {
       event.preventDefault();
-      ContextMenuHandler.open(
-        event.clientX,
-        event.clientY,
-        worldPos.x,
-        worldPos.y,
-        state.contextMenuState,
+      state.updateContextMenu(
+        ContextMenuHandler.open(event.clientX, event.clientY, worldPos.x, worldPos.y),
       );
       return true;
     }
@@ -180,7 +176,7 @@ export class PointerEventHandler {
     if (!state.isCreateMode()) return false;
 
     if (event.button === 0) {
-      BoxCreationHandler.startCreate(worldPos.x, worldPos.y, state.createState);
+      state.updateCreateState(BoxCreationHandler.startCreate(worldPos.x, worldPos.y));
       canvas.setPointerCapture(event.pointerId);
       return true;
     }
@@ -232,20 +228,10 @@ export class PointerEventHandler {
   ): boolean {
     if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, worldBox, camera)) return false;
 
-    state.startRotating(
-      Math.atan2(worldPos.y - worldBox.y, worldPos.x - worldBox.x),
-      worldBox.rotation,
-    );
+    const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, worldBox);
+    state.startRotating(rotationInfo.angle, rotationInfo.boxRotation);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    BoxManipulationHandler.startRotation(
-      worldPos.x,
-      worldPos.y,
-      worldBox,
-      state.rotationStartAngle,
-      state.boxStartRotation,
-      state.currentCursor,
-      canvas,
-    );
+    state.setCursor('grabbing');
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -265,7 +251,7 @@ export class PointerEventHandler {
     state.startResizing(corner);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
     state.updateLastPointer(worldPos.x, worldPos.y);
-    BoxManipulationHandler.startResize(corner, worldBox, state.currentCursor, canvas);
+    state.setCursor('nwse-resize'); // Will be updated by cursor manager
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -281,16 +267,14 @@ export class PointerEventHandler {
     if (!CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) return false;
 
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
-    BoxManipulationHandler.startDrag(
-      worldPos.x,
-      worldPos.y,
-      worldBox,
-      state.dragStartWorld,
-      state.boxStartPos,
-      state.currentCursor,
-      canvas,
+    const dragInfo = BoxManipulationHandler.startDrag(worldPos.x, worldPos.y, worldBox);
+    state.startDragging(
+      dragInfo.dragStart.x,
+      dragInfo.dragStart.y,
+      dragInfo.boxStart.x,
+      dragInfo.boxStart.y,
     );
+    state.setCursor('move');
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -341,7 +325,7 @@ export class PointerEventHandler {
 
   private static handleCameraPanStart(event: PointerEvent, state: StateManager): void {
     state.updateSelectedBox(null);
-    CameraHandler.startPan(state.lastPointer, event.clientX, event.clientY);
+    state.updateLastPointer(event.clientX, event.clientY);
     state.updatePointerDown(true);
   }
 
@@ -412,7 +396,9 @@ export class PointerEventHandler {
   ): boolean {
     if (!state.createState().isCreating) return false;
 
-    BoxCreationHandler.updatePreview(worldPos.x, worldPos.y, state.createState);
+    state.updateCreateState(
+      BoxCreationHandler.updatePreview(worldPos.x, worldPos.y, state.createState()),
+    );
     return true;
   }
 
@@ -563,7 +549,6 @@ export class PointerEventHandler {
         camera,
         state.isCreateMode(),
         state.currentCursor,
-        canvas,
       );
     }
   }
@@ -641,7 +626,7 @@ export class PointerEventHandler {
       onRebuildIndex();
     }
 
-    BoxCreationHandler.resetCreateState(state.createState);
+    state.updateCreateState(BoxCreationHandler.resetCreateState());
     return true;
   }
 
