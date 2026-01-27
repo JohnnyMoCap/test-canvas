@@ -63,6 +63,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.debugMagicDetection.set(value);
     }
   }
+  @Input() set brightnessInput(value: number) {
+    if (value !== this.state.brightness()) {
+      this.state.brightness.set(value);
+    }
+  }
+  @Input() set contrastInput(value: number) {
+    if (value !== this.state.contrast()) {
+      this.state.contrast.set(value);
+    }
+  }
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
   @Output() magicModeChange = new EventEmitter<boolean>();
@@ -83,6 +93,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
   contextMenuY = computed(() => this.state.contextMenuState()?.y ?? 0);
+  canvasFilter = computed(
+    () => `brightness(${this.state.brightness()}%) contrast(${this.state.contrast()}%)`,
+  );
   constructor(
     private historyService: HistoryService,
     private hotkeyService: HotkeyService,
@@ -267,7 +280,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //TODOS: cursor is a bit wrong sometimes?
-  //TODO: add css brightness and contrast controls
   //TODO: add measurment tool - add to reset tool on id change etc
 
   //TODO: READ AND VERIFY MAGIC WORKS AND FOLLOWS THE STRUCTURE

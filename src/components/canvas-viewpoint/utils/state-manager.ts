@@ -95,6 +95,8 @@ export class StateManager {
   lastMouseScreen = signal<{ x: number; y: number } | null>(null);
   showNametags = signal(true);
   debugShowQuadtree = signal(true);
+  brightness = signal(100);
+  contrast = signal(100);
 
   // ========================================
   // COMPUTED STATE

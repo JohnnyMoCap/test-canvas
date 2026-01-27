@@ -6,7 +6,7 @@
   (pointermove)="onPointerMove($event)"
   (contextmenu)="$event.preventDefault()"
 >
-  <canvas #canvasEl></canvas>
+  <canvas #canvasEl [style.filter]="canvasFilter()"></canvas>
 
   <app-box-context-menu
     [visible]="contextMenuVisible()"
