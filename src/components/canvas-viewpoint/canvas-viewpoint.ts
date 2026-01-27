@@ -11,12 +11,10 @@ import {
   effect,
   computed,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { Box, getBoxId } from '../../intefaces/boxes.interface';
 import { Quadtree } from './core/quadtree';
 import { Camera, TextMetrics } from './core/types';
 import { BoxType } from './core/creation-state';
-import { CoordinateTransform } from './utils/coordinate-transform';
 import { CameraUtils } from './utils/camera-utils';
 import { BoxCreationUtils } from './utils/box-creation-utils';
 import { ContextMenuUtils } from './utils/context-menu-utils';
@@ -38,7 +36,7 @@ import { HotkeyService } from '../../services/hotkey.service';
   templateUrl: './canvas-viewpoint.html',
   styleUrls: ['./canvas-viewpoint.css'],
   standalone: true,
-  imports: [BoxContextMenuComponent, FormsModule],
+  imports: [BoxContextMenuComponent],
 })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
