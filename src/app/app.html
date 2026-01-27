@@ -1,3 +1,40 @@
 <div class="max">
-  <app-canvas-viewport [backgroundUrl]="'/assets/background.jpg'"></app-canvas-viewport>
+  <div class="controls">
+    <button (click)="resetCamera()">Reset</button>
+    <button (click)="toggleCreateMode()" [class.active]="isCreateMode()">
+      {{ isCreateMode() ? 'Exit Create' : 'Create Mode' }}
+    </button>
+    <button (click)="toggleMagicMode()" [class.active]="isMagicMode()">
+      {{ isMagicMode() ? 'Exit Magic' : 'Magic Box' }}
+    </button>
+    @if (isMagicMode()) {
+      <label>
+        Tolerance:
+        <input
+          type="number"
+          [(ngModel)]="magicTolerance"
+          min="5"
+          max="100"
+          step="5"
+          class="tolerance-input"
+        />
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="debugMagic" />
+        Debug Logs
+      </label>
+    }
+    <label>Zoom: {{ zoom() }}%</label>
+  </div>
+
+  <app-canvas-viewport
+    [backgroundUrl]="'/assets/background.jpg'"
+    [isCreateModeInput]="isCreateMode()"
+    [isMagicModeInput]="isMagicMode()"
+    [magicToleranceInput]="magicTolerance()"
+    [debugMagicInput]="debugMagic()"
+    (zoomChange)="onZoomChange($event)"
+    (createModeChange)="onCreateModeChange($event)"
+    (magicModeChange)="onMagicModeChange($event)"
+  ></app-canvas-viewport>
 </div>

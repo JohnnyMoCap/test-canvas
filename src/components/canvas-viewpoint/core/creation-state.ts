@@ -8,7 +8,7 @@ export interface CreateBoxState {
   currentPoint: { x: number; y: number } | null;
 }
 
-export type BoxType = 'finding' | 'annotation' | 'highlight' | 'comment';
+export type BoxType = 'finding' | 'annotation' | 'highlight' | 'comment' | 'magic';
 
 export interface BoxTypeInfo {
   type: BoxType;
@@ -40,6 +40,12 @@ export const BOX_TYPES: Record<BoxType, BoxTypeInfo> = {
     type: 'comment',
     label: 'Comment',
     defaultColor: 'hsl(120, 70%, 50%)',
+    defaultSize: { w: 120, h: 90 },
+  },
+  magic: {
+    type: 'magic',
+    label: 'Magic',
+    defaultColor: 'hsl(180, 70%, 50%)',
     defaultSize: { w: 120, h: 90 },
   },
 };

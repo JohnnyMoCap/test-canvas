@@ -35,6 +35,14 @@ export class StateManager {
   nextTempId = signal(1);
 
   // ========================================
+  // FEATURE: MAGIC DETECTION
+  // ========================================
+
+  isMagicMode = signal(false);
+  magicTolerance = signal(30);
+  debugMagicDetection = signal(false);
+
+  // ========================================
   // FEATURE: CONTEXT MENU
   // ========================================
 
@@ -127,6 +135,20 @@ export class StateManager {
     if (!this.isCreateMode()) {
       this.resetCreationState();
     }
+  }
+
+  // ========================================
+  // FEATURE: MAGIC DETECTION - Methods
+  // ========================================
+
+  /**
+   * Toggle magic mode
+   */
+  toggleMagicMode(): void {
+    this.isMagicMode.update((v) => !v);
+    // Set cursor after signal updates
+    const newCursor = this.isMagicMode() ? 'crosshair' : 'default';
+    this.setCursor(newCursor);
   }
 
   // ========================================

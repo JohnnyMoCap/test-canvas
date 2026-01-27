@@ -10,6 +10,7 @@ import { BoxManipulationHandler } from '../handlers/box-manipulation.handler';
 import { BoxCreationHandler } from '../handlers/box-creation.handler';
 import { CameraHandler } from '../handlers/camera.handler';
 import { ContextMenuHandler } from '../handlers/context-menu.handler';
+import { MagicDetectionHandler } from '../handlers/magic-detection.handler';
 
 /**
  * Routes pointer events to appropriate handlers based on state
@@ -18,7 +19,7 @@ import { ContextMenuHandler } from '../handlers/context-menu.handler';
 export class PointerEventHandler {
   /**
    * Handle pointer down event
-   * Routes to handlers based on priority: context menu > creation > interaction > selection > camera
+   * Routes to handlers based on priority: magic detection > context menu > creation > interaction > selection > camera
    */
   static handlePointerDown(
     event: PointerEvent,
@@ -39,6 +40,22 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+
+    // PRIORITY 0: Magic Detection Mode
+    if (
+      this.handleMagicDetection(
+        event,
+        canvas,
+        worldPos,
+        imageWidth,
+        imageHeight,
+        camera,
+        state,
+        historyService,
+      )
+    ) {
+      return;
+    }
 
     // PRIORITY 1: Context Menu
     if (this.handleContextMenu(event, worldPos, state)) return;
@@ -79,6 +96,44 @@ export class PointerEventHandler {
 
     // PRIORITY 7: Camera Pan
     this.handleCameraPanStart(event, state);
+    return;
+  }
+
+  private static handleMagicDetection(
+    event: PointerEvent,
+    canvas: HTMLCanvasElement,
+    worldPos: { x: number; y: number },
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+    state: StateManager,
+    historyService: HistoryService,
+  ): boolean {
+    if (!state.isMagicMode()) return false;
+
+    const bgCanvas = state.bgCanvas();
+    if (!bgCanvas) return false;
+
+    const newBox = MagicDetectionHandler.detectAndCreateBox(
+      event,
+      canvas,
+      bgCanvas,
+      camera,
+      state.devicePixelRatio(),
+      state.magicTolerance(),
+      state.nextTempId(),
+      historyService,
+      state.debugMagicDetection(),
+    );
+
+    if (newBox) {
+      state.nextTempId.set(state.nextTempId() + 1);
+    }
+
+    // Stay in magic mode to allow multiple detections
+    // User can click the button again or press Escape to exit
+
+    return true; // Consumed the event
   }
 
   private static handleContextMenu(

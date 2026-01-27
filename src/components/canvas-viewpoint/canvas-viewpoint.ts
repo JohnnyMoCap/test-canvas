@@ -5,10 +5,13 @@ import {
   AfterViewInit,
   OnDestroy,
   Input,
+  Output,
+  EventEmitter,
   signal,
   effect,
   computed,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Box, getBoxId } from '../../intefaces/boxes.interface';
 import { Quadtree } from './core/quadtree';
 import { Camera, TextMetrics } from './core/types';
@@ -35,11 +38,35 @@ import { HotkeyService } from '../../services/hotkey.service';
   templateUrl: './canvas-viewpoint.html',
   styleUrls: ['./canvas-viewpoint.css'],
   standalone: true,
-  imports: [BoxContextMenuComponent],
+  imports: [BoxContextMenuComponent, FormsModule],
 })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @Input() backgroundUrl?: string;
+  @Input() set isCreateModeInput(value: boolean) {
+    if (value !== this.state.isCreateMode()) {
+      this.toggleCreateMode();
+    }
+  }
+  @Input() set isMagicModeInput(value: boolean) {
+    if (value !== this.state.isMagicMode()) {
+      this.toggleMagicMode();
+    }
+  }
+  @Input() set magicToleranceInput(value: number) {
+    if (value !== this.state.magicTolerance()) {
+      this.state.magicTolerance.set(value);
+    }
+  }
+  @Input() set debugMagicInput(value: boolean) {
+    if (value !== this.state.debugMagicDetection()) {
+      this.state.debugMagicDetection.set(value);
+    }
+  }
+  @Output() zoomChange = new EventEmitter<number>();
+  @Output() createModeChange = new EventEmitter<boolean>();
+  @Output() magicModeChange = new EventEmitter<boolean>();
+  @Output() resetCameraRequest = new EventEmitter<void>();
 
   // State management
   private state: StateManager;
@@ -56,8 +83,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
   contextMenuY = computed(() => this.state.contextMenuState()?.y ?? 0);
-  isCreateMode = computed(() => this.state.isCreateMode());
-
   constructor(
     private historyService: HistoryService,
     private hotkeyService: HotkeyService,
@@ -85,6 +110,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
     this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });
     this.scheduleRender();
+    this.zoomChange.emit(this.camera().zoom);
   }
 
   toggleCreateMode() {
@@ -93,6 +119,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (!this.state.isCreateMode) {
       this.scheduleRender();
     }
+    this.createModeChange.emit(this.state.isCreateMode());
+  }
+
+  toggleMagicMode() {
+    this.state.toggleMagicMode();
+    this.magicModeChange.emit(this.state.isMagicMode());
   }
 
   // ========================================
@@ -149,6 +181,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       (newCamera) => {
         this.camera.set(newCamera);
         this.scheduleRender();
+        this.zoomChange.emit(newCamera.zoom);
       },
     );
   }
@@ -236,8 +269,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODOS: cursor is a bit wrong sometimes?
   //TODO: add css brightness and contrast controls
   //TODO: add measurment tool - add to reset tool on id change etc
-  //TODO: add outside list of boxes (test semi render?) and clicking inside scrolls to it, when clicking in the list zoom into the box.
-  //TODO: add from outside box class change
+
+  //TODO: READ AND VERIFY MAGIC WORKS AND FOLLOWS THE STRUCTURE
+  //TODO: remove the stupid form crap, its there just for the tolorance
+
+  //TODO: bug, the blue is still the fucking canvas, its not allowed. the canvas is ONLY the image.
+
+  //TODO: bug, there may be some funky state updates going on here
 
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)

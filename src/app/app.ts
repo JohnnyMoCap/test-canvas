@@ -1,22 +1,57 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
 import { Box } from '../intefaces/boxes.interface';
 import { HistoryService } from '../services/history.service';
 
 @Component({
   selector: 'app-root',
-  imports: [CanvasViewportComponent],
+  imports: [CanvasViewportComponent, FormsModule],
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
   standalone: true,
 })
 export class App {
+  isCreateMode = signal(false);
+  isMagicMode = signal(false);
+  magicTolerance = signal(30);
+  zoom = signal(100);
+  debugMagic = signal(false);
+
   constructor(private historyService: HistoryService) {
     // Initialize history service with example boxes
     this.historyService.initialize(this.exampleBoxes);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
+  resetCamera() {
+    // This will trigger via the component
+  }
+
+  toggleCreateMode() {
+    this.isCreateMode.update((v) => !v);
+  }
+
+  toggleMagicMode() {
+    this.isMagicMode.update((v) => !v);
+  }
+
+  toggleDebugMagic() {
+    this.debugMagic.update((v) => !v);
+  }
+
+  onZoomChange(zoom: number) {
+    this.zoom.set(Math.round(zoom * 100));
+  }
+
+  onCreateModeChange(isCreateMode: boolean) {
+    this.isCreateMode.set(isCreateMode);
+  }
+
+  onMagicModeChange(isMagicMode: boolean) {
+    this.isMagicMode.set(isMagicMode);
+  }
+
+  exampleBoxes: Box[] = Array.from({ length: 1 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 

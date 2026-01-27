@@ -7,13 +7,6 @@
   (contextmenu)="$event.preventDefault()"
 >
   <canvas #canvasEl></canvas>
-  <div class="controls">
-    <button (click)="resetCamera()">Reset</button>
-    <button (click)="toggleCreateMode()" [class.active]="isCreateMode()">
-      {{ isCreateMode() ? 'Exit Create' : 'Create Mode' }}
-    </button>
-    <label>Zoom: {{ (camera().zoom * 100).toFixed(0) }}%</label>
-  </div>
 
   <app-box-context-menu
     [visible]="contextMenuVisible()"
