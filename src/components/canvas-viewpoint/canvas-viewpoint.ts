@@ -288,8 +288,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: add measurment tool - add to reset tool on id change etc
 
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
-  //TODO: fix interaction with nametag, hover works? but not dragging?
-  //TODO: change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
+  
+  //TODO:maybe? change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
 
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly

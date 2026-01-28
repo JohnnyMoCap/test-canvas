@@ -3,6 +3,7 @@ import { Quadtree } from '../core/quadtree';
 import { Camera, TextMetrics } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
+import { NametagUtils } from '../utils/nametag-utils';
 import { StateManager } from './state-manager';
 import { HistoryService } from '../../../services/history.service';
 import { HoverHandler } from '../handlers/hover.handler';
@@ -324,10 +325,17 @@ export class PointerEventHandler {
       const box = boxes.find((b) => String(getBoxId(b)) === hoveredBoxId);
       if (box) {
         const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
-        if (worldBox && CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) {
-          // Start interaction state so the box can be immediately dragged
-          state.startInteraction(hoveredBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
-          state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
+        if (worldBox) {
+          // Check if clicking on box OR nametag - both should enable dragging
+          const clickedOnBox = CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox);
+          const clickedOnNametag = state.showNametags() && 
+            NametagUtils.pointInNametag(worldPos.x, worldPos.y, worldBox, camera, nametagMetricsCache, ctx);
+          
+          if (clickedOnBox || clickedOnNametag) {
+            // Start interaction state so the box can be immediately dragged
+            state.startInteraction(hoveredBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
+            state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
+          }
         }
       }
 
