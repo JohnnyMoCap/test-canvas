@@ -14,6 +14,7 @@ import { HistoryService } from '../services/history.service';
 export class App {
   isCreateMode = signal(false);
   isMagicMode = signal(false);
+  readOnlyMode = signal(false);
   magicTolerance = signal(30);
   zoom = signal(100);
   debugMagic = signal(false);
@@ -29,6 +30,10 @@ export class App {
 
   toggleCreateMode() {
     this.isCreateMode.update((v) => !v);
+  }
+
+  toggleReadOnlyMode() {
+    this.readOnlyMode.update((v) => !v);
   }
 
   toggleMagicMode() {

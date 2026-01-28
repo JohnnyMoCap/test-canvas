@@ -71,6 +71,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.updateContrast(value);
     }
   }
+  @Input() set readOnlyMode(value: boolean) {
+    if (value !== this.state.readOnlyMode()) {
+      this.state.updateReadOnlyMode(value);
+    }
+  }
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
   @Output() magicModeChange = new EventEmitter<boolean>();

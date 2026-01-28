@@ -1,5 +1,8 @@
 <div class="max">
   <div class="controls">
+    <button (click)="toggleReadOnlyMode()" [class.active]="readOnlyMode()">
+      {{ readOnlyMode() ? 'Exit Read-Only' : 'Read-Only Mode' }}
+    </button>
     <button (click)="resetCamera()">Reset</button>
     <button (click)="toggleCreateMode()" [class.active]="isCreateMode()">
       {{ isCreateMode() ? 'Exit Create' : 'Create Mode' }}
@@ -36,5 +39,6 @@
     (zoomChange)="onZoomChange($event)"
     (createModeChange)="onCreateModeChange($event)"
     (magicModeChange)="onMagicModeChange($event)"
+    [readOnlyMode]="readOnlyMode()"
   ></app-canvas-viewport>
 </div>

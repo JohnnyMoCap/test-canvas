@@ -31,6 +31,12 @@ export class StateManager {
   readonly minZoom = this._minZoom.asReadonly();
   readonly canvasAspectRatio = this._canvasAspectRatio.asReadonly();
 
+  private _readOnlyMode = signal(false);
+  readonly readOnlyMode = this._readOnlyMode.asReadonly();
+  updateReadOnlyMode(value: boolean) {
+    this._readOnlyMode.set(value);
+  }
+
   // ========================================
   // FEATURE: BOX CREATION
   // ========================================
