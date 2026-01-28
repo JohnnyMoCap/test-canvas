@@ -278,8 +278,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODOS: cursor is a bit wrong sometimes?
   //TODO: add measurment tool - add to reset tool on id change etc
 
-  //TODO: handle background changes happening some time AFTER the component is initialized, along with changes to the component with a whole different photo, label, etc
-  //TODO: test delete box hotkey
+  //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
   //TODO: fix interaction with nametag, hover works? but not dragging?
   //TODO: read only mode
   //TODO: change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
@@ -287,6 +286,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly
+
+  //TODO: zoom in on selected finding
 
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization
@@ -557,7 +558,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private handleDelete(): void {
     const selected = this.state.selectedBoxId();
-    if (!selected) return;
+    if (!(typeof selected == 'number' || typeof selected == 'string')) return;
     this.historyService.recordDelete(selected);
     this.state.updateSelectedBox(null);
     this.rebuildIndex();

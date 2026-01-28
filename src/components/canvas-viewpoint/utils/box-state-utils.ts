@@ -22,7 +22,7 @@ export class BoxStateUtils {
    * Removes a box by its ID
    */
   static removeBox(boxes: Box[], boxId: string): Box[] {
-    return boxes.filter((b) => String(getBoxId(b)) !== boxId);
+    return boxes.filter((b) => String(getBoxId(b)) != boxId);
   }
 
   /**

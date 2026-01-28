@@ -47,7 +47,7 @@ export class ClipboardHandler {
     clipboardSignal.set({ ...box });
 
     // Remove from boxes
-    const updatedBoxes = boxes.filter((b) => String(getBoxId(b)) !== selectedBoxId);
+    const updatedBoxes = boxes.filter((b) => String(getBoxId(b)) != selectedBoxId);
 
     // Record in history
     const boxId = getBoxId(box);
@@ -102,6 +102,6 @@ export class ClipboardHandler {
     const boxId = getBoxId(box);
     historyService.recordDelete(boxId);
 
-    return boxes.filter((b) => String(getBoxId(b)) !== selectedBoxId);
+    return boxes.filter((b) => String(getBoxId(b)) != selectedBoxId);
   }
 }

@@ -261,7 +261,7 @@ export class StateManager {
    * Update hover state
    */
   updateHoverState(boxId: string | null): boolean {
-    if (this.hoveredBoxId() !== boxId) {
+    if (this.hoveredBoxId() != boxId) {
       this._hoveredBoxId.set(boxId);
       return true; // State changed
     }

@@ -119,10 +119,15 @@ export class HotkeyService {
         event.preventDefault();
       }
       // H or Ctrl+H - Hide (prevent browser history popup)
-      else if ((ctrl && key === 'h')) {
+      else if (ctrl && key === 'h') {
         event.preventDefault();
         this.toggleHide();
         return; // Don't execute callbacks, just toggle the state
+      }
+      // Delete or Backspace - Delete
+      else if (key === 'delete' || key === 'backspace') {
+        command = 'DELETE';
+        event.preventDefault();
       }
 
       // Execute callbacks for the command

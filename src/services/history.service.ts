@@ -273,7 +273,7 @@ export class HistoryService {
     switch (delta.type) {
       case 'ADD':
         // Remove the added box
-        return boxes.filter((b) => getBoxId(b) !== delta.boxId);
+        return boxes.filter((b) => getBoxId(b) != delta.boxId);
 
       case 'DELETE':
         // Restore the deleted box
@@ -302,7 +302,7 @@ export class HistoryService {
 
       case 'DELETE':
         // Re-delete the box
-        return boxes.filter((b) => getBoxId(b) !== delta.boxId);
+        return boxes.filter((b) => getBoxId(b) != delta.boxId);
 
       case 'MOVE':
       case 'RESIZE':
