@@ -35,6 +35,13 @@ export class StateManager {
   readonly readOnlyMode = this._readOnlyMode.asReadonly();
   updateReadOnlyMode(value: boolean) {
     this._readOnlyMode.set(value);
+    // Disable interactive modes when entering read-only
+    if (value) {
+      this._isCreateMode.set(false);
+      this._isMagicMode.set(false);
+      this._selectedBoxId.set(null);
+      this.resetInteractionStates();
+    }
   }
 
   // ========================================

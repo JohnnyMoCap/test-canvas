@@ -56,7 +56,7 @@ export class App {
     this.isMagicMode.set(isMagicMode);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 1 }, (_, i) => {
+  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 

@@ -11,6 +11,7 @@ import { BoxCreationHandler } from '../handlers/box-creation.handler';
 import { CameraHandler } from '../handlers/camera.handler';
 import { ContextMenuHandler } from '../handlers/context-menu.handler';
 import { MagicDetectionHandler } from '../handlers/magic-detection.handler';
+import { isNullOrUndefined } from './validation-utils';
 
 /**
  * Routes pointer events to appropriate handlers based on state
@@ -40,8 +41,17 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+    // Check if CTRL/CMD is pressed - if so, skip all box interactions and go straight to camera pan;
+    const shouldSkipInteractions = event.ctrlKey || event.metaKey || state.readOnlyMode();
 
-    // PRIORITY 0: Magic Detection Mode
+    if(shouldSkipInteractions) {
+      this.handleCameraPanStart(event, state);
+      return;
+    }
+
+
+
+    // PRIORITY 0: Magic Detection Mode (blocked in read-only and when CTRL pressed)
     if (
       this.handleMagicDetection(
         event,
@@ -57,13 +67,17 @@ export class PointerEventHandler {
       return;
     }
 
-    // PRIORITY 1: Context Menu
-    if (this.handleContextMenu(event, worldPos, state)) return;
+    // PRIORITY 1: Context Menu (blocked in read-only and when CTRL pressed)
+    if (this.handleContextMenu(event, worldPos, state))
+      return;
 
-    // PRIORITY 2: Box Creation
-    if (this.handleCreateMode(event, worldPos, canvas, state)) return;
+    // PRIORITY 2: Box Creation (blocked in read-only and when CTRL pressed)
+    if (
+      this.handleCreateMode(event, worldPos, canvas, state)
+    )
+      return;
 
-    // PRIORITY 3-5: Box Interaction (Rotation, Resize, Drag) for selected box
+    // PRIORITY 3-5: Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
     if (
       this.handleSelectedBoxInteraction(
         event,
@@ -78,7 +92,7 @@ export class PointerEventHandler {
     )
       return;
 
-    // PRIORITY 6: Selection (clicking on unselected box)
+    // PRIORITY 6: Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
     if (
       this.handleBoxSelection(
         worldPos,
@@ -196,7 +210,7 @@ export class PointerEventHandler {
   ): boolean {
     const selectedBoxId = state.selectedBoxId();
 
-    if (!selectedBoxId) return false;
+    if (isNullOrUndefined(selectedBoxId)) return false;
 
     const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
     if (!box) return false;

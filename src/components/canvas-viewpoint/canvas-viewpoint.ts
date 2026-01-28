@@ -26,6 +26,7 @@ import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
 import { PointerEventHandler } from './utils/pointer-event-handler';
 import { ClipboardManager } from './utils/clipboard-manager';
+import { isNullOrUndefined } from './utils/validation-utils';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 import { HistoryService } from '../../services/history.service';
@@ -130,6 +131,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleCreateMode() {
+    if (this.state.readOnlyMode()) return;
     this.state.toggleCreateMode();
     if (!this.state.isCreateMode()) {
       this.scheduleRender();
@@ -138,6 +140,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleMagicMode() {
+    if (this.state.readOnlyMode()) return;
     this.state.toggleMagicMode();
     this.magicModeChange.emit(this.state.isMagicMode());
   }
@@ -148,6 +151,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Related: context-menu-utils.ts
 
   onContextMenuSelect(type: BoxType) {
+    if (this.state.readOnlyMode()) return;
     const wp = this.state.contextMenuState();
     const bgc = this.state.bgCanvas();
     if (!wp?.worldPos || !bgc) return;
@@ -285,9 +289,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
   //TODO: fix interaction with nametag, hover works? but not dragging?
-  //TODO: read only mode
   //TODO: change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
-  //TODO: CTRL + click will only move and avoid selecting / interacting with boxes
 
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly
@@ -515,24 +517,28 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Related: clipboard-manager.ts
 
   private handleUndo(): void {
+    if (this.state.readOnlyMode()) return;
     this.historyService.undo();
     this.rebuildIndex();
     this.scheduleRender();
   }
 
   private handleRedo(): void {
+    if (this.state.readOnlyMode()) return;
     this.historyService.redo();
     this.rebuildIndex();
     this.scheduleRender();
   }
 
   private handleCopy(): void {
+    if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
-    if (!selected) return;
+    if (isNullOrUndefined(selected)) return;
     this.state.updateClipboard(ClipboardManager.copyBox(selected, this.localBoxes()));
   }
 
   private handlePaste(): void {
+    if (this.state.readOnlyMode()) return;
     const clipboard = this.state.clipboard();
     const bgc = this.state.bgCanvas();
     if (!clipboard || !bgc) return;
@@ -562,6 +568,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private handleDelete(): void {
+    if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
     if (!(typeof selected == 'number' || typeof selected == 'string')) return;
     this.historyService.recordDelete(selected);

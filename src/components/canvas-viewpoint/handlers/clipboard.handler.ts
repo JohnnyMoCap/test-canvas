@@ -3,6 +3,7 @@ import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { Camera } from '../core/types';
 import { ClipboardManager as ClipboardUtils } from '../utils/clipboard-manager';
 import { HistoryService } from '../../../services/history.service';
+import { isNullOrUndefined } from '../utils/validation-utils';
 
 /**
  * Handler for clipboard operations (copy, paste, cut)
@@ -17,7 +18,7 @@ export class ClipboardHandler {
     boxes: Box[],
     clipboardSignal: WritableSignal<Box | null>,
   ): void {
-    if (!selectedBoxId) return;
+    if (isNullOrUndefined(selectedBoxId)) return;
 
     const copiedBox = ClipboardUtils.copyBox(selectedBoxId, boxes);
     if (copiedBox) {
@@ -34,7 +35,7 @@ export class ClipboardHandler {
     clipboardSignal: WritableSignal<Box | null>,
     historyService: HistoryService,
   ): { clipboard: Box | null; updatedBoxes: Box[] } {
-    if (!selectedBoxId) {
+    if (isNullOrUndefined(selectedBoxId)) {
       return { clipboard: null, updatedBoxes: boxes };
     }
 
@@ -94,7 +95,7 @@ export class ClipboardHandler {
    * Delete selected box
    */
   static delete(selectedBoxId: string | null, boxes: Box[], historyService: HistoryService): Box[] {
-    if (!selectedBoxId) return boxes;
+    if (isNullOrUndefined(selectedBoxId)) return boxes;
 
     const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
     if (!box) return boxes;
