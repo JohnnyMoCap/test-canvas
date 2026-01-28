@@ -7,6 +7,9 @@
     <button (click)="toggleCreateMode()" [class.active]="isCreateMode()">
       {{ isCreateMode() ? 'Exit Create' : 'Create Mode' }}
     </button>
+    <button (click)="toggleBoxList()" [class.active]="showBoxList()">
+      {{ showBoxList() ? 'Hide Boxes' : 'Show Boxes' }}
+    </button>
     <button (click)="toggleMagicMode()" [class.active]="isMagicMode()">
       {{ isMagicMode() ? 'Exit Magic' : 'Magic Box' }}
     </button>
@@ -30,15 +33,31 @@
     <label>Zoom: {{ zoom() }}%</label>
   </div>
 
-  <app-canvas-viewport
-    [backgroundUrl]="'/assets/background.jpg'"
-    [isCreateModeInput]="isCreateMode()"
-    [isMagicModeInput]="isMagicMode()"
-    [magicToleranceInput]="magicTolerance()"
-    [debugMagicInput]="debugMagic()"
-    (zoomChange)="onZoomChange($event)"
-    (createModeChange)="onCreateModeChange($event)"
-    (magicModeChange)="onMagicModeChange($event)"
-    [readOnlyMode]="readOnlyMode()"
-  ></app-canvas-viewport>
+  <div class="main-content">
+    <app-canvas-viewport
+      [backgroundUrl]="'/assets/background.jpg'"
+      [isCreateModeInput]="isCreateMode()"
+      [isMagicModeInput]="isMagicMode()"
+      [magicToleranceInput]="magicTolerance()"
+      [debugMagicInput]="debugMagic()"
+      [readOnlyMode]="readOnlyMode()"
+      [externalHoverBoxId]="hoveredBoxId()"
+      [externalSelectBoxId]="selectedBoxId()"
+      (zoomChange)="onZoomChange($event)"
+      (createModeChange)="onCreateModeChange($event)"
+      (magicModeChange)="onMagicModeChange($event)"
+      (selectedBoxChange)="onSelectedBoxChange($event)"
+      (hoveredBoxChange)="onHoveredBoxChange($event)"
+    ></app-canvas-viewport>
+
+    @if (showBoxList()) {
+      <app-box-list
+        [boxes]="historyService.visibleBoxes()"
+        [selectedBoxId]="selectedBoxId()"
+        [hoveredBoxId]="hoveredBoxId()"
+        (boxHover)="onBoxListHover($event)"
+        (boxClick)="onBoxListClick($event)"
+      ></app-box-list>
+    }
+  </div>
 </div>

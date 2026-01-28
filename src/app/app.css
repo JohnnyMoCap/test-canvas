@@ -3,6 +3,24 @@
   height: calc(100vh - 20px);
   background-color: aqua;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+app-canvas-viewport {
+  flex: 1;
+  overflow: hidden;
+}
+
+app-box-list {
+  width: 250px;
+  flex-shrink: 0;
 }
 
 .controls {

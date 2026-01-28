@@ -21,6 +21,7 @@ import { ContextMenuUtils } from './utils/context-menu-utils';
 import { BackgroundUtils } from './utils/background-utils';
 import { FrameRenderer } from './utils/frame-renderer';
 import { CreationUtils } from './utils/creation-utils';
+import { BoxUtils } from './utils/box-utils';
 
 import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
@@ -77,10 +78,31 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.updateReadOnlyMode(value);
     }
   }
+  @Input() set externalHoverBoxId(value: string | number | null) {
+    if (value !== null && value != this.state.selectedBoxId()) {
+      this.state.updateHoverState(value === null ? null : String(value));
+      this.scheduleRender();
+    }
+  }
+  @Input() set externalSelectBoxId(
+    value: string | number | null, //{ boxId: string | number; timestamp: number } | undefined,
+  ) {
+    if (value !== null && value != this.state.selectedBoxId()) {
+      const boxId = value; //value.boxId;
+      this.state.updateSelectedBox(boxId === null ? null : String(boxId));
+      this.zoomToBox(boxId);
+      if (this.state.readOnlyMode()) {
+        this.state.updateSelectedBox(null);
+      }
+      this.scheduleRender();
+    }
+  }
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
   @Output() magicModeChange = new EventEmitter<boolean>();
   @Output() resetCameraRequest = new EventEmitter<void>();
+  @Output() selectedBoxChange = new EventEmitter<string | number | null>();
+  @Output() hoveredBoxChange = new EventEmitter<string | number | null>();
 
   // State management
   private state: StateManager;
@@ -126,6 +148,32 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
     this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });
+    this.scheduleRender();
+    this.zoomChange.emit(this.camera().zoom);
+  }
+
+  /**
+   * Zoom and pan camera to fit a specific box in view
+   */
+  zoomToBox(boxId: string | number | null | undefined): void {
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
+    const canvas = this.canvasRef.nativeElement;
+    const newCamera = CameraUtils.zoomToBox(
+      boxId,
+      this.localBoxes(),
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.state.minZoom(),
+    );
+
+    if (!newCamera) return;
+
+    // Clamp camera to ensure we don't go out of bounds
+    this.camera.set(this.clampCamera(newCamera));
     this.scheduleRender();
     this.zoomChange.emit(this.camera().zoom);
   }
@@ -288,13 +336,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: add measurment tool - add to reset tool on id change etc
 
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
-  
+
   //TODO:maybe? change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
 
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly
-
-  //TODO: zoom in on selected finding
 
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization
@@ -332,6 +378,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       }
 
       canvas.style.cursor = cursor;
+    });
+
+    // Emit selection changes to parent
+    effect(() => {
+      const selectedBoxId = this.state.selectedBoxId();
+      this.selectedBoxChange.emit(selectedBoxId);
+    });
+
+    // Emit hover changes to parent
+    effect(() => {
+      const hoveredBoxId = this.state.hoveredBoxId();
+      this.hoveredBoxChange.emit(hoveredBoxId);
     });
   }
 

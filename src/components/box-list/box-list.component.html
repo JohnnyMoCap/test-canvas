@@ -1,0 +1,19 @@
+<div class="box-list-container">
+  <div class="box-list-header">
+    <h3>Boxes ({{ boxes.length }})</h3>
+  </div>
+  <div class="box-list-scroll">
+    <div
+      *ngFor="let box of boxes"
+      class="box-list-item"
+      [class.selected]="isSelected(box)"
+      [class.hovered]="isHovered(box)"
+      (mouseenter)="onBoxMouseEnter(box)"
+      (mouseleave)="onBoxMouseLeave()"
+      (click)="onBoxClick(box)"
+    >
+      <div class="box-id">ID: {{ getBoxId(box) }}</div>
+      <div class="box-color" [style.background-color]="box.color"></div>
+    </div>
+  </div>
+</div>

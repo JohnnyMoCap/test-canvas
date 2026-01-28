@@ -1,12 +1,13 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
+import { BoxListComponent } from '../components/box-list/box-list.component';
 import { Box } from '../intefaces/boxes.interface';
 import { HistoryService } from '../services/history.service';
 
 @Component({
   selector: 'app-root',
-  imports: [CanvasViewportComponent, FormsModule],
+  imports: [CanvasViewportComponent, BoxListComponent, FormsModule],
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
   standalone: true,
@@ -16,12 +17,35 @@ export class App {
   isMagicMode = signal(false);
   readOnlyMode = signal(false);
   magicTolerance = signal(30);
+  showBoxList = signal(false);
   zoom = signal(100);
   debugMagic = signal(false);
 
-  constructor(private historyService: HistoryService) {
+  // Box list state
+  selectedBoxId = signal<string | number | null>(null);
+  hoveredBoxId = signal<string | number | null>(null);
+
+  constructor(public historyService: HistoryService) {
     // Initialize history service with example boxes
     this.historyService.initialize(this.exampleBoxes);
+  }
+
+  // Canvas event handlers
+  onSelectedBoxChange(boxId: string | number | null) {
+    this.selectedBoxId.set(boxId);
+  }
+
+  onHoveredBoxChange(boxId: string | number | null) {
+    this.hoveredBoxId.set(boxId);
+  }
+
+  // Box list event handlers
+  onBoxListHover(boxId: string | number | null) {
+    this.hoveredBoxId.set(boxId);
+  }
+
+  onBoxListClick(boxId: string | number) {
+    this.selectedBoxId.set(boxId);
   }
 
   resetCamera() {
@@ -42,6 +66,10 @@ export class App {
 
   toggleDebugMagic() {
     this.debugMagic.update((v) => !v);
+  }
+
+  toggleBoxList() {
+    this.showBoxList.update((v) => !v);
   }
 
   onZoomChange(zoom: number) {

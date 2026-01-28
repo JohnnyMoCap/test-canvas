@@ -4,8 +4,8 @@ import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';
-import { CursorManager } from '../cursor/cursor-manager';
 import { CursorStyles } from '../cursor/cursor-styles';
+import { BoxStateUtils } from '../utils/box-state-utils';
 
 /**
  * Handler for hover detection and interaction point detection
@@ -144,7 +144,7 @@ export class HoverHandler {
 
     // If hovering over selected box, check for interaction points
     if (hoveredBoxId && hoveredBoxId === selectedBoxId) {
-      const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
+      const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
       if (box) {
         const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
         if (worldBox) {

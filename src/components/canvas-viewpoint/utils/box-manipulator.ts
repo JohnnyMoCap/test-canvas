@@ -1,6 +1,7 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { ResizeCorner } from '../core/types';
 import { BoxUtils } from './box-utils';
+import { BoxStateUtils } from './box-state-utils';
 
 /**
  * Handles box manipulation operations (rotate, resize, move)
@@ -113,7 +114,7 @@ export class BoxManipulator {
    */
   static updateBoxInArray(boxes: Box[], updatedBox: Box): Box[] {
     const boxId = String(getBoxId(updatedBox));
-    const boxesRes = boxes.map((b) => (String(getBoxId(b)) === boxId ? updatedBox : b));
+    const boxesRes = BoxStateUtils.updateBox(boxes, boxId, updatedBox);
     return boxesRes;
   }
 }

@@ -1,5 +1,7 @@
 import { Camera } from '../core/types';
 import { QuadtreeUtils } from './quadtree-utils';
+import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { BoxUtils } from './box-utils';
 
 /**
  * Camera manipulation and constraints utilities
@@ -14,7 +16,7 @@ export class CameraUtils {
     canvasHeight: number,
     imageWidth: number,
     imageHeight: number,
-    minZoom: number
+    minZoom: number,
   ): Camera {
     const halfViewW = canvasWidth / (2 * camera.zoom);
     const halfViewH = canvasHeight / (2 * camera.zoom);
@@ -42,7 +44,7 @@ export class CameraUtils {
     canvasWidth: number,
     canvasHeight: number,
     imageWidth: number,
-    imageHeight: number
+    imageHeight: number,
   ): number {
     return Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight);
   }
@@ -53,7 +55,7 @@ export class CameraUtils {
   static getViewBoundsInWorld(
     canvasWidth: number,
     canvasHeight: number,
-    camera: Camera
+    camera: Camera,
   ): { minX: number; minY: number; maxX: number; maxY: number } {
     // Transform all four corners of the canvas to world space
     const corners = [
@@ -98,6 +100,46 @@ export class CameraUtils {
       minY: minY - margin,
       maxX: maxX + margin,
       maxY: maxY + margin,
+    };
+  }
+
+  /**
+   * Zoom and pan camera to fit a specific box in view
+   */
+  static zoomToBox(
+    boxId: string | number | null | undefined,
+    boxes: Box[],
+    canvasWidth: number,
+    canvasHeight: number,
+    bgWidth: number,
+    bgHeight: number,
+    minZoom: number,
+    padding: number = 50,
+  ): Camera | null {
+    if (!boxId) return null;
+
+    const box = boxes.find((b) => String(getBoxId(b)) === String(boxId));
+    if (!box) return null;
+
+    const worldBox = BoxUtils.normalizeBoxToWorld(box, bgWidth, bgHeight);
+    if (!worldBox) return null;
+
+    // Calculate zoom to fit box with padding
+    const boxScreenWidth = worldBox.w;
+    const boxScreenHeight = worldBox.h;
+
+    const zoomX = (canvasWidth - padding * 2) / boxScreenWidth;
+    const zoomY = (canvasHeight - padding * 2) / boxScreenHeight;
+    const targetZoom = Math.min(zoomX, zoomY, 3); // Max zoom of 3x
+
+    // Ensure zoom is at least minZoom
+    const finalZoom = Math.max(targetZoom, minZoom);
+
+    return {
+      zoom: finalZoom,
+      x: worldBox.x,
+      y: worldBox.y,
+      rotation: 0,
     };
   }
 }

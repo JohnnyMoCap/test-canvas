@@ -4,6 +4,7 @@ import { Camera } from '../core/types';
 import { ClipboardManager as ClipboardUtils } from '../utils/clipboard-manager';
 import { HistoryService } from '../../../services/history.service';
 import { isNullOrUndefined } from '../utils/validation-utils';
+import { BoxStateUtils } from '../utils/box-state-utils';
 
 /**
  * Handler for clipboard operations (copy, paste, cut)
@@ -39,7 +40,7 @@ export class ClipboardHandler {
       return { clipboard: null, updatedBoxes: boxes };
     }
 
-    const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
+    const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
     if (!box) {
       return { clipboard: null, updatedBoxes: boxes };
     }
@@ -48,7 +49,7 @@ export class ClipboardHandler {
     clipboardSignal.set({ ...box });
 
     // Remove from boxes
-    const updatedBoxes = boxes.filter((b) => String(getBoxId(b)) != selectedBoxId);
+    const updatedBoxes = BoxStateUtils.removeBox(boxes, selectedBoxId);
 
     // Record in history
     const boxId = getBoxId(box);
@@ -97,12 +98,12 @@ export class ClipboardHandler {
   static delete(selectedBoxId: string | null, boxes: Box[], historyService: HistoryService): Box[] {
     if (isNullOrUndefined(selectedBoxId)) return boxes;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
+    const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
     if (!box) return boxes;
 
     const boxId = getBoxId(box);
     historyService.recordDelete(boxId);
 
-    return boxes.filter((b) => String(getBoxId(b)) != selectedBoxId);
+    return BoxStateUtils.removeBox(boxes, selectedBoxId);
   }
 }

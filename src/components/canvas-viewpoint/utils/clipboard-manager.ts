@@ -3,6 +3,7 @@ import { Camera } from '../core/types';
 import { CoordinateTransform } from './coordinate-transform';
 import { BoxUtils } from './box-utils';
 import { BoxCreationUtils } from './box-creation-utils';
+import { BoxStateUtils } from './box-state-utils';
 
 /**
  * Handles clipboard operations (copy, paste)
@@ -12,7 +13,7 @@ export class ClipboardManager {
    * Copy a box to clipboard
    */
   static copyBox(boxId: string, boxes: Box[]): Box | null {
-    const box = boxes.find((b) => String(getBoxId(b)) === boxId);
+    const box = BoxStateUtils.findBoxById(boxes, boxId);
     return box ? { ...box } : null;
   }
 

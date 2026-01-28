@@ -8,6 +8,7 @@ import { StateManager } from './state-manager';
 import { HistoryService } from '../../../services/history.service';
 import { HoverHandler } from '../handlers/hover.handler';
 import { BoxManipulationHandler } from '../handlers/box-manipulation.handler';
+import { BoxStateUtils } from './box-state-utils';
 import { BoxCreationHandler } from '../handlers/box-creation.handler';
 import { CameraHandler } from '../handlers/camera.handler';
 import { ContextMenuHandler } from '../handlers/context-menu.handler';
@@ -45,12 +46,10 @@ export class PointerEventHandler {
     // Check if CTRL/CMD is pressed - if so, skip all box interactions and go straight to camera pan;
     const shouldSkipInteractions = event.ctrlKey || event.metaKey || state.readOnlyMode();
 
-    if(shouldSkipInteractions) {
+    if (shouldSkipInteractions) {
       this.handleCameraPanStart(event, state);
       return;
     }
-
-
 
     // PRIORITY 0: Magic Detection Mode (blocked in read-only and when CTRL pressed)
     if (
@@ -69,14 +68,10 @@ export class PointerEventHandler {
     }
 
     // PRIORITY 1: Context Menu (blocked in read-only and when CTRL pressed)
-    if (this.handleContextMenu(event, worldPos, state))
-      return;
+    if (this.handleContextMenu(event, worldPos, state)) return;
 
     // PRIORITY 2: Box Creation (blocked in read-only and when CTRL pressed)
-    if (
-      this.handleCreateMode(event, worldPos, canvas, state)
-    )
-      return;
+    if (this.handleCreateMode(event, worldPos, canvas, state)) return;
 
     // PRIORITY 3-5: Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
     if (
@@ -213,7 +208,7 @@ export class PointerEventHandler {
 
     if (isNullOrUndefined(selectedBoxId)) return false;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === selectedBoxId);
+    const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
     if (!box) return false;
 
     const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
@@ -322,15 +317,23 @@ export class PointerEventHandler {
       state.updateSelectedBox(hoveredBoxId);
 
       // Prepare for potential drag - find the box and initialize drag state
-      const box = boxes.find((b) => String(getBoxId(b)) === hoveredBoxId);
+      const box = BoxStateUtils.findBoxById(boxes, hoveredBoxId);
       if (box) {
         const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
         if (worldBox) {
           // Check if clicking on box OR nametag - both should enable dragging
           const clickedOnBox = CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox);
-          const clickedOnNametag = state.showNametags() && 
-            NametagUtils.pointInNametag(worldPos.x, worldPos.y, worldBox, camera, nametagMetricsCache, ctx);
-          
+          const clickedOnNametag =
+            state.showNametags() &&
+            NametagUtils.pointInNametag(
+              worldPos.x,
+              worldPos.y,
+              worldBox,
+              camera,
+              nametagMetricsCache,
+              ctx,
+            );
+
           if (clickedOnBox || clickedOnNametag) {
             // Start interaction state so the box can be immediately dragged
             state.startInteraction(hoveredBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
@@ -434,7 +437,7 @@ export class PointerEventHandler {
   ): boolean {
     if (!state.isRotating()) return false;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
 
     const rotatedBox = BoxManipulationHandler.rotate(
@@ -461,7 +464,7 @@ export class PointerEventHandler {
   ): boolean {
     if (!state.isResizing() || !state.resizeCorner()) return false;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
 
     const resizedBox = BoxManipulationHandler.resize(
@@ -487,7 +490,7 @@ export class PointerEventHandler {
   ): boolean {
     if (!state.isDraggingBox()) return false;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
 
     const draggedBox = BoxManipulationHandler.drag(
@@ -661,7 +664,7 @@ export class PointerEventHandler {
     if (!state.isAnyInteractionActive()) return false;
 
     const interactionStart = state.interactionStartState();
-    const box = boxes.find((b) => String(getBoxId(b)) === state.selectedBoxId());
+    const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
 
     if (interactionStart && box) {
       BoxManipulationHandler.completeManipulation(
