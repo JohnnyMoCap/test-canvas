@@ -1,4 +1,4 @@
-import { ResizeCorner } from '../core/types';
+import { ResizeCorner, WorldBoxGeometry } from '../core/types';
 
 /**
  * Cursor style utilities - Layer between business logic and utils
@@ -9,21 +9,18 @@ export class CursorStyles {
    * Returns appropriate cursor style for a resize corner based on its actual world position
    * Takes into account the box's rotation to show the correct resize direction
    */
-  static getResizeCursor(
-    corner: ResizeCorner,
-    box: { x: number; y: number; w: number; h: number; rotation: number },
-  ): string {
+  static getResizeCursor(corner: ResizeCorner, boxGeometry: WorldBoxGeometry): string {
     // Get the actual world position of the corner
     const cornerOffsets = {
-      nw: { x: -box.w / 2, y: -box.h / 2 },
-      ne: { x: box.w / 2, y: -box.h / 2 },
-      sw: { x: -box.w / 2, y: box.h / 2 },
-      se: { x: box.w / 2, y: box.h / 2 },
+      nw: { x: -boxGeometry.w / 2, y: -boxGeometry.h / 2 },
+      ne: { x: boxGeometry.w / 2, y: -boxGeometry.h / 2 },
+      sw: { x: -boxGeometry.w / 2, y: boxGeometry.h / 2 },
+      se: { x: boxGeometry.w / 2, y: boxGeometry.h / 2 },
     };
 
     const offset = cornerOffsets[corner];
-    const cos = Math.cos(box.rotation);
-    const sin = Math.sin(box.rotation);
+    const cos = Math.cos(boxGeometry.rotation);
+    const sin = Math.sin(boxGeometry.rotation);
 
     // Rotate corner offset
     const rotatedX = offset.x * cos - offset.y * sin;

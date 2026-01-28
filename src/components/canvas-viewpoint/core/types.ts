@@ -38,3 +38,32 @@ export interface TextMetrics {
   width: number;
   height: number;
 }
+
+/**
+ * Geometric properties of a box in world space
+ * ONLY contains spatial data - no metadata, no styling, no business logic properties
+ * Used for purely geometric calculations (hit detection, transformations, etc.)
+ */
+export interface WorldBoxGeometry {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+}
+
+/**
+ * Complete world box with all metadata
+ * Extends WorldBoxGeometry and adds all non-geometric properties
+ * Used for rendering and operations that need access to the original box data
+ *
+ * Future properties may include:
+ * - ML classification data
+ * - Ownership/permission data
+ * - Real-world measurement metrics
+ * - Custom metadata
+ */
+export interface WorldBox extends WorldBoxGeometry {
+  raw: import('../../../intefaces/boxes.interface').Box;
+  color: string;
+}

@@ -1,6 +1,6 @@
 import { WritableSignal } from '@angular/core';
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
-import { ResizeCorner } from '../core/types';
+import { ResizeCorner, WorldBoxGeometry } from '../core/types';
 import { BoxManipulator } from '../utils/box-manipulator';
 import { HistoryService } from '../../../services/history.service';
 import { CursorManager } from '../cursor/cursor-manager';
@@ -16,10 +16,10 @@ export class BoxManipulationHandler {
   static startRotation(
     worldX: number,
     worldY: number,
-    box: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
   ): { angle: number; boxRotation: number } {
-    const angle = Math.atan2(worldY - box.y, worldX - box.x);
-    return { angle, boxRotation: box.rotation };
+    const angle = Math.atan2(worldY - boxGeometry.y, worldX - boxGeometry.x);
+    return { angle, boxRotation: boxGeometry.rotation };
   }
 
   /**
@@ -48,10 +48,7 @@ export class BoxManipulationHandler {
   /**
    * Start box resize - returns nothing, just for cursor update
    */
-  static startResize(
-    corner: ResizeCorner,
-    box: { x: number; y: number; w: number; h: number; rotation: number },
-  ): void {
+  static startResize(corner: ResizeCorner, boxGeometry: WorldBoxGeometry): void {
     // Just a marker method - actual logic handled by caller
   }
 
@@ -107,7 +104,7 @@ export class BoxManipulationHandler {
    */
   static completeManipulation(
     boxId: string,
-    startState: { x: number; y: number; w: number; h: number; rotation: number },
+    startState: WorldBoxGeometry,
     currentBox: Box,
     isRotating: boolean,
     isResizing: boolean,

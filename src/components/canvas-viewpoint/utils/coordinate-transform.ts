@@ -1,4 +1,4 @@
-import { Camera, Point } from '../core/types';
+import { Camera, Point, WorldBoxGeometry } from '../core/types';
 
 /**
  * Coordinate transformation utilities for canvas rendering
@@ -12,7 +12,7 @@ export class CoordinateTransform {
     screenY: number,
     canvasWidth: number,
     canvasHeight: number,
-    camera: Camera
+    camera: Camera,
   ): Point {
     // Center-based coordinates: translate screen to canvas center
     const cx = screenX - canvasWidth / 2;
@@ -44,17 +44,13 @@ export class CoordinateTransform {
    * Checks if a point is inside a rotated box
    * Logic: Translate point to box center, un-rotate point, check AABB
    */
-  static pointInBox(
-    wx: number,
-    wy: number,
-    box: { x: number; y: number; w: number; h: number; rotation: number }
-  ): boolean {
+  static pointInBox(wx: number, wy: number, boxGeometry: WorldBoxGeometry): boolean {
     // 1. Translate point so box center is at (0,0)
-    const dx = wx - box.x;
-    const dy = wy - box.y;
+    const dx = wx - boxGeometry.x;
+    const dy = wy - boxGeometry.y;
 
     // 2. Rotate point by inverse of box rotation
-    const rot = -box.rotation;
+    const rot = -boxGeometry.rotation;
     const cos = Math.cos(rot);
     const sin = Math.sin(rot);
 
@@ -62,8 +58,8 @@ export class CoordinateTransform {
     const localY = dx * sin + dy * cos;
 
     // 3. Check bounds (box width/height are full dimensions centered at 0)
-    const halfW = box.w / 2;
-    const halfH = box.h / 2;
+    const halfW = boxGeometry.w / 2;
+    const halfH = boxGeometry.h / 2;
 
     return localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH;
   }
@@ -71,15 +67,14 @@ export class CoordinateTransform {
   /**
    * Calculates the axis-aligned bounding box (AABB) of a rotated box
    */
-  static calculateRotatedAABB(box: {
+  static calculateRotatedAABB(boxGeometry: WorldBoxGeometry): {
     x: number;
     y: number;
     w: number;
     h: number;
-    rotation: number;
-  }): { x: number; y: number; w: number; h: number } {
-    const hw = box.w / 2;
-    const hh = box.h / 2;
+  } {
+    const hw = boxGeometry.w / 2;
+    const hh = boxGeometry.h / 2;
 
     // Four corners relative to center
     const corners = [
@@ -89,8 +84,8 @@ export class CoordinateTransform {
       { x: -hw, y: hh },
     ];
 
-    const cos = Math.cos(box.rotation);
-    const sin = Math.sin(box.rotation);
+    const cos = Math.cos(boxGeometry.rotation);
+    const sin = Math.sin(boxGeometry.rotation);
 
     let minX = Infinity,
       minY = Infinity,
@@ -103,8 +98,8 @@ export class CoordinateTransform {
       const ry = p.x * sin + p.y * cos;
 
       // Translate to world
-      const wx = box.x + rx;
-      const wy = box.y + ry;
+      const wx = boxGeometry.x + rx;
+      const wy = boxGeometry.y + ry;
 
       minX = Math.min(minX, wx);
       minY = Math.min(minY, wy);

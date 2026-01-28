@@ -41,7 +41,7 @@ export class Quadtree<T> {
   // -------- Geometry helpers --------
   private intersects(
     a: { x: number; y: number; w: number; h: number },
-    b: { x: number; y: number; w: number; h: number }
+    b: { x: number; y: number; w: number; h: number },
   ) {
     const EPS = 0.001;
     return !(
@@ -55,7 +55,7 @@ export class Quadtree<T> {
   // -------- Insertion logic --------
   private _insert(
     node: QTNode<T>,
-    box: { x: number; y: number; w: number; h: number; payload?: T }
+    box: { x: number; y: number; w: number; h: number; payload?: T },
   ): boolean {
     // Bail if box does not overlap this node
     if (!this.intersects(node.bounds, box)) return false;
@@ -69,21 +69,30 @@ export class Quadtree<T> {
     // If leaf but full → subdivide
     if (node.isLeaf()) this.subdivide(node);
 
-    // Determine which children the box overlaps
-    let insertedIntoChild = false;
+    // Count how many children the box overlaps
+    let overlapCount = 0;
     for (const child of node.children) {
-      if (!child) continue;
-      if (this.intersects(child.bounds, box)) {
-        this._insert(child, box);
-        insertedIntoChild = true;
+      if (child && this.intersects(child.bounds, box)) {
+        overlapCount++;
       }
     }
 
     // If overlaps multiple children → keep it in this node
-    if (!insertedIntoChild) {
+    if (overlapCount > 1) {
       node.items.push(box);
+      return true;
     }
 
+    // Otherwise, insert into the single child it overlaps
+    for (const child of node.children) {
+      if (child && this.intersects(child.bounds, box)) {
+        this._insert(child, box);
+        return true;
+      }
+    }
+
+    // Fallback: shouldn't reach here, but keep in this node if we do
+    node.items.push(box);
     return true;
   }
 

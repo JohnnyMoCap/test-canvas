@@ -14,4 +14,9 @@ export interface Box {
  */
 export function getBoxId(box: Box): string | number {
   return box.id !== undefined ? box.id : box.tempId!;
+  // if (box.id !== undefined) return box.id;
+  // if (box.tempId !== undefined) return box.tempId;
+  // // Fallback for boxes without either id or tempId
+  // console.warn('Box missing both id and tempId:', box);
+  // return 'unknown';
 }

@@ -1,4 +1,4 @@
-import { Camera, ResizeCorner, TextMetrics } from '../core/types';
+import { Camera, ResizeCorner, TextMetrics, WorldBox } from '../core/types';
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 
 /**
@@ -9,20 +9,12 @@ export class NametagUtils {
    * Gets nametag bounds in world space
    */
   static getNametagBounds(
-    box: {
-      id?: number;
-      tempId?: string;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      rotation: number;
-    },
+    box: WorldBox,
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
-    ctx?: CanvasRenderingContext2D
+    ctx?: CanvasRenderingContext2D,
   ): { x: number; y: number; w: number; h: number } | null {
-    const text = String(getBoxId(box));
+    const text = String(getBoxId(box.raw));
 
     // Get or calculate metrics
     let metrics = metricsCache.get(text);
@@ -81,18 +73,10 @@ export class NametagUtils {
   static pointInNametag(
     wx: number,
     wy: number,
-    box: {
-      id?: number;
-      tempId?: string;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      rotation: number;
-    },
+    box: WorldBox,
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
-    ctx?: CanvasRenderingContext2D
+    ctx?: CanvasRenderingContext2D,
   ): boolean {
     const bounds = this.getNametagBounds(box, camera, metricsCache, ctx);
     if (!bounds) return false;
@@ -108,19 +92,11 @@ export class NametagUtils {
    */
   static drawNametag(
     ctx: CanvasRenderingContext2D,
-    box: {
-      raw: Box;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      rotation: number;
-      color: string;
-    },
+    box: WorldBox,
     camera: Camera,
     canvasWidth: number,
     canvasHeight: number,
-    metricsCache: Map<string, TextMetrics>
+    metricsCache: Map<string, TextMetrics>,
   ): void {
     const text = String(getBoxId(box.raw));
 
@@ -175,7 +151,7 @@ export class NametagUtils {
       0,
       camera.zoom,
       canvasWidth / 2 - camera.x * camera.zoom,
-      canvasHeight / 2 - camera.y * camera.zoom
+      canvasHeight / 2 - camera.y * camera.zoom,
     );
 
     const tagX = topmostCorner.x;

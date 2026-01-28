@@ -1,4 +1,4 @@
-import { Camera } from '../core/types';
+import { Camera, WorldBox } from '../core/types';
 import { QTNode } from '../core/quadtree';
 import { Box } from '../../../intefaces/boxes.interface';
 
@@ -13,7 +13,7 @@ export class RenderUtils {
     ctx: CanvasRenderingContext2D,
     canvasWidth: number,
     canvasHeight: number,
-    camera: Camera
+    camera: Camera,
   ): void {
     ctx.setTransform(
       camera.zoom,
@@ -21,7 +21,7 @@ export class RenderUtils {
       0,
       camera.zoom,
       canvasWidth / 2 - camera.x * camera.zoom,
-      canvasHeight / 2 - camera.y * camera.zoom
+      canvasHeight / 2 - camera.y * camera.zoom,
     );
 
     if (camera.rotation !== 0) {
@@ -36,9 +36,9 @@ export class RenderUtils {
    */
   static drawBox(
     ctx: CanvasRenderingContext2D,
-    box: { x: number; y: number; w: number; h: number; rotation: number; color: string },
+    box: WorldBox,
     camera: Camera,
-    isHovered: boolean
+    isHovered: boolean,
   ): void {
     ctx.save();
     ctx.translate(box.x, box.y);
@@ -63,11 +63,7 @@ export class RenderUtils {
   /**
    * Draws selection UI (corner handles and rotation knob)
    */
-  static drawSelectionUI(
-    ctx: CanvasRenderingContext2D,
-    box: { x: number; y: number; w: number; h: number; rotation: number; color: string },
-    camera: Camera
-  ): void {
+  static drawSelectionUI(ctx: CanvasRenderingContext2D, box: WorldBox, camera: Camera): void {
     ctx.save();
     ctx.translate(box.x, box.y);
     if (box.rotation) ctx.rotate(box.rotation);

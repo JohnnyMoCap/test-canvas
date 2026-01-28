@@ -1,5 +1,5 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
-import { Camera, ResizeCorner, TextMetrics } from '../core/types';
+import { Camera, ResizeCorner, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
@@ -31,6 +31,7 @@ export class HoverHandler {
 
     for (let i = candidates.length - 1; i >= 0; i--) {
       const rawBox = candidates[i];
+
       const worldBox = BoxUtils.normalizeBoxToWorld(rawBox, imageWidth, imageHeight);
       if (!worldBox) continue;
 
@@ -55,7 +56,7 @@ export class HoverHandler {
   static detectRotationKnob(
     wx: number,
     wy: number,
-    box: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
     camera: Camera,
   ): boolean {
     const knobDistance = 30 / camera.zoom;
@@ -63,19 +64,19 @@ export class HoverHandler {
 
     // Calculate knob position on the shorter side
     const localKnobX = 0;
-    const localKnobY = box.w < box.h ? 0 : box.h / 2 + knobDistance;
-    const localKnobX2 = box.w < box.h ? box.w / 2 + knobDistance : 0;
-    const localKnobY2 = box.w < box.h ? 0 : 0;
+    const localKnobY = boxGeometry.w < boxGeometry.h ? 0 : boxGeometry.h / 2 + knobDistance;
+    const localKnobX2 = boxGeometry.w < boxGeometry.h ? boxGeometry.w / 2 + knobDistance : 0;
+    const localKnobY2 = boxGeometry.w < boxGeometry.h ? 0 : 0;
 
     // Use the shorter side
-    const finalKnobX = box.w < box.h ? localKnobX2 : localKnobX;
-    const finalKnobY = box.w < box.h ? localKnobY2 : localKnobY;
+    const finalKnobX = boxGeometry.w < boxGeometry.h ? localKnobX2 : localKnobX;
+    const finalKnobY = boxGeometry.w < boxGeometry.h ? localKnobY2 : localKnobY;
 
     // Rotate knob position to world space
-    const cos = Math.cos(box.rotation);
-    const sin = Math.sin(box.rotation);
-    const knobWorldX = box.x + (finalKnobX * cos - finalKnobY * sin);
-    const knobWorldY = box.y + (finalKnobX * sin + finalKnobY * cos);
+    const cos = Math.cos(boxGeometry.rotation);
+    const sin = Math.sin(boxGeometry.rotation);
+    const knobWorldX = boxGeometry.x + (finalKnobX * cos - finalKnobY * sin);
+    const knobWorldY = boxGeometry.y + (finalKnobX * sin + finalKnobY * cos);
 
     // Check if point is within knob radius
     const dist = Math.sqrt((wx - knobWorldX) ** 2 + (wy - knobWorldY) ** 2);

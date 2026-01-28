@@ -1,4 +1,5 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { WorldBox } from '../core/types';
 
 /**
  * Box normalization and transformation utilities
@@ -7,19 +8,7 @@ export class BoxUtils {
   /**
    * Converts a normalized box (0..1 coords & sizes) into world units (pixels centered at origin)
    */
-  static normalizeBoxToWorld(
-    box: Box,
-    imageWidth: number,
-    imageHeight: number
-  ): {
-    raw: Box;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    rotation: number;
-    color: string;
-  } | null {
+  static normalizeBoxToWorld(box: Box, imageWidth: number, imageHeight: number): WorldBox | null {
     if (!imageWidth || !imageHeight) return null;
 
     return {
@@ -40,7 +29,7 @@ export class BoxUtils {
     worldX: number,
     worldY: number,
     imageWidth: number,
-    imageHeight: number
+    imageHeight: number,
   ): { x: number; y: number } {
     return {
       x: (worldX + imageWidth / 2) / imageWidth,
@@ -55,7 +44,7 @@ export class BoxUtils {
     worldW: number,
     worldH: number,
     imageWidth: number,
-    imageHeight: number
+    imageHeight: number,
   ): { w: number; h: number } {
     return {
       w: worldW / imageWidth,

@@ -1,6 +1,6 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { Quadtree } from '../core/quadtree';
-import { Camera, TextMetrics } from '../core/types';
+import { Camera, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
@@ -230,15 +230,15 @@ export class PointerEventHandler {
   private static handleRotationStart(
     event: PointerEvent,
     worldPos: { x: number; y: number },
-    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     camera: Camera,
     state: StateManager,
   ): boolean {
-    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, worldBox, camera)) return false;
+    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, boxGeometry, camera)) return false;
 
-    const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, worldBox);
+    const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, boxGeometry);
     state.startRotating(rotationInfo.angle, rotationInfo.boxRotation);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
     state.setCursor('grabbing');
@@ -249,13 +249,13 @@ export class PointerEventHandler {
   private static handleResizeStart(
     event: PointerEvent,
     worldPos: { x: number; y: number },
-    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     camera: Camera,
     state: StateManager,
   ): boolean {
-    const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, worldBox, camera);
+    const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, boxGeometry, camera);
     if (!corner) return false;
 
     state.startResizing(corner);
@@ -269,15 +269,15 @@ export class PointerEventHandler {
   private static handleDragStart(
     event: PointerEvent,
     worldPos: { x: number; y: number },
-    worldBox: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     state: StateManager,
   ): boolean {
-    if (!CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox)) return false;
+    if (!CoordinateTransform.pointInBox(worldPos.x, worldPos.y, boxGeometry)) return false;
 
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    const dragInfo = BoxManipulationHandler.startDrag(worldPos.x, worldPos.y, worldBox);
+    const dragInfo = BoxManipulationHandler.startDrag(worldPos.x, worldPos.y, boxGeometry);
     state.startDragging(
       dragInfo.dragStart.x,
       dragInfo.dragStart.y,

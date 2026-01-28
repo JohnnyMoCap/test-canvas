@@ -1,5 +1,5 @@
 import { WritableSignal } from '@angular/core';
-import { ResizeCorner } from '../core/types';
+import { ResizeCorner, WorldBoxGeometry } from '../core/types';
 import { CursorStyles } from './cursor-styles';
 
 /**
@@ -13,9 +13,9 @@ export class CursorManager {
   static updateForResize(
     cursorSignal: WritableSignal<string>,
     corner: ResizeCorner,
-    box: { x: number; y: number; w: number; h: number; rotation: number },
+    boxGeometry: WorldBoxGeometry,
   ): void {
-    const cursor = CursorStyles.getResizeCursor(corner, box);
+    const cursor = CursorStyles.getResizeCursor(corner, boxGeometry);
     this.setCursor(cursorSignal, cursor);
   }
 
