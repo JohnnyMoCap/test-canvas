@@ -20,8 +20,7 @@ import { BoxCreationUtils } from './utils/box-creation-utils';
 import { ContextMenuUtils } from './utils/context-menu-utils';
 import { BackgroundUtils } from './utils/background-utils';
 import { FrameRenderer } from './utils/frame-renderer';
-import { CreationUtils } from './utils/creation-utils';
-import { BoxUtils } from './utils/box-utils';
+import { CursorStyles } from './cursor/cursor-styles';
 
 import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
@@ -332,7 +331,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
-  //TODOS: cursor is a bit wrong sometimes?
+  //TODOS: cursor is still just a little bit wrong, fix render order too
   //TODO: add measurment tool - add to reset tool on id change etc
 
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
@@ -373,7 +372,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       const cursor = this.state.currentCursor();
 
       if (this.state.isCreateMode() || this.state.isMagicMode()) {
-        canvas.style.cursor = CreationUtils.getCreateCursor();
+        canvas.style.cursor = CursorStyles.getCreateModeCursor();
         return;
       }
 
@@ -620,7 +619,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     this.historyService.recordAdd(newBox);
     this.state.updateSelectedBox(String(getBoxId(newBox)));
-    this.state.setCursor('move');
+    this.state.setCursor(CursorStyles.getHoverCursor());
     this.rebuildIndex();
     this.scheduleRender();
   }

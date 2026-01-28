@@ -6,6 +6,7 @@ import { NametagUtils } from '../utils/nametag-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { CursorStyles } from '../cursor/cursor-styles';
 import { BoxStateUtils } from '../utils/box-state-utils';
+import { StateManager } from '../utils/state-manager';
 
 /**
  * Handler for hover detection and interaction point detection
@@ -134,12 +135,11 @@ export class HoverHandler {
     imageWidth: number,
     imageHeight: number,
     camera: Camera,
-    isCreateMode: boolean,
-    setCursorFn: (cursor: string) => void,
+    state: StateManager,
   ): void {
     // In create mode, always use crosshair
-    if (isCreateMode) {
-      setCursorFn('crosshair');
+    if (state.isCreateMode() || state.isMagicMode()) {
+      state.setCursor(CursorStyles.getCreateModeCursor());
       return;
     }
 
@@ -151,7 +151,7 @@ export class HoverHandler {
         if (worldBox) {
           // Check rotation knob first
           if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
-            setCursorFn('grab');
+            state.setCursor(CursorStyles.getRotationKnobCursor());
             return;
           }
 
@@ -159,24 +159,24 @@ export class HoverHandler {
           const corner = this.detectCornerHandle(wx, wy, worldBox, camera);
           if (corner) {
             const cursor = CursorStyles.getResizeCursor(corner, worldBox);
-            setCursorFn(cursor);
+            state.setCursor(cursor);
             return;
           }
         }
       }
 
       // Hovering over box but not on interaction points
-      setCursorFn('move');
+      state.setCursor(CursorStyles.getHoverCursor());
       return;
     }
 
     // Hovering over any box
     if (hoveredBoxId) {
-      setCursorFn('move');
+      state.setCursor(CursorStyles.getHoverCursor());
       return;
     }
 
     // No hover
-    setCursorFn('default');
+    state.setCursor(CursorStyles.getDefaultCursor());
   }
 }

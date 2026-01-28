@@ -14,6 +14,7 @@ import { CameraHandler } from '../handlers/camera.handler';
 import { ContextMenuHandler } from '../handlers/context-menu.handler';
 import { MagicDetectionHandler } from '../handlers/magic-detection.handler';
 import { isNullOrUndefined } from './validation-utils';
+import { CursorStyles } from '../cursor/cursor-styles';
 
 /**
  * Routes pointer events to appropriate handlers based on state
@@ -241,7 +242,7 @@ export class PointerEventHandler {
     const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, boxGeometry);
     state.startRotating(rotationInfo.angle, rotationInfo.boxRotation);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    state.setCursor('grabbing');
+    state.setCursor(CursorStyles.getRotateCursor());
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -261,7 +262,8 @@ export class PointerEventHandler {
     state.startResizing(corner);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
     state.updateLastPointer(worldPos.x, worldPos.y);
-    state.setCursor('nwse-resize'); // Will be updated by cursor manager
+    const resizeCursor = CursorStyles.getResizeCursor(corner, boxGeometry);
+    state.setCursor(resizeCursor);
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -284,7 +286,7 @@ export class PointerEventHandler {
       dragInfo.boxStart.x,
       dragInfo.boxStart.y,
     );
-    state.setCursor('move');
+    state.setCursor(CursorStyles.getDragCursor());
     canvas.setPointerCapture(event.pointerId);
     return true;
   }
@@ -352,6 +354,7 @@ export class PointerEventHandler {
     state.updateSelectedBox(null);
     state.updateLastPointer(event.clientX, event.clientY);
     state.updatePointerDown(true);
+    state.setCursor(CursorStyles.getDragCursor());
   }
 
   /**
@@ -572,8 +575,7 @@ export class PointerEventHandler {
         imageWidth,
         imageHeight,
         camera,
-        state.isCreateMode(),
-        state.currentCursor,
+        state,
       );
     }
   }
@@ -680,11 +682,13 @@ export class PointerEventHandler {
     }
 
     state.resetInteractionStates();
+    state.setCursor(CursorStyles.getDefaultCursor());
     return true;
   }
 
   private static completeCameraPan(state: StateManager): void {
     state.updatePointerDown(false);
+    state.setCursor(CursorStyles.getDefaultCursor());
   }
 
   /**

@@ -3,7 +3,6 @@ import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { ResizeCorner, WorldBoxGeometry } from '../core/types';
 import { BoxManipulator } from '../utils/box-manipulator';
 import { HistoryService } from '../../../services/history.service';
-import { CursorManager } from '../cursor/cursor-manager';
 
 /**
  * Handler for box manipulation operations (drag, resize, rotate)
