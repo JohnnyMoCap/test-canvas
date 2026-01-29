@@ -347,11 +347,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //features
-  //TODO: fix render order too
   //TODO: add measurment tool - add to reset tool on id change etc
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
+  //TODO: cursors again: detectCornerHandle and updateCursorForHover use different logic to find corners - consolidate
 
   //housekeeping
+  //TODO: full refactor of some flows. now that its all in place mostly make it look normal, must be hand made
   //TODO: fix types and make sure they make sense
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly

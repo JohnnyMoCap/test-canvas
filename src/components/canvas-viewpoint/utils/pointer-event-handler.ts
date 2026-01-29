@@ -604,7 +604,7 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
-    
+
     // Complete interactions
     if (
       this.completeBoxCreation(
@@ -619,10 +619,22 @@ export class PointerEventHandler {
       )
     )
       return;
-    if (this.completeBoxManipulation(boxes, state, historyService, onRebuildIndex)) return;
+    if (
+      this.completeBoxManipulation(
+        worldPos,
+        boxes,
+        state,
+        historyService,
+        onRebuildIndex,
+        imageWidth,
+        imageHeight,
+        camera,
+      )
+    )
+      return;
 
     // Complete camera pan
-    this.completeCameraPan(state);
+    this.completeCameraPan(worldPos, boxes, state, imageWidth, imageHeight, camera);
   }
 
   private static completeBoxCreation(
@@ -660,10 +672,14 @@ export class PointerEventHandler {
   }
 
   private static completeBoxManipulation(
+    worldPos: { x: number; y: number },
     boxes: Box[],
     state: StateManager,
     historyService: HistoryService,
     onRebuildIndex: () => void,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
   ): boolean {
     if (!state.isAnyInteractionActive()) return false;
 
@@ -684,13 +700,45 @@ export class PointerEventHandler {
     }
 
     state.resetInteractionStates();
-    state.setCursor(CursorStyles.getDefaultCursor());
+
+    // Re-evaluate cursor based on current mouse position
+    HoverHandler.updateCursorForHover(
+      worldPos.x,
+      worldPos.y,
+      state.hoveredBoxId(),
+      state.selectedBoxId(),
+      boxes,
+      imageWidth,
+      imageHeight,
+      camera,
+      state,
+    );
+
     return true;
   }
 
-  private static completeCameraPan(state: StateManager): void {
+  private static completeCameraPan(
+    worldPos: { x: number; y: number },
+    boxes: Box[],
+    state: StateManager,
+    imageWidth: number,
+    imageHeight: number,
+    camera: Camera,
+  ): void {
     state.updatePointerDown(false);
-    state.setCursor(CursorStyles.getDefaultCursor());
+
+    // Re-evaluate cursor based on current mouse position
+    HoverHandler.updateCursorForHover(
+      worldPos.x,
+      worldPos.y,
+      state.hoveredBoxId(),
+      state.selectedBoxId(),
+      boxes,
+      imageWidth,
+      imageHeight,
+      camera,
+      state,
+    );
   }
 
   /**
