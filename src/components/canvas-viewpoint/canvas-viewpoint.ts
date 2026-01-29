@@ -277,6 +277,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   onPointerUp(e: PointerEvent) {
     const canvas = this.canvasRef.nativeElement;
     const bgc = this.state.bgCanvas();
+    console.log(bgc);
+
     if (!bgc) return;
 
     PointerEventHandler.handlePointerUp(
@@ -306,6 +308,20 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const bgc = this.state.bgCanvas();
     if (!bgc) return;
 
+    // Check if pointer is outside canvas bounds
+    const rect = canvas.getBoundingClientRect();
+    const isOutsideCanvas =
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom;
+
+    // If outside canvas during any interaction, treat as pointer up
+    if (isOutsideCanvas && (this.state.isDraggingOrInteracting() || this.state.isCreateMode())) {
+      this.onPointerUp(e);
+      return;
+    }
+
     PointerEventHandler.handlePointerMove(
       e,
       canvas,
@@ -332,7 +348,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //features
-  //TODO: cursor is still just a little bit wrong, fix render order too
+  //TODO: fix render order too
   //TODO: add measurment tool - add to reset tool on id change etc
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
 
@@ -401,6 +417,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.hotkeyService.on('COPY', () => this.handleCopy());
     this.hotkeyService.on('PASTE', () => this.handlePaste());
     this.hotkeyService.on('DELETE', () => this.handleDelete());
+    this.hotkeyService.on('ESCAPE', () => this.handleEscape());
   }
 
   private initializeCanvas(): void {
@@ -635,5 +652,19 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.updateSelectedBox(null);
     this.rebuildIndex();
     this.scheduleRender();
+  }
+
+  private handleEscape(): void {
+    // Exit create mode
+    if (this.state.isCreateMode()) {
+      this.state.updateCreateMode(false);
+      this.createModeChange.emit(false);
+    }
+
+    // Exit magic mode
+    if (this.state.isMagicMode()) {
+      this.state.toggleMagicMode();
+      this.magicModeChange.emit(false);
+    }
   }
 }

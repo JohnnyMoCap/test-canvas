@@ -76,10 +76,6 @@ export class HoverHandler {
     boxGeometry: WorldBoxGeometry,
     camera: Camera,
   ): boolean {
-    console.log('----');
-
-    console.log(boxGeometry);
-
     const knobDistance = 30 / camera.zoom;
     const knobSize = 10 / camera.zoom;
 

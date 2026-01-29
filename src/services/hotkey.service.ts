@@ -3,7 +3,7 @@ import { Injectable, signal, computed, effect, DestroyRef, inject } from '@angul
 /**
  * Hotkey command types
  */
-export type HotkeyCommand = 'UNDO' | 'REDO' | 'COPY' | 'PASTE' | 'HIDE' | 'DELETE';
+export type HotkeyCommand = 'UNDO' | 'REDO' | 'COPY' | 'PASTE' | 'HIDE' | 'DELETE' | 'ESCAPE';
 
 /**
  * Callback type for hotkey handlers
@@ -127,6 +127,11 @@ export class HotkeyService {
       // Delete or Backspace - Delete
       else if (key === 'delete' || key === 'backspace') {
         command = 'DELETE';
+        event.preventDefault();
+      }
+      // Escape - Exit create/magic mode
+      else if (key === 'escape') {
+        command = 'ESCAPE';
         event.preventDefault();
       }
 

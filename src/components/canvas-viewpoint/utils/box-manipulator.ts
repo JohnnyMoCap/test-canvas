@@ -2,6 +2,7 @@ import { Box, getBoxId } from '../../../intefaces/boxes.interface';
 import { ResizeCorner } from '../core/types';
 import { BoxUtils } from './box-utils';
 import { BoxStateUtils } from './box-state-utils';
+import { BoundaryUtils } from './boundary-utils';
 
 /**
  * Handles box manipulation operations (rotate, resize, move)
@@ -88,25 +89,31 @@ export class BoxManipulator {
       bgHeight,
     );
 
-    return {
+    const resizedBox = {
       ...box,
       x: normalizedPos.x,
       y: normalizedPos.y,
       w: normalizedDims.w,
       h: normalizedDims.h,
     };
+
+    // Clamp to bounds to ensure box stays fully within canvas
+    return BoundaryUtils.clampBoxToBounds(resizedBox, bgWidth, bgHeight);
   }
 
   /**
-   * Move a box to a new position
+   * Move a box to a new position, clamped to canvas bounds
    */
   static moveBox(box: Box, worldX: number, worldY: number, bgWidth: number, bgHeight: number): Box {
     const normalized = BoxUtils.worldToNormalized(worldX, worldY, bgWidth, bgHeight);
-    return {
+    const movedBox = {
       ...box,
       x: normalized.x,
       y: normalized.y,
     };
+
+    // Clamp to bounds to ensure box stays fully within canvas
+    return BoundaryUtils.clampBoxToBounds(movedBox, bgWidth, bgHeight);
   }
 
   /**
