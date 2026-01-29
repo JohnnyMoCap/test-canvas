@@ -357,9 +357,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: READ AND VERIFY EVERYTHING
   //TODO: read documentation and create more, and write in code comments properly
 
-  //maybe
-  //TODO: change interactions to be "do the thing" on pointer UP. plus allow to move while pointer down in stuff like magic mode
-
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization
   // ========================================
