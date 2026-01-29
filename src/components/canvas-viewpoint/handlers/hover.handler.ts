@@ -27,13 +27,29 @@ export class HoverHandler {
     showNametags: boolean,
     nametagMetricsCache: Map<string, TextMetrics>,
     ctx: CanvasRenderingContext2D | undefined,
+    selectedBoxId?: string | null,
   ): string | null {
+    // Check selected box first (including rotation knob) since it might not be in the query range
+    if (selectedBoxId) {
+      const selectedBox = BoxStateUtils.findBoxById(boxes, selectedBoxId);
+      if (selectedBox) {
+        const worldBox = BoxUtils.normalizeBoxToWorld(selectedBox, imageWidth, imageHeight);
+        if (worldBox) {
+          // Check rotation knob first (it can be outside the small query range)
+          if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
+            return selectedBoxId;
+          }
+        }
+      }
+    }
+
     const candidates = quadtree ? (quadtree.queryRange(wx - 1, wy - 1, 2, 2) as Box[]) : boxes;
 
     for (let i = candidates.length - 1; i >= 0; i--) {
       const rawBox = candidates[i];
 
       const worldBox = BoxUtils.normalizeBoxToWorld(rawBox, imageWidth, imageHeight);
+
       if (!worldBox) continue;
 
       if (
@@ -60,6 +76,10 @@ export class HoverHandler {
     boxGeometry: WorldBoxGeometry,
     camera: Camera,
   ): boolean {
+    console.log('----');
+
+    console.log(boxGeometry);
+
     const knobDistance = 30 / camera.zoom;
     const knobSize = 10 / camera.zoom;
 

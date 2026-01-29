@@ -313,6 +313,7 @@ export class PointerEventHandler {
       state.showNametags(),
       nametagMetricsCache,
       ctx,
+      state.selectedBoxId(),
     );
 
     if (hoveredBoxId) {
@@ -562,6 +563,7 @@ export class PointerEventHandler {
       state.showNametags(),
       nametagMetricsCache,
       ctx,
+      state.selectedBoxId(),
     );
 
     const hoverChanged = state.updateHoverState(hoveredBoxId);
