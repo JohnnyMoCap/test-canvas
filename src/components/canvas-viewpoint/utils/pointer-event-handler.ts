@@ -604,9 +604,7 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
-
-    console.log('in handle pointer up');
-
+    
     // Complete interactions
     if (
       this.completeBoxCreation(

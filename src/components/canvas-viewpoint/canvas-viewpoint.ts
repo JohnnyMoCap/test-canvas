@@ -277,7 +277,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   onPointerUp(e: PointerEvent) {
     const canvas = this.canvasRef.nativeElement;
     const bgc = this.state.bgCanvas();
-    console.log(bgc);
 
     if (!bgc) return;
 
@@ -486,19 +485,30 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
     if (!this.state.bgCanvas()) return [];
 
-    // Skip quadtree during active interactions for performance
-    if (this.state.isDraggingOrInteracting()) {
-      return this.localBoxes();
+    const allBoxes = this.localBoxes();
+
+    // If no quadtree, return all boxes in z-order
+    if (!this.quadtree) {
+      return allBoxes;
     }
 
-    // Use quadtree for efficient querying
-    if (this.quadtree) {
-      const width = bounds.maxX - bounds.minX;
-      const height = bounds.maxY - bounds.minY;
-      return this.quadtree.queryRange(bounds.minX, bounds.minY, width, height) as Box[];
+    // Get candidates from quadtree (may be stale during interactions)
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const candidates = this.quadtree.queryRange(bounds.minX, bounds.minY, width, height) as Box[];
+
+    // Create a Set of visible box IDs for O(1) lookup
+    const visibleIds = new Set(candidates.map((box) => getBoxId(box)));
+
+    // During interactions, ensure the selected box is included
+    // (it might have moved out of its quadtree cell)
+    const selectedId = this.state.selectedBoxId();
+    if (selectedId && this.state.isDraggingOrInteracting()) {
+      visibleIds.add(selectedId);
     }
 
-    return this.localBoxes();
+    // Filter allBoxes to only include visible ones, preserving z-order
+    return allBoxes.filter((box) => visibleIds.has(getBoxId(box)));
   }
 
   // ========================================
