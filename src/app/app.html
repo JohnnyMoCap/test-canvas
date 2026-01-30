@@ -30,6 +30,31 @@
         Debug Logs
       </label>
     }
+    <button (click)="toggleMeasurementMode()" [class.active]="isMeasurementMode()">
+      {{ isMeasurementMode() ? 'Exit Measurement' : 'Measurement Tool' }}
+    </button>
+    @if (isMeasurementMode()) {
+      <label>
+        Width (m):
+        <input
+          type="number"
+          [(ngModel)]="metricWidth"
+          min="0.1"
+          step="0.1"
+          class="tolerance-input"
+        />
+      </label>
+      <label>
+        Height (m):
+        <input
+          type="number"
+          [(ngModel)]="metricHeight"
+          min="0.1"
+          step="0.1"
+          class="tolerance-input"
+        />
+      </label>
+    }
     <label>Zoom: {{ zoom() }}%</label>
   </div>
 
@@ -38,7 +63,10 @@
       [backgroundUrl]="'/assets/background.jpg'"
       [isCreateModeInput]="isCreateMode()"
       [isMagicModeInput]="isMagicMode()"
+      [isMeasurementModeInput]="isMeasurementMode()"
       [magicToleranceInput]="magicTolerance()"
+      [metricWidthInput]="metricWidth()"
+      [metricHeightInput]="metricHeight()"
       [debugMagicInput]="debugMagic()"
       [readOnlyMode]="readOnlyMode()"
       [externalHoverBoxId]="hoveredBoxId()"
@@ -46,6 +74,7 @@
       (zoomChange)="onZoomChange($event)"
       (createModeChange)="onCreateModeChange($event)"
       (magicModeChange)="onMagicModeChange($event)"
+      (measurementModeChange)="onMeasurementModeChange($event)"
       (selectedBoxChange)="onSelectedBoxChange($event)"
       (hoveredBoxChange)="onHoveredBoxChange($event)"
     ></app-canvas-viewport>

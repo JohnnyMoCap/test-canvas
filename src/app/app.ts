@@ -15,8 +15,11 @@ import { HistoryService } from '../services/history.service';
 export class App {
   isCreateMode = signal(false);
   isMagicMode = signal(false);
+  isMeasurementMode = signal(false);
   readOnlyMode = signal(false);
   magicTolerance = signal(30);
+  metricWidth = signal(10);
+  metricHeight = signal(10);
   showBoxList = signal(false);
   zoom = signal(100);
   debugMagic = signal(false);
@@ -64,6 +67,10 @@ export class App {
     this.isMagicMode.update((v) => !v);
   }
 
+  toggleMeasurementMode() {
+    this.isMeasurementMode.update((v) => !v);
+  }
+
   toggleDebugMagic() {
     this.debugMagic.update((v) => !v);
   }
@@ -82,6 +89,10 @@ export class App {
 
   onMagicModeChange(isMagicMode: boolean) {
     this.isMagicMode.set(isMagicMode);
+  }
+
+  onMeasurementModeChange(isMeasurementMode: boolean) {
+    this.isMeasurementMode.set(isMeasurementMode);
   }
 
   exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {

@@ -1,8 +1,9 @@
 import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { Box } from '../../../intefaces/boxes.interface';
-import { Camera, ResizeCorner } from '../core/types';
+import { Camera, ResizeCorner, MeasurementState } from '../core/types';
 import { CreateBoxState } from '../core/creation-state';
 import { ContextMenuState } from './context-menu-utils';
+import { MeasurementUtils } from './measurement-utils';
 
 /**
  * Centralized state management for the canvas viewport component
@@ -71,6 +72,14 @@ export class StateManager {
   readonly isMagicMode = this._isMagicMode.asReadonly();
   readonly magicTolerance = this._magicTolerance.asReadonly();
   readonly debugMagicDetection = this._debugMagicDetection.asReadonly();
+
+  // ========================================
+  // FEATURE: MEASUREMENT TOOL
+  // ========================================
+
+  private _measurementState = signal<MeasurementState>(MeasurementUtils.createInitialState());
+
+  readonly measurementState = this._measurementState.asReadonly();
 
   // ========================================
   // FEATURE: CONTEXT MENU
@@ -511,5 +520,16 @@ export class StateManager {
    */
   updateContrast(contrast: number): void {
     this._contrast.set(contrast);
+  }
+
+  // ========================================
+  // FEATURE: MEASUREMENT TOOL - Methods
+  // ========================================
+
+  /**
+   * Update measurement state
+   */
+  updateMeasurementState(state: MeasurementState): void {
+    this._measurementState.set(state);
   }
 }

@@ -13,6 +13,7 @@ import { BoxCreationHandler } from '../handlers/box-creation.handler';
 import { CameraHandler } from '../handlers/camera.handler';
 import { ContextMenuHandler } from '../handlers/context-menu.handler';
 import { MagicDetectionHandler } from '../handlers/magic-detection.handler';
+import { MeasurementHandler } from '../handlers/measurement.handler';
 import { isNullOrUndefined } from './validation-utils';
 import { CursorStyles } from '../cursor/cursor-styles';
 
@@ -23,7 +24,7 @@ import { CursorStyles } from '../cursor/cursor-styles';
 export class PointerEventHandler {
   /**
    * Handle pointer down event
-   * Routes to handlers based on priority: magic detection > context menu > creation > interaction > selection > camera
+   * Routes to handlers based on priority: measurement > magic detection > context menu > creation > interaction > selection > camera
    */
   static handlePointerDown(
     event: PointerEvent,
@@ -47,12 +48,17 @@ export class PointerEventHandler {
     // Check if CTRL/CMD is pressed - if so, skip all box interactions and go straight to camera pan;
     const shouldSkipInteractions = event.ctrlKey || event.metaKey || state.readOnlyMode();
 
-    if (shouldSkipInteractions) {
+    if (shouldSkipInteractions && !state.measurementState().isActive) {
       this.handleCameraPanStart(event, state);
       return;
     }
 
-    // PRIORITY 0: Magic Detection Mode (blocked in read-only and when CTRL pressed)
+    // PRIORITY 0: Measurement Mode (highest priority when active)
+    if (this.handleMeasurementMode(event, worldPos, camera, state)) {
+      return;
+    }
+
+    // PRIORITY 1: Magic Detection Mode (blocked in read-only and when CTRL pressed)
     if (
       this.handleMagicDetection(
         event,
@@ -68,13 +74,13 @@ export class PointerEventHandler {
       return;
     }
 
-    // PRIORITY 1: Context Menu (blocked in read-only and when CTRL pressed)
+    // PRIORITY 2: Context Menu (blocked in read-only and when CTRL pressed)
     if (this.handleContextMenu(event, worldPos, state)) return;
 
-    // PRIORITY 2: Box Creation (blocked in read-only and when CTRL pressed)
+    // PRIORITY 3: Box Creation (blocked in read-only and when CTRL pressed)
     if (this.handleCreateMode(event, worldPos, canvas, state)) return;
 
-    // PRIORITY 3-5: Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
+    // PRIORITY 4-6: Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
     if (
       this.handleSelectedBoxInteraction(
         event,
@@ -89,7 +95,7 @@ export class PointerEventHandler {
     )
       return;
 
-    // PRIORITY 6: Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
+    // PRIORITY 7: Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
     if (
       this.handleBoxSelection(
         worldPos,
@@ -105,9 +111,21 @@ export class PointerEventHandler {
     )
       return;
 
-    // PRIORITY 7: Camera Pan
+    // PRIORITY 8: Camera Pan
     this.handleCameraPanStart(event, state);
     return;
+  }
+
+  private static handleMeasurementMode(
+    event: PointerEvent,
+    worldPos: { x: number; y: number },
+    camera: Camera,
+    state: StateManager,
+  ): boolean {
+    if (!state.measurementState().isActive) return false;
+    if (event.button !== 0) return false; // Only handle left-click
+
+    return MeasurementHandler.handlePointerDown(worldPos, camera, state);
   }
 
   private static handleMagicDetection(
@@ -385,6 +403,9 @@ export class PointerEventHandler {
 
     state.updateMouseScreenPosition(event.clientX, event.clientY);
 
+    // Handle measurement mode
+    if (this.handleMeasurementMove(worldPos, camera, state)) return;
+
     // Handle active interactions
     if (this.handleCreatePreview(worldPos, state)) return;
     if (this.handleRotation(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
@@ -404,19 +425,35 @@ export class PointerEventHandler {
     )
       return;
 
-    // Handle hover detection
-    this.handleHoverDetection(
-      worldPos,
-      boxes,
-      quadtree,
-      imageWidth,
-      imageHeight,
-      camera,
-      canvas,
-      state,
-      nametagMetricsCache,
-      ctx,
-    );
+    // Handle hover detection (skip in measurement mode)
+    if (!state.measurementState().isActive) {
+      this.handleHoverDetection(
+        worldPos,
+        boxes,
+        quadtree,
+        imageWidth,
+        imageHeight,
+        camera,
+        canvas,
+        state,
+        nametagMetricsCache,
+        ctx,
+      );
+    } else {
+      // Update cursor for measurement mode
+      const cursor = MeasurementHandler.getCursorStyle(worldPos, camera, state);
+      state.setCursor(cursor);
+    }
+  }
+
+  private static handleMeasurementMove(
+    worldPos: { x: number; y: number },
+    camera: Camera,
+    state: StateManager,
+  ): boolean {
+    if (!state.measurementState().isActive) return false;
+
+    return MeasurementHandler.handlePointerMove(worldPos, state);
   }
 
   private static handleCreatePreview(
@@ -605,6 +642,9 @@ export class PointerEventHandler {
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
 
+    // Handle measurement mode
+    if (this.completeMeasurement(state)) return;
+
     // Complete interactions
     if (
       this.completeBoxCreation(
@@ -635,6 +675,12 @@ export class PointerEventHandler {
 
     // Complete camera pan
     this.completeCameraPan(worldPos, boxes, state, imageWidth, imageHeight, camera);
+  }
+
+  private static completeMeasurement(state: StateManager): boolean {
+    if (!state.measurementState().isActive) return false;
+
+    return MeasurementHandler.handlePointerUp(state);
   }
 
   private static completeBoxCreation(

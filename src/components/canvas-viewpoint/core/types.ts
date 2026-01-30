@@ -67,3 +67,23 @@ export interface WorldBox extends WorldBoxGeometry {
   raw: import('../../../intefaces/boxes.interface').Box;
   color: string;
 }
+
+/**
+ * Measurement point in world space
+ */
+export interface MeasurementPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Measurement state for the measurement tool
+ */
+export interface MeasurementState {
+  isActive: boolean;
+  pointOne: MeasurementPoint | null;
+  pointTwo: MeasurementPoint | null;
+  isDraggingPoint: 'one' | 'two' | null;
+  metricWidth: number; // Real-world width in meters
+  metricHeight: number; // Real-world height in meters
+}

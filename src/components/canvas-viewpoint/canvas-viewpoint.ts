@@ -21,6 +21,8 @@ import { ContextMenuUtils } from './utils/context-menu-utils';
 import { BackgroundUtils } from './utils/background-utils';
 import { FrameRenderer } from './utils/frame-renderer';
 import { CursorStyles } from './cursor/cursor-styles';
+import { MeasurementHandler } from './handlers/measurement.handler';
+import { CoordinateTransform } from './utils/coordinate-transform';
 
 import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
@@ -77,6 +79,24 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.updateReadOnlyMode(value);
     }
   }
+  @Input() set isMeasurementModeInput(value: boolean) {
+    const currentlyActive = this.state.measurementState().isActive;
+    if (value !== currentlyActive) {
+      this.toggleMeasurementMode();
+    }
+  }
+  @Input() set metricWidthInput(value: number) {
+    const current = this.state.measurementState().metricWidth;
+    if (value !== current) {
+      this.updateMetricDimensions(value, this.state.measurementState().metricHeight);
+    }
+  }
+  @Input() set metricHeightInput(value: number) {
+    const current = this.state.measurementState().metricHeight;
+    if (value !== current) {
+      this.updateMetricDimensions(this.state.measurementState().metricWidth, value);
+    }
+  }
   @Input() set externalHoverBoxId(value: string | number | null) {
     if (value !== null && value != this.state.selectedBoxId()) {
       this.state.updateHoverState(value === null ? null : String(value));
@@ -99,6 +119,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
   @Output() magicModeChange = new EventEmitter<boolean>();
+  @Output() measurementModeChange = new EventEmitter<boolean>();
   @Output() resetCameraRequest = new EventEmitter<void>();
   @Output() selectedBoxChange = new EventEmitter<string | number | null>();
   @Output() hoveredBoxChange = new EventEmitter<string | number | null>();
@@ -190,6 +211,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (this.state.readOnlyMode()) return;
     this.state.toggleMagicMode();
     this.magicModeChange.emit(this.state.isMagicMode());
+  }
+
+  toggleMeasurementMode() {
+    if (this.state.readOnlyMode()) return;
+    MeasurementHandler.toggleMeasurementMode(this.state);
+    this.measurementModeChange.emit(this.state.measurementState().isActive);
+    this.scheduleRender();
+  }
+
+  updateMetricDimensions(width: number, height: number) {
+    MeasurementHandler.updateMetricDimensions(width, height, this.state);
+    this.scheduleRender();
   }
 
   // ========================================
@@ -347,7 +380,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //features
-  //TODO: add measurment tool - add to reset tool on id change etc
+  //TODO: verify measurement tool contents are good and not stupid
   //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
   //TODO: cursors again: detectCornerHandle and updateCursorForHover use different logic to find corners - consolidate
 
@@ -462,6 +495,22 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const viewBounds = CameraUtils.getViewBoundsInWorld(canvas.width, canvas.height, cam);
     const visibleBoxes = this.queryVisible(viewBounds);
 
+    // Get current mouse position in world coordinates
+    let currentMouseWorld: { x: number; y: number } | null = null;
+    const lastMouse = this.state.lastMouseScreen();
+    if (lastMouse) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (lastMouse.x - rect.left) * this.state.devicePixelRatio();
+      const my = (lastMouse.y - rect.top) * this.state.devicePixelRatio();
+      currentMouseWorld = CoordinateTransform.screenToWorld(
+        mx,
+        my,
+        canvas.width,
+        canvas.height,
+        cam,
+      );
+    }
+
     FrameRenderer.renderFrame(
       ctx,
       canvas,
@@ -477,6 +526,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.createState(),
       this.state.debugShowQuadtree(),
       this.quadtree,
+      this.state.measurementState(),
+      currentMouseWorld,
     );
   }
 
@@ -663,6 +714,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private handleEscape(): void {
+    // Exit measurement mode
+    if (this.state.measurementState().isActive) {
+      this.toggleMeasurementMode();
+      return;
+    }
+
     // Exit create mode
     if (this.state.isCreateMode()) {
       this.state.updateCreateMode(false);

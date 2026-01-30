@@ -28,6 +28,37 @@ export class CoordinateTransform {
   }
 
   /**
+   * Converts world coordinates to screen coordinates (inverse of screenToWorld)
+   */
+  static worldToScreen(
+    worldX: number,
+    worldY: number,
+    canvasWidth: number,
+    canvasHeight: number,
+    camera: Camera,
+  ): Point {
+    // Subtract camera offset
+    const wx = worldX - camera.x;
+    const wy = worldY - camera.y;
+
+    // Apply scale
+    const sx = wx * camera.zoom;
+    const sy = wy * camera.zoom;
+
+    // Apply rotation
+    const cos = Math.cos(camera.rotation);
+    const sin = Math.sin(camera.rotation);
+    const rx = sx * cos - sy * sin;
+    const ry = sx * sin + sy * cos;
+
+    // Translate to screen coordinates (canvas center based)
+    return {
+      x: rx + canvasWidth / 2,
+      y: ry + canvasHeight / 2,
+    };
+  }
+
+  /**
    * Converts screen delta to world delta
    */
   static screenDeltaToWorld(dx: number, dy: number, camera: Camera): Point {

@@ -1,11 +1,12 @@
 import { Box, getBoxId } from '../../../intefaces/boxes.interface';
-import { Camera, TextMetrics } from '../core/types';
+import { Camera, TextMetrics, MeasurementState } from '../core/types';
 import { BOX_TYPES } from '../core/creation-state';
 import { CreateBoxState } from '../core/creation-state';
 import { BoxUtils } from './box-utils';
 import { RenderUtils } from './render-utils';
 import { NametagUtils } from './nametag-utils';
 import { CreationUtils } from './creation-utils';
+import { MeasurementRenderUtils } from './measurement-render-utils';
 import { Quadtree } from '../core/quadtree';
 
 /**
@@ -30,6 +31,8 @@ export class FrameRenderer {
     createState: CreateBoxState,
     debugShowQuadtree: boolean,
     quadtree: Quadtree<Box> | undefined,
+    measurementState: MeasurementState,
+    currentMouseWorld: { x: number; y: number } | null,
   ): void {
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -88,6 +91,23 @@ export class FrameRenderer {
     if (debugShowQuadtree && quadtree) {
       ctx.save();
       RenderUtils.drawQuadtreeNode(ctx, quadtree.root, camera);
+      ctx.restore();
+    }
+
+    // Draw measurement tool
+    if (measurementState.isActive) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for screen-space rendering
+      MeasurementRenderUtils.render(
+        ctx,
+        measurementState,
+        camera,
+        canvas.width,
+        canvas.height,
+        imageWidth,
+        imageHeight,
+        currentMouseWorld,
+      );
       ctx.restore();
     }
   }
