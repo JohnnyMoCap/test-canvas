@@ -169,7 +169,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.setCanvas(this.canvasRef.nativeElement);
     this.initializeCanvas();
     this.setupPageResizeObserver();
-    if (this.backgroundUrl) this.loadBackground(this.backgroundUrl); //TODO: change this to properly handle late additions to the page.
+    if (this.backgroundUrl) {
+      this.loadBackground(this.backgroundUrl);
+    } else {
+      // Load placeholder if no background URL is provided
+      this.loadPlaceholder();
+    }
     this.startRenderLoop();
   }
 
@@ -582,8 +587,31 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // INFRASTRUCTURE: Background & Layout
   // ========================================
 
+  private async loadPlaceholder() {
+    const canvas = this.canvasRef.nativeElement;
+    const result = await BackgroundUtils.loadPlaceholder(canvas.width, canvas.height);
+
+    this.state.updateBgCanvas(result.canvas);
+    this.state.updateMinZoom(result.minZoom);
+
+    if (this.state.bgCanvas()!.width > 0 && this.state.bgCanvas()!.height > 0) {
+      this.state.updateCanvasAspectRatio(
+        this.state.bgCanvas()!.width / this.state.bgCanvas()!.height,
+      );
+    }
+
+    this.onResize();
+    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0, rotation: 0 });
+    this.scheduleRender();
+  }
+
   private async loadBackground(url: string) {
     const canvas = this.canvasRef.nativeElement;
+
+    // Load placeholder first
+    await this.loadPlaceholder();
+
+    // Then load actual background
     const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
 
     this.state.updateBgCanvas(result.canvas);
