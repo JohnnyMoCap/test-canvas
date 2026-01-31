@@ -31,6 +31,7 @@ import { ClipboardManager } from './utils/clipboard-manager';
 import { isNullOrUndefined } from './utils/validation-utils';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
+import { ScaleBarComponent } from './scale-bar.component';
 import { HistoryService } from '../../services/history.service';
 import { HotkeyService } from '../../services/hotkey.service';
 
@@ -39,10 +40,11 @@ import { HotkeyService } from '../../services/hotkey.service';
   templateUrl: './canvas-viewpoint.html',
   styleUrls: ['./canvas-viewpoint.css'],
   standalone: true,
-  imports: [BoxContextMenuComponent],
+  imports: [BoxContextMenuComponent, ScaleBarComponent],
 })
 export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasEl', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('scaleBarRef') scaleBarRef?: ScaleBarComponent;
   @Input() backgroundUrl?: string;
   @Input() set isCreateModeInput(value: boolean) {
     if (value !== this.state.isCreateMode()) {
@@ -142,6 +144,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   canvasFilter = computed(
     () => `brightness(${this.state.brightness()}%) contrast(${this.state.contrast()}%)`,
   );
+
+  // Scale bar computed properties
+  viewportWidth = signal(0);
+  viewportHeight = signal(0);
+  scaleBarZoom = computed(() => this.camera().zoom);
+  scaleBarImageWidth = computed(() => this.state.bgCanvas()?.width || 0);
+  scaleBarImageHeight = computed(() => this.state.bgCanvas()?.height || 0);
+  scaleBarMetricWidth = computed(() => this.state.measurementState().metricWidth);
+  scaleBarMetricHeight = computed(() => this.state.measurementState().metricHeight);
+
   constructor(
     private historyService: HistoryService,
     private hotkeyService: HotkeyService,
@@ -282,6 +294,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.zoomChange.emit(newCamera.zoom);
       },
     );
+
+    // Show scale bar on zoom
+    this.scaleBarRef?.show();
   }
 
   onPointerDown(e: PointerEvent) {
@@ -377,6 +392,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       },
     );
     this.scheduleRender();
+
+    // Show scale bar on movement
+    this.scaleBarRef?.show();
   }
 
   //features
@@ -604,6 +622,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const rect = container.getBoundingClientRect();
     const containerWidth = rect.width * this.state.devicePixelRatio();
     const containerHeight = rect.height * this.state.devicePixelRatio();
+
+    // Update viewport dimensions for scale bar
+    this.viewportWidth.set(rect.width);
+    this.viewportHeight.set(rect.height);
 
     // Calculate canvas size maintaining aspect ratio
     let w: number, h: number;

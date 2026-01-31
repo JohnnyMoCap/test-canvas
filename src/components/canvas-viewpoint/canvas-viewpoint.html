@@ -15,4 +15,15 @@
     (selectType)="onContextMenuSelect($event)"
     (close)="closeContextMenu()"
   ></app-box-context-menu>
+
+  <app-scale-bar
+    #scaleBarRef
+    [zoom]="scaleBarZoom()"
+    [viewportWidth]="viewportWidth()"
+    [viewportHeight]="viewportHeight()"
+    [imageWidth]="scaleBarImageWidth()"
+    [imageHeight]="scaleBarImageHeight()"
+    [metricWidth]="scaleBarMetricWidth()"
+    [metricHeight]="scaleBarMetricHeight()"
+  ></app-scale-bar>
 </div>

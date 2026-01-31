@@ -16,7 +16,7 @@ export class MeasurementUtils {
 
   /**
    * Calculate metric distance based on canvas distance and image dimensions
-   * @param canvasDistance - Distance in canvas normalized coordinates (0-1)
+   * @param canvasDistance - Distance in world coordinates (same scale as image pixels)
    * @param imageWidth - Width of the background image in pixels
    * @param imageHeight - Height of the background image in pixels
    * @param metricWidth - Real-world width in meters
@@ -38,11 +38,9 @@ export class MeasurementUtils {
     // Use average of both dimensions for diagonal measurements
     const avgPixelsPerMeter = (pixelsPerMeterX + pixelsPerMeterY) / 2;
 
-    // Convert canvas distance (0-1 normalized) to pixels
-    const pixelDistance = canvasDistance * imageWidth;
-
-    // Convert to meters
-    return pixelDistance / avgPixelsPerMeter;
+    // Convert world distance to meters
+    // World coordinates are at the same scale as image pixels (at zoom=1)
+    return canvasDistance / avgPixelsPerMeter;
   }
 
   /**
