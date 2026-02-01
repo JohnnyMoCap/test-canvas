@@ -403,8 +403,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //features
-  //TODO: verify measurement tool contents are good and not stupid
-  //TODO: handle background changes happening some time AFTER the component is initialized (photo loading), along with changes to the component with a whole different photo, label, etc
+  //TODO: fix the stupid canvas sizing and extra space issues
+  //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: cursors again: detectCornerHandle and updateCursorForHover use different logic to find corners - consolidate
 
   //housekeeping
