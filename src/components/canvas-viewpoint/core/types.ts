@@ -49,7 +49,7 @@ export interface WorldBoxGeometry {
   y: number;
   w: number;
   h: number;
-  rotation: number;
+  rotation: number; // Rotation angle in radians (0 to 2π)
 }
 
 /**
