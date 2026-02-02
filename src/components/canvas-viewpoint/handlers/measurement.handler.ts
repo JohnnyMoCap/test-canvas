@@ -15,9 +15,9 @@ export class MeasurementHandler {
     worldPos: MeasurementPoint,
     camera: Camera,
     state: StateManager,
-  ): boolean {
+  ) {
     const measurementState = state.measurementState();
-    if (!measurementState.isActive) return false;
+    if (!measurementState.isActive) return;
 
     const pointOne = measurementState.pointOne;
     const pointTwo = measurementState.pointTwo;
@@ -32,7 +32,7 @@ export class MeasurementHandler {
         ...measurementState,
         isDraggingPoint: 'two',
       });
-      return true;
+      return;
     }
 
     // Check if clicking on point one
@@ -41,24 +41,24 @@ export class MeasurementHandler {
         ...measurementState,
         isDraggingPoint: 'one',
       });
-      return true;
+      return;
     }
 
     // If both points exist and clicking away from them, clear all points
     if (pointOne && pointTwo) {
       state.updateMeasurementState(MeasurementUtils.resetPoints(measurementState));
-      return true;
+      return;
     }
 
     // If only point one exists, set point two
     if (pointOne && !pointTwo) {
       state.updateMeasurementState(MeasurementUtils.setPointTwo(measurementState, worldPos));
-      return true;
+      return;
     }
 
     // If no points exist, set point one
     state.updateMeasurementState(MeasurementUtils.setPointOne(measurementState, worldPos));
-    return true;
+    return;
   }
 
   /**

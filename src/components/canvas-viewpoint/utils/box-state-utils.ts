@@ -28,7 +28,10 @@ export class BoxStateUtils {
   /**
    * Finds a box by its ID
    */
-  static findBoxById(boxes: Box[], boxId: string): Box | undefined {
+  static findBoxById(boxes: Box[], boxId: string | undefined): Box | undefined {
+    if (!boxId) {
+      return undefined;
+    }
     return boxes.find((b) => String(getBoxId(b)) === boxId);
   }
 
@@ -55,7 +58,7 @@ export class BoxStateUtils {
     x: number,
     y: number,
     w: number,
-    h: number
+    h: number,
   ): Box[] {
     return BoxStateUtils.updateBox(boxes, boxId, { x, y, w, h });
   }
