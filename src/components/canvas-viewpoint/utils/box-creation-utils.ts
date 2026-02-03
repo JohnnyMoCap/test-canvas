@@ -17,7 +17,7 @@ export class BoxCreationUtils {
     camera: Camera,
     imageWidth: number,
     imageHeight: number,
-    tempId: string
+    tempId: string,
   ): Box {
     const typeInfo = BOX_TYPES[type];
 
@@ -31,7 +31,7 @@ export class BoxCreationUtils {
       worldW,
       worldH,
       imageWidth,
-      imageHeight
+      imageHeight,
     );
 
     return {
@@ -57,7 +57,7 @@ export class BoxCreationUtils {
     imageHeight: number,
     tempId: string,
     color?: string,
-    minSize: number = 10
+    minSize: number = 10,
   ): Box | null {
     // Calculate preview box dimensions
     const left = Math.min(startX, endX);
@@ -79,7 +79,7 @@ export class BoxCreationUtils {
       width,
       height,
       imageWidth,
-      imageHeight
+      imageHeight,
     );
 
     return {
@@ -89,7 +89,7 @@ export class BoxCreationUtils {
       w: normalizedDims.w,
       h: normalizedDims.h,
       rotation: 0,
-      color: color ?? BOX_TYPES.finding.defaultColor,
+      color: color ?? BOX_TYPES['you tellin'].defaultColor,
     };
   }
 

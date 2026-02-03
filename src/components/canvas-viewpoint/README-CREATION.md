@@ -84,10 +84,10 @@ The context menu provides these box types:
 
 | Type       | Color  | Size (world px) | HSL Color          |
 | ---------- | ------ | --------------- | ------------------ |
-| Finding    | Red    | 200 × 150       | hsl(0, 70%, 50%)   |
-| Annotation | Blue   | 150 × 100       | hsl(220, 70%, 50%) |
-| Highlight  | Yellow | 100 × 75        | hsl(55, 90%, 55%)  |
-| Comment    | Green  | 120 × 90        | hsl(100, 50%, 45%) |
+| 1234567    | Red    | 200 × 150       | hsl(0, 70%, 50%)   |
+| 1234568    | Blue   | 150 × 100       | hsl(220, 70%, 50%) |
+| 1234569    | Yellow | 100 × 75        | hsl(55, 90%, 55%)  |
+| 1234560    | Green  | 120 × 90        | hsl(100, 50%, 45%) |
 
 **Note:** Sizes are in world coordinates (pixels on the background image), not screen pixels.
 

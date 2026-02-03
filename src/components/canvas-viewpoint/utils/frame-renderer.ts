@@ -84,7 +84,12 @@ export class FrameRenderer {
         createState.currentPoint.x,
         createState.currentPoint.y,
       );
-      CreationUtils.drawCreationPreview(ctx, previewBox, BOX_TYPES.finding.defaultColor, camera);
+      CreationUtils.drawCreationPreview(
+        ctx,
+        previewBox,
+        BOX_TYPES['you tellin'].defaultColor,
+        camera,
+      );
     }
 
     // Debug quadtree

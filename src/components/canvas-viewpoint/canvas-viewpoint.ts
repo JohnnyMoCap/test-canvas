@@ -413,7 +413,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //the future:
   //split component into base and add more extentions for results and coverage and crap
   //full debug mode? for performance as well?
-  //
+
+  //testing:
+  // double check other browsers
+  // double check different screen sizes
 
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization

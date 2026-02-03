@@ -265,7 +265,7 @@ On pointer up: HistoryService.recordMove()
 ### Context Menu
 
 - Right-click to open
-- Select box type (Finding, Annotation, etc.)
+- Select box type
 - Box created at click position
 - Size scaled based on zoom
 

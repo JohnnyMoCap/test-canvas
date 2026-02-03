@@ -8,7 +8,7 @@ export interface CreateBoxState {
   currentPoint: { x: number; y: number } | null;
 }
 
-export type BoxType = 'finding' | 'annotation' | 'highlight' | 'comment' | 'magic';
+export type BoxType = 'you tellin' | 'me a' | 'shrimp fried' | 'this rice' | 'magic';
 
 export interface BoxTypeInfo {
   type: BoxType;
@@ -18,27 +18,27 @@ export interface BoxTypeInfo {
 }
 
 export const BOX_TYPES: Record<BoxType, BoxTypeInfo> = {
-  finding: {
-    type: 'finding',
-    label: 'Finding',
+  'you tellin': {
+    type: 'you tellin',
+    label: 'You Tellin',
     defaultColor: 'hsl(0, 70%, 50%)',
     defaultSize: { w: 200, h: 150 },
   },
-  annotation: {
-    type: 'annotation',
-    label: 'Annotation',
+  'me a': {
+    type: 'me a',
+    label: 'Me A',
     defaultColor: 'hsl(210, 70%, 50%)',
     defaultSize: { w: 150, h: 100 },
   },
-  highlight: {
-    type: 'highlight',
-    label: 'Highlight',
+  'shrimp fried': {
+    type: 'shrimp fried',
+    label: 'Shrimp Fried',
     defaultColor: 'hsl(60, 70%, 50%)',
     defaultSize: { w: 100, h: 75 },
   },
-  comment: {
-    type: 'comment',
-    label: 'Comment',
+  'this rice': {
+    type: 'this rice',
+    label: 'This Rice',
     defaultColor: 'hsl(120, 70%, 50%)',
     defaultSize: { w: 120, h: 90 },
   },
