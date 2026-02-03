@@ -26,7 +26,7 @@ import { CoordinateTransform } from './utils/coordinate-transform';
 
 import { StateManager } from './utils/state-manager';
 import { LifecycleManager } from './utils/lifecycle-manager';
-import { PointerEventHandler } from './utils/pointer-event-handler';
+import { PointerEventHandler } from './handlers/pointer-event-handler';
 import { ClipboardManager } from './utils/clipboard-manager';
 import { isNullOrUndefined } from './utils/validation-utils';
 
@@ -405,13 +405,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //features
   //TODO: fix the stupid canvas sizing and extra space issues
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
-  //TODO: cursors again: detectCornerHandle and updateCursorForHover use different logic to find corners - consolidate
-
-  //housekeeping
-  //TODO: full refactor of some flows. now that its all in place mostly make it look normal, must be hand made
-  //TODO: fix types and make sure they make sense
-  //TODO: READ AND VERIFY EVERYTHING
-  //TODO: read documentation and create more, and write in code comments properly
+  //TODO: whos the idiot that made the temp id a string? oh wait it was me.... me, you're an idiot
 
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization

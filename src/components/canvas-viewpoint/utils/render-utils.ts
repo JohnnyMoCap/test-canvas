@@ -124,7 +124,7 @@ export class RenderUtils {
 
     // Draw bounds in world coordinates
     ctx.save();
-    ctx.strokeStyle = 'rgba(0,255,0,0.25)';
+    ctx.strokeStyle = 'rgba(89, 247, 255, 0.25)';
     ctx.lineWidth = 1 / camera.zoom;
     ctx.strokeRect(x, y, w, h);
     ctx.restore();

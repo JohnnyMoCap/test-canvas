@@ -530,10 +530,6 @@ export class StateManager {
     () => this.isRotating() || this.isResizing() || this.isDraggingBox(),
   );
 
-  // ========================================
-  // CONSTRUCTOR
-  // ========================================
-
   constructor(contextMenuState: ContextMenuState) {
     this._contextMenuState.set(contextMenuState);
   }

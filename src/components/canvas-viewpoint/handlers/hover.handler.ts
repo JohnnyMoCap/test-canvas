@@ -7,6 +7,7 @@ import { CoordinateTransform } from '../utils/coordinate-transform';
 import { CursorStyles } from '../cursor/cursor-styles';
 import { BoxStateUtils } from '../utils/box-state-utils';
 import { StateManager } from '../utils/state-manager';
+import { isNullOrUndefined } from '../utils/validation-utils';
 
 /**
  * Handler for hover detection and interaction point detection
@@ -160,30 +161,33 @@ export class HoverHandler {
     }
 
     // If hovering over selected box, check for interaction points
-    if (hoveredBoxId && hoveredBoxId === selectedBoxId) {
+    if (!isNullOrUndefined(selectedBoxId)) {
       const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
-      if (box) {
-        const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
-        if (worldBox) {
-          // Check rotation knob first
-          if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
-            state.setCursor(CursorStyles.getRotationKnobCursor());
-            return;
-          }
+      if (!box) {
+        // Hovering over box but not on interaction points
+        state.setCursor(CursorStyles.getHoverCursor());
+        return;
+      }
 
-          // Check corner handles
-          const corner = this.detectCornerHandle(wx, wy, worldBox, camera);
-          if (corner) {
-            const cursor = CursorStyles.getResizeCursor(corner, worldBox);
-            state.setCursor(cursor);
-            return;
-          }
+      const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+
+      if (!isNullOrUndefined(hoveredBoxId) && hoveredBoxId === selectedBoxId && worldBox) {
+        // Check rotation knob first
+        if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
+          state.setCursor(CursorStyles.getRotationKnobCursor());
+          return;
         }
       }
 
-      // Hovering over box but not on interaction points
-      state.setCursor(CursorStyles.getHoverCursor());
-      return;
+      if (worldBox) {
+        // Check corner handles, corners are clickable outside the internal box area
+        const corner = this.detectCornerHandle(wx, wy, worldBox, camera);
+        if (corner) {
+          const cursor = CursorStyles.getResizeCursor(corner, worldBox);
+          state.setCursor(cursor);
+          return;
+        }
+      }
     }
 
     // Hovering over any box

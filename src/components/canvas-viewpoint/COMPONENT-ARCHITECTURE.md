@@ -1,342 +1,376 @@
 # Canvas Viewpoint - Component Architecture
 
-## Recent Updates (January 25, 2026)
+## Overview
 
-### State Management Consolidation
-
-- **Removed**: `cursor-manager.ts` - merged into StateManager
-- **Added**: `event-context.ts` - groups callbacks to reduce parameter count
-- **Improved**: StateManager now manages canvas reference directly
-- **Result**: Simpler, more maintainable event handling
-
-See [ADR-001](../../docs/ADR-001-state-management-consolidation.md) for full details.
+The Canvas Viewpoint component is a feature-rich, interactive canvas for viewing and editing bounding boxes on background images. It uses a multi-layered architecture with clear separation of concerns.
 
 ---
 
-## Component Responsibilities
+## Architecture Layers
 
-### Main Component (canvas-viewpoint.ts)
+### Layer 1: Component (canvas-viewpoint.ts)
 
-**Role:** Orchestrator & Event Coordinator
+**Role:** Orchestrator and Angular Integration Point
 
 **Responsibilities:**
 
-- Coordinate between utilities and services
-- Manage Angular lifecycle
-- Handle template bindings
-- Route events to appropriate handlers
-- Maintain component-level signals and state
+- Handle Angular lifecycle (ngAfterViewInit, ngOnDestroy)
+- Manage Angular-specific features (@Input, @Output, signals, effects)
+- Route DOM events to PointerEventHandler
+- Coordinate between handlers, utilities, and services
+- Maintain component-level state (camera, localBoxes, dirty flag)
+- Trigger renders via dirty flag
 
-**Does NOT:**
+**What it does NOT do:**
 
-- Contain business logic
-- Perform calculations
-- Manipulate DOM directly (except via utilities)
-- Handle complex state updates
+- Calculate box transformations
+- Detect interactions (clicks on handles, rotation knobs, etc.)
+- Perform rendering operations
+- Manage pointer capture or coordinate conversion
+
+### Layer 2: Event Router (pointer-event-handler.ts)
+
+**Role:** Event Routing and Priority Management
+
+**Responsibilities:**
+
+- Convert screen coordinates to world coordinates
+- Route events to handlers based on priority order
+- Determine which interaction should handle the event
+- Pass necessary context to handlers
+
+**Priority Order (handlePointerDown):**
+
+1. **CTRL/CMD + Click** → Camera pan (skip all interactions)
+2. **Measurement Mode** → Measurement tool operations
+3. **Magic Mode** → Automatic box detection
+4. **Context Menu** → Right-click menu
+5. **Create Mode** → Drag-to-create boxes
+6. **Selected Box Interaction** → Rotate/Resize/Drag selected box
+7. **Box Selection** → Click unselected box to select it
+8. **Camera Pan** → Default fallback
+
+**No Business Logic:** Router only determines WHO handles the event, not HOW.
+
+### Layer 3: Handlers (handlers/\*.ts)
+
+**Role:** Feature-Specific Business Logic
+
+Eight specialized handlers:
+
+- **BoxCreationHandler** - Create boxes via drag or context menu
+- **BoxManipulationHandler** - Rotate, resize, move boxes
+- **CameraHandler** - Pan and zoom operations
+- **ClipboardHandler** - Copy/paste operations
+- **ContextMenuHandler** - Context menu state
+- **HoverHandler** - Detect hover over boxes/handles/knobs
+- **MagicDetectionHandler** - Automatic box detection from image
+- **MeasurementHandler** - Measurement tool operations
+
+**Responsibilities:**
+
+- Implement feature-specific logic
+- Calculate new states or values
+- Return data (don't modify state directly)
+- Stateless operations (except via StateManager)
+
+### Layer 4: Utilities (utils/\*.ts)
+
+**Role:** Reusable, Pure Functions
+
+**Core Utilities:**
+
+- **StateManager** - Centralized state management (all component state signals)
+- **LifecycleManager** - RAF loop, canvas init, resize observer, quadtree rebuild
+- **BoxManipulator** - Pure box transformation math (rotate, resize, move)
+- **ClipboardManager** - Clipboard operations
+- **CoordinateTransform** - Screen ↔ World coordinate conversion
+- **BoxUtils** - Box normalization, world ↔ normalized conversion
+- **CameraUtils** - Camera clamping, zoom-to-box calculations
+- **BackgroundUtils** - Background image loading, min zoom calculation
+- **FrameRenderer** - Actual canvas drawing operations
+- **QuadtreeUtils** - Build and query spatial index
+
+**Characteristics:**
+
+- Most are static classes
+- Pure functions (same input → same output)
+- No side effects (except state-manager)
+- Easily testable
 
 ---
 
-## Utility Layer
+## State Management
 
-### State Management
+### StateManager (utils/state-manager.ts)
 
-**state-manager.ts** - Single source of truth for component state
+**Centralized State Container** - All component state lives here
 
-- Tracks all interaction states (rotation, resizing, dragging, etc.)
-- Manages cursor state and DOM updates
-- Manages canvas element reference
-- Provides state mutation methods
-- Organized by feature with clear boundaries
+**State Categories:**
 
-**event-context.ts** - Event callback interface
+1. **Canvas & Rendering** - canvas element, context, device pixel ratio, RAF ID, background canvas, zoom limits
+2. **Read-Only Mode** - Disables all editing when enabled
+3. **Box Creation** - Create mode active, creation state, temp ID counter
+4. **Magic Detection** - Magic mode, tolerance, debug flag
+5. **Measurement Tool** - Measurement points, metric dimensions
+6. **Context Menu** - Menu visibility, position, worldPos
+7. **Selection & Hover** - Hovered box ID, selected box ID
+8. **Box Interaction** - Pointer down, dragging, resizing, rotating, drag/resize/rotate state
+9. **Clipboard** - Copied box
+10. **UI State** - Cursor, mouse position, nametags visibility, debug flags, brightness/contrast
 
-- Groups related callbacks logically
-- Reduces coupling between PointerEventHandler and component
-- Makes event handlers more testable
-- Provides stable API for event routing
+**Pattern:** Each state property follows:
 
-### Lifecycle & Rendering
+```typescript
+private _stateName = signal(initialValue);
+readonly stateName = this._stateName.asReadonly();
+updateStateName(value) { this._stateName.set(value); }
+```
 
-**lifecycle-manager.ts** - Component lifecycle operations
+### Component-Level State
 
-- RAF loop management
-- Canvas initialization
-- Resize observer setup
-- Index rebuilding coordination
+**Component maintains these signals:**
 
-**frame-renderer.ts** (existing) - Frame rendering
-
-- Actual drawing operations
-- Visual representation logic
-
-### Event Processing
-
-**pointer-event-handler.ts** - Pointer event delegation
-
-- Routes events to appropriate actions
-- Converts screen to world coordinates
-- Detects interaction types
-- Fires callbacks for actions
-
-### Box Operations
-
-**box-manipulator.ts** - Box transformation calculations
-
-- Rotation math
-- Resize math
-- Move calculations
-- Immutable updates
-
-**box-creation-utils.ts** (existing) - Box creation
-
-- Create from drag
-- Create from context menu
-- ID generation
-
-**box-utils.ts** (existing) - Box utilities
-
-- Coordinate transformations
-- Normalization
-- World/screen conversions
-
-### User Actions
-
-**clipboard-manager.ts** - Copy/paste operations
-
-- Copy box state
-- Calculate paste position
-- Create pasted instances
-
-**context-menu-utils.ts** (existing) - Context menu
-
-- Open/close logic
-- Position management
-- Hit detection
-
-### Detection & Query
-
-**hover-detection-utils.ts** (existing) - Hover detection
-
-- Find hovered boxes
-- Nametag hit testing
-- Quadtree querying
-
-**interaction-utils.ts** (existing) - Interaction detection
-
-- Corner handle detection
-- Rotation knob detection
-- Cursor type calculation
-
-### Spatial Indexing
-
-**quadtree-utils.ts** (existing) - Quadtree operations
-
-- Build quadtree
-- Query visible items
-- Spatial optimization
-
-**quadtree.ts** (existing) - Quadtree implementation
-
-- Data structure
-- Query methods
+- `camera` - Camera position and zoom (controlled by component, used by all layers)
+- `localBoxes` - Working copy of boxes (synced from HistoryService)
+- `dirty` - Render flag (triggers RAF render when true)
+- `nametagMetricsCache` - Text measurement cache
+- `quadtree` - Spatial index for efficient queries
 
 ---
 
 ## Data Flow
 
-### Event Flow
+### Event Flow: Pointer Down Example
 
 ```
-User Input (DOM Event)
-    ↓
-Component Event Handler (onPointerMove, etc.)
-    ↓
-PointerEventHandler.handle*()
-    ↓
-Multiple Callbacks
-    ↓
-- State Updates (StateManager)
-- Box Manipulation (BoxManipulator)
-- History Recording (HistoryService)
-- Render Scheduling (Component)
+1. User clicks canvas
+   ↓
+2. onPointerDown(event) - Component
+   ↓
+3. PointerEventHandler.handlePointerDown()
+   - Convert screen → world coordinates
+   - Check CTRL/CMD key
+   - Check active modes (measurement, magic, create)
+   - Check selected box interactions
+   - Route to appropriate handler
+   ↓
+4. Handler (e.g., BoxManipulationHandler.startRotation())
+   - Calculate rotation angle
+   - Return rotation info
+   ↓
+5. Component receives return value
+   - Update StateManager
+   - Set pointer capture
+   - Schedule render
 ```
 
 ### Render Flow
 
 ```
-State Change
-    ↓
+State Change (camera, boxes, etc.)
+   ↓
 Signal Update
-    ↓
-Effect Triggers
-    ↓
-scheduleRender()
-    ↓
-RAF Loop (LifecycleManager)
-    ↓
-renderFrame()
-    ↓
+   ↓
+Effect Triggers scheduleRender()
+   ↓
+dirty.set(true)
+   ↓
+RAF Loop (60fps with throttle)
+   ↓
+if (dirty()) → renderFrame()
+   ↓
 FrameRenderer.renderFrame()
+   - Draw background
+   - Draw boxes
+   - Draw selection UI
+   - Draw creation preview
+   ↓
+dirty.set(false)
 ```
 
-### State Synchronization
+### History Integration
 
 ```
-HistoryService.visibleBoxes (signal)
-    ↓
-Effect in Component
-    ↓
+HistoryService.visibleBoxes (signal - source of truth)
+   ↓
+effect() in Component
+   - Skip if dragging/interacting
+   - Compare with localBoxes
+   ↓
 localBoxes.set([...boxes])
-    ↓
+   ↓
 rebuildIndex()
-    ↓
+   ↓
 scheduleRender()
 ```
 
----
+### Box Modification Flow
 
-## Key Design Patterns
-
-### 1. **Delegation Pattern**
-
-The component delegates to specialized utilities:
-
-- Events → PointerEventHandler
-- Box updates → BoxManipulator
-- Clipboard → ClipboardManager
-- Lifecycle → LifecycleManager
-
-### 2. **Callback Pattern**
-
-Utilities use callbacks to communicate back:
-
-```typescript
-PointerEventHandler.handlePointerDown(
-  event,
-  state,
-  boxes,
-  // Callbacks:
-  onContextMenuOpen,
-  onCreateStart,
-  onBoxInteractionStart,
-  onCameraPanStart,
-);
 ```
-
-### 3. **Single Responsibility**
-
-Each file has ONE clear purpose:
-
-- StateManager: State
-- LifecycleManager: Lifecycle
-- BoxManipulator: Box transformations
-- etc.
-
-### 4. **Immutability Where Appropriate**
-
-Box updates create new instances:
-
-```typescript
-const updatedBox = BoxManipulator.rotateBox(box, ...);
-this.localBoxes.set(BoxManipulator.updateBoxInArray(...));
-```
-
-### 5. **Static Utility Classes**
-
-Most utilities are static for simplicity:
-
-```typescript
-BoxManipulator.rotateBox(...)
-PointerEventHandler.handleWheel(...)
-ClipboardManager.copyBox(...)
+User drags box
+   ↓
+onPointerMove
+   ↓
+PointerEventHandler routes to BoxManipulationHandler
+   ↓
+BoxManipulator.moveBox() - pure function
+   ↓
+Returns new box object
+   ↓
+Component updates localBoxes signal
+   ↓
+Render triggered
+   ↓
+On pointer up: HistoryService.recordMove()
 ```
 
 ---
 
-## Extension Points
+## Coordinate Systems
 
-### Adding New Features
+### Three Coordinate Spaces
 
-**New Interaction Type:**
+1. **Screen Space** - Pixels relative to browser viewport
+2. **Canvas Space** - Pixels on the canvas element (accounting for devicePixelRatio)
+3. **World Space** - Pixels on the background image (independent of zoom/pan)
 
-1. Add state to StateManager
-2. Add detection in PointerEventHandler
-3. Add manipulation logic to BoxManipulator or new utility
-4. Add render logic to FrameRenderer
+**Box Storage:** Boxes stored in **normalized coordinates** (0-1 range)
 
-**New Hotkey:**
+- Converted to world space for calculations
+- Converted back to normalized for storage
 
-1. Register in setupHotkeys()
-2. Add handler method in component
-3. Use existing utilities for logic
+**CoordinateTransform utility** handles all conversions.
 
-**New Tool:**
+---
 
-1. Add state to StateManager
-2. Add event handling in PointerEventHandler
-3. Create specialized utility if needed
-4. Update render logic
+## Key Features
+
+### Create Mode
+
+- Toggle via button or @Input
+- Drag to create boxes
+- Preview shown during drag
+- Minimum size enforced (10x10)
+- Disabled in read-only mode
+
+### Magic Mode
+
+- Click image to auto-detect boundaries
+- Uses color similarity algorithm
+- Adjustable tolerance
+- Optional debug logging
+- Creates box automatically
+
+### Context Menu
+
+- Right-click to open
+- Select box type (Finding, Annotation, etc.)
+- Box created at click position
+- Size scaled based on zoom
+
+### Measurement Tool
+
+- Place two points
+- Shows pixel and metric dimensions
+- Drag points to adjust
+- Used to calibrate pixel-to-meter ratio
+
+### Box Manipulation
+
+- **Rotate** - Drag rotation knob above box
+- **Resize** - Drag corner handles
+- **Move** - Drag box body
+- All operations clamped to image bounds
+
+### Selection & Hover
+
+- Click to select box
+- Hover shows resize handles
+- Selected box shows rotation knob
+- External selection via @Input
+
+### Clipboard
+
+- Copy (Ctrl+C) - Copy selected box
+- Paste (Ctrl+V) - Paste at mouse position
+- Delete (Delete key) - Remove selected box
+
+### Read-Only Mode
+
+- Disables all editing
+- View and navigation only
+- Clears selection on entry
+
+---
+
+## Performance Optimizations
+
+1. **RAF Loop with Throttling** - 60fps limit, only renders when dirty
+2. **Quadtree Spatial Index** - O(log n) box queries instead of O(n)
+3. **Dirty Flag** - Avoids unnecessary renders
+4. **Text Metrics Cache** - Avoid repeated text measurements
+5. **Pointer Capture** - Ensures smooth dragging
+6. **Effect Guards** - Skip updates during interactions
+
+---
+
+## File Organization
+
+```
+canvas-viewpoint/
+├── canvas-viewpoint.ts (Main Component)
+├── canvas-viewpoint.html (Template)
+├── canvas-viewpoint.css (Styles)
+├── box-context-menu.component.ts (Context Menu UI)
+├── scale-bar.component.ts (Scale Bar UI)
+├── core/
+│   ├── types.ts (TypeScript interfaces)
+│   ├── creation-state.ts (Box types and creation state)
+│   ├── quadtree.ts (Spatial index implementation)
+│   └── performance-config.ts (Performance constants)
+├── cursor/
+│   └── cursor-styles.ts (Cursor CSS generation)
+├── handlers/
+│   ├── box-creation.handler.ts
+│   ├── box-manipulation.handler.ts
+│   ├── camera.handler.ts
+│   ├── clipboard.handler.ts
+│   ├── context-menu.handler.ts
+│   ├── hover.handler.ts
+│   ├── magic-detection.handler.ts
+│   └── measurement.handler.ts
+└── utils/
+    ├── state-manager.ts (Centralized state)
+    ├── pointer-event-handler.ts (Event router)
+    ├── lifecycle-manager.ts (Lifecycle operations)
+    ├── box-manipulator.ts (Box transformations)
+    ├── clipboard-manager.ts (Clipboard operations)
+    ├── coordinate-transform.ts (Coordinate conversion)
+    ├── frame-renderer.ts (Rendering)
+    ├── camera-utils.ts (Camera operations)
+    ├── box-utils.ts (Box utilities)
+    ├── background-utils.ts (Background operations)
+    ├── quadtree-utils.ts (Quadtree operations)
+    └── [15+ other utilities]
+```
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+**Unit Tests:**
 
-- **Utilities:** Easy to test (pure functions, static methods)
-- **StateManager:** Test state transitions
-- **BoxManipulator:** Test math calculations
+- Handlers - Test business logic
+- Utilities - Test pure functions
+- StateManager - Test state transitions
 
-### Integration Tests
+**Integration Tests:**
 
-- **Component:** Test orchestration
-- **Event Flow:** Test callbacks fire correctly
-- **Render Flow:** Test render scheduling
+- Component - Test event routing
+- Render flow - Test dirty flag and rendering
 
-### Example:
+**E2E Tests:**
 
-```typescript
-// Easy to test utility
-describe('BoxManipulator', () => {
-  it('should rotate box correctly', () => {
-    const box = { x: 0.5, y: 0.5, rotation: 0 };
-    const rotated = BoxManipulator.rotateBox(box, ...);
-    expect(rotated.rotation).toBe(Math.PI / 4);
-  });
-});
-```
-
----
-
-## Performance Considerations
-
-### Optimizations Maintained
-
-- RAF loop with frame limiting
-- Quadtree spatial indexing
-- Dirty flag rendering
-- Efficient state updates
-
-### Optimizations Added
-
-- Cursor manager prevents redundant updates
-- State manager centralizes state checks
-- Clear separation allows targeted optimization
-
----
-
-## Future Improvements
-
-### Potential Enhancements
-
-1. **Command Pattern** for undo/redo
-2. **Observer Pattern** for state changes
-3. **Factory Pattern** for box creation
-4. **Strategy Pattern** for different tools
-
-### Refactoring Opportunities
-
-1. Extract history operations to HistoryManager utility
-2. Create RenderScheduler utility
-3. Add BoxQueryService for complex queries
-4. Create ToolManager for tool state
+- Full user workflows
+- Cross-feature interactions

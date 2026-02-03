@@ -4,17 +4,17 @@ import { Camera, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
-import { StateManager } from './state-manager';
+import { StateManager } from '../utils/state-manager';
 import { HistoryService } from '../../../services/history.service';
-import { HoverHandler } from '../handlers/hover.handler';
-import { BoxManipulationHandler } from '../handlers/box-manipulation.handler';
-import { BoxStateUtils } from './box-state-utils';
-import { BoxCreationHandler } from '../handlers/box-creation.handler';
-import { CameraHandler } from '../handlers/camera.handler';
-import { ContextMenuHandler } from '../handlers/context-menu.handler';
-import { MagicDetectionHandler } from '../handlers/magic-detection.handler';
-import { MeasurementHandler } from '../handlers/measurement.handler';
-import { isNullOrUndefined } from './validation-utils';
+import { HoverHandler } from './hover.handler';
+import { BoxManipulationHandler } from './box-manipulation.handler';
+import { BoxStateUtils } from '../utils/box-state-utils';
+import { BoxCreationHandler } from './box-creation.handler';
+import { CameraHandler } from './camera.handler';
+import { ContextMenuHandler } from './context-menu.handler';
+import { MagicDetectionHandler } from './magic-detection.handler';
+import { MeasurementHandler } from './measurement.handler';
+import { isNullOrUndefined } from '../utils/validation-utils';
 import { CursorStyles } from '../cursor/cursor-styles';
 
 /**
@@ -45,7 +45,7 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
-  
+
     // Check if CTRL/CMD is pressed - if so, skip all box interactions and go straight to camera pan;
     const shouldSkipInteractions = event.ctrlKey || event.metaKey || state.readOnlyMode();
 
@@ -54,30 +54,24 @@ export class PointerEventHandler {
       return;
     }
 
-    if(state.measurementState().isActive && event.button == 0) {
-      this.handleMeasurementMode(worldPos, camera, state)
+    if (state.measurementState().isActive && event.button == 0) {
+      this.handleMeasurementMode(worldPos, camera, state);
       return;
     }
 
-    if(state.isMagicMode() && state.bgCanvas()) {
-      this.handleMagicDetection(
-        event,
-        canvas,
-        camera,
-        state,
-        historyService,
-      )
+    if (state.isMagicMode() && state.bgCanvas()) {
+      this.handleMagicDetection(event, canvas, camera, state, historyService);
       return;
     }
 
     //works but still build in a very stupid way, fix this
-    if(state.contextMenuState()?.visible || event.button === 2) {
+    if (state.contextMenuState()?.visible || event.button === 2) {
       this.handleContextMenu(event, worldPos, state);
       return;
     }
 
     // Box Creation (blocked in read-only and when CTRL pressed)
-    if(state.isCreateMode() && event.button === 0) {
+    if (state.isCreateMode() && event.button === 0) {
       this.handleCreateMode(event, worldPos, canvas, state);
       return;
     }
@@ -192,8 +186,8 @@ export class PointerEventHandler {
     canvas: HTMLCanvasElement,
     state: StateManager,
   ) {
-      state.updateCreateState(BoxCreationHandler.startCreate(worldPos.x, worldPos.y));
-      canvas.setPointerCapture(event.pointerId);
+    state.updateCreateState(BoxCreationHandler.startCreate(worldPos.x, worldPos.y));
+    canvas.setPointerCapture(event.pointerId);
   }
 
   private static handleSelectedBoxInteraction(
@@ -257,7 +251,11 @@ export class PointerEventHandler {
     camera: Camera,
     state: StateManager,
   ): boolean {
+    console.log('handleResizeStart');
+
     const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, boxGeometry, camera);
+    console.log(corner);
+
     if (!corner) return false;
 
     state.startResizing(corner);
@@ -583,8 +581,10 @@ export class PointerEventHandler {
       state.selectedBoxId(),
     );
 
-    const hoverChanged = state.updateHoverState(hoveredBoxId);
-    if (hoverChanged) {
+    state.updateHoverState(hoveredBoxId);
+    console.log(hoveredBoxId);
+
+    if (hoveredBoxId || (Number(hoveredBoxId) ?? -1) === 0) {
       HoverHandler.updateCursorForHover(
         worldPos.x,
         worldPos.y,
@@ -727,7 +727,6 @@ export class PointerEventHandler {
 
     state.resetInteractionStates();
 
-    // Re-evaluate cursor based on current mouse position
     HoverHandler.updateCursorForHover(
       worldPos.x,
       worldPos.y,
@@ -753,7 +752,6 @@ export class PointerEventHandler {
   ): void {
     state.updatePointerDown(false);
 
-    // Re-evaluate cursor based on current mouse position
     HoverHandler.updateCursorForHover(
       worldPos.x,
       worldPos.y,

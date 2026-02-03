@@ -45,13 +45,6 @@ export class BoxManipulationHandler {
   }
 
   /**
-   * Start box resize - returns nothing, just for cursor update
-   */
-  static startResize(corner: ResizeCorner, boxGeometry: WorldBoxGeometry): void {
-    // Just a marker method - actual logic handled by caller
-  }
-
-  /**
    * Perform box resize
    */
   static resize(
@@ -98,9 +91,6 @@ export class BoxManipulationHandler {
     return BoxManipulator.moveBox(box, newWorldX, newWorldY, bgWidth, bgHeight);
   }
 
-  /**
-   * Complete box manipulation and save to history
-   */
   static completeManipulation(
     boxId: string,
     startState: WorldBoxGeometry,
