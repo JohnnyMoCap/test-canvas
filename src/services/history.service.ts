@@ -318,7 +318,7 @@ export class HistoryService {
   }
 
   /**
-   * Saves history to cookies for crash recovery
+   * Saves history to localStorage for crash recovery
    */
   private saveToStorage(): void {
     try {
@@ -329,65 +329,46 @@ export class HistoryService {
         timestamp: Date.now(),
       };
       const jsonData = JSON.stringify(data);
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 7);
-      //TODO: add photo id / label id?
-      document.cookie = `${this.STORAGE_KEY}=${encodeURIComponent(jsonData)}; expires=${expirationDate.toUTCString()}; SameSite=Strict`; //add path=/;  if theres path bs making it unavailable
+      localStorage.setItem(this.STORAGE_KEY, jsonData);
     } catch (e) {
-      console.warn('Failed to save history to cookies:', e);
+      console.warn('Failed to save history to localStorage:', e);
     }
   }
 
   /**
-   * Loads history from cookies
+   * HAAAANK! HAAAANK! YOU NEED THIS! ITS COMMENTED OUT IN LINE 57! HAAAANK!
+   * Loads history from localStorage
    */
   private loadFromStorage(): void {
     try {
-      const stored = this.getCookie(this.STORAGE_KEY);
+      const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) return;
 
+      //I swear if aikido complains about this I will call a few favours from the IDF
       const data = JSON.parse(stored);
 
-      // Only restore if less than 24 hours old
       const age = Date.now() - (data.timestamp || 0);
-      if (age < 24 * 60 * 60 * 1000) {
+      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+      if (age < SEVEN_DAYS) {
         this._undoStack.set(data.undoStack || []);
         this._redoStack.set(data.redoStack || []);
       } else {
         this.clearStorage();
       }
     } catch (e) {
-      console.warn('Failed to load history from cookies:', e);
+      console.warn('Failed to load history from localStorage:', e);
       this.clearStorage();
     }
   }
 
   /**
-   * Clears cookies
+   * Clears localStorage
    */
   private clearStorage(): void {
     try {
-      document.cookie = `${this.STORAGE_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict`; //add path=/;  if theres path bs making it unavailable
+      localStorage.removeItem(this.STORAGE_KEY);
     } catch (e) {
-      console.warn('Failed to clear cookies:', e);
+      console.warn('Failed to clear localStorage:', e);
     }
-  }
-
-  /**
-   * Helper method to get a cookie by name
-   */
-  private getCookie(name: string): string | null {
-    const nameEQ = name + '=';
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      let cookie = cookies[i];
-      while (cookie.charAt(0) === ' ') {
-        cookie = cookie.substring(1, cookie.length);
-      }
-      if (cookie.indexOf(nameEQ) === 0) {
-        return decodeURIComponent(cookie.substring(nameEQ.length, cookie.length));
-      }
-    }
-    return null;
   }
 }
