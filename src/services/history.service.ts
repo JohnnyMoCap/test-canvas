@@ -44,6 +44,10 @@ export class HistoryService {
       return [];
     }
 
+    // PENDING / ACCEPTED filter
+    // ML CLASSES filter
+    // yo mama filter
+
     // Otherwise return all boxes
     return allBoxes;
   });

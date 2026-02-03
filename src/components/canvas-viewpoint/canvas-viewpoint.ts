@@ -407,6 +407,13 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TOOD: fuckin measurment scale position fuckin fuck fucking measurement bar
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: whos the idiot that made the temp id a string? oh wait it was me.... me, you're an idiot
+  //TODO: dont forget to add low opacity for PENDING state
+  //TODO: filters in history.service visibleBoxes()
+
+  //the future:
+  //split component into base and add more extentions for results and coverage and crap
+  //full debug mode? for performance as well?
+  //
 
   // ========================================
   // INFRASTRUCTURE: Setup & Initialization
@@ -559,7 +566,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       return allBoxes;
     }
 
-    // Get candidates from quadtree (may be stale during interactions)
+    // Get candidates from quadtree (will be stale during interactions)
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
     const candidates = this.quadtree.queryRange(bounds.minX, bounds.minY, width, height) as Box[];
