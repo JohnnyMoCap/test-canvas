@@ -251,10 +251,7 @@ export class PointerEventHandler {
     camera: Camera,
     state: StateManager,
   ): boolean {
-    console.log('handleResizeStart');
-
     const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, boxGeometry, camera);
-    console.log(corner);
 
     if (!corner) return false;
 
@@ -582,7 +579,6 @@ export class PointerEventHandler {
     );
 
     state.updateHoverState(hoveredBoxId);
-    console.log(hoveredBoxId);
 
     if (hoveredBoxId || (Number(hoveredBoxId) ?? -1) === 0) {
       HoverHandler.updateCursorForHover(

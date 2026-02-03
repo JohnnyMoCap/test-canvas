@@ -28,7 +28,7 @@ export class MagicDetectionUtils {
 
     // Validate click position
     if (clickX < 0 || clickX >= width || clickY < 0 || clickY >= height) {
-      if (log) console.log('❌ Click outside image bounds:', { clickX, clickY, width, height });
+      if (log) console.log('Click outside image bounds:', { clickX, clickY, width, height });
       return null;
     }
 
@@ -43,7 +43,7 @@ export class MagicDetectionUtils {
 
     // Check if center pixel is transparent or invalid
     if (centerColor.a < 10) {
-      if (log) console.log('❌ Center pixel is transparent:', centerColor);
+      if (log) console.log('Center pixel is transparent:', centerColor);
       return null;
     }
 
@@ -54,7 +54,7 @@ export class MagicDetectionUtils {
     const seedColor = this.getSampleColor(data, width, height, clickX, clickY, sampleRadius);
 
     if (log) {
-      console.log('🎨 Detection params:', {
+      console.log('Detection params:', {
         clickPos: { x: clickX, y: clickY },
         centerPixel: centerColor,
         seedColor: seedColor,
@@ -119,7 +119,7 @@ export class MagicDetectionUtils {
     }
 
     if (log) {
-      console.log('🔍 Flood fill complete:', {
+      console.log('Flood fill complete:', {
         pixelsFound: region.length,
         maxReached: region.length >= maxPixels,
         visited: visited.size,
@@ -130,7 +130,7 @@ export class MagicDetectionUtils {
     }
 
     if (region.length < 10) {
-      if (log) console.log('❌ Region too small (<10 pixels):', region.length);
+      if (log) console.log('Region too small (<10 pixels):', region.length);
       return null;
     }
 
@@ -228,7 +228,7 @@ export class MagicDetectionUtils {
     const rotation = this.calculateRotationPCA(points);
 
     if (log) {
-      console.log('📦 Bounding box calculated:', {
+      console.log('Bounding box calculated:', {
         bounds: { minX, maxX, minY, maxY },
         center: { x: centerX.toFixed(1), y: centerY.toFixed(1) },
         size: { w: width, h: height },

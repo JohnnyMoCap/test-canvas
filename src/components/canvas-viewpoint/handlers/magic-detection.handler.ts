@@ -27,7 +27,7 @@ export class MagicDetectionHandler {
     const startTime = performance.now();
 
     if (debug) {
-      console.log('🎯 Magic detection triggered');
+      console.log('Magic detection triggered');
     }
 
     const rect = canvas.getBoundingClientRect();
@@ -51,7 +51,7 @@ export class MagicDetectionHandler {
     const clampedY = Math.max(0, Math.min(bgCanvas.height - 1, Math.floor(pixelY)));
 
     if (debug) {
-      console.log('📍 Click position:', {
+      console.log('Click position:', {
         screen: { x: e.clientX, y: e.clientY },
         world: { x: worldPos.x.toFixed(1), y: worldPos.y.toFixed(1) },
         pixel: { x: pixelX.toFixed(1), y: pixelY.toFixed(1) },
@@ -64,7 +64,7 @@ export class MagicDetectionHandler {
     // Get image data from background canvas
     const bgCtx = bgCanvas.getContext('2d');
     if (!bgCtx) {
-      if (debug) console.log('❌ No background context');
+      if (debug) console.log('No background context');
       return null;
     }
 
@@ -100,7 +100,7 @@ export class MagicDetectionHandler {
       );
 
       if (debug) {
-        console.log('✅ Detection successful:', {
+        console.log('Detection successful:', {
           //pixelCount: result.points.length,
           boundingBox: {
             center: { x: result.x.toFixed(1), y: result.y.toFixed(1) },
@@ -123,7 +123,7 @@ export class MagicDetectionHandler {
       return newBox;
     } else {
       if (debug) {
-        console.log('❌ No region detected (time: ' + detectionTime.toFixed(2) + 'ms)');
+        console.log('No region detected (time: ' + detectionTime.toFixed(2) + 'ms)');
       }
       return null;
     }

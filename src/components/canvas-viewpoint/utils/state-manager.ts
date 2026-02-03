@@ -1,6 +1,6 @@
 import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { Box } from '../../../intefaces/boxes.interface';
-import {  ResizeCorner, MeasurementState } from '../core/types';
+import { ResizeCorner, MeasurementState } from '../core/types';
 import { CreateBoxState } from '../core/creation-state';
 import { ContextMenuState } from './context-menu-utils';
 import { MeasurementUtils } from './measurement-utils';
@@ -490,7 +490,7 @@ export class StateManager {
    * showing how the canvas is subdivided for efficient box queries.
    * Useful for understanding performance or debugging spatial queries.
    */
-  private _debugShowQuadtree = signal(true);
+  private _debugShowQuadtree = signal(false);
   readonly debugShowQuadtree = this._debugShowQuadtree.asReadonly();
   updateDebugShowQuadtree(show: boolean): void {
     this._debugShowQuadtree.set(show);

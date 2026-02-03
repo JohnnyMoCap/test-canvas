@@ -404,6 +404,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   //features
   //TODO: fix the stupid canvas sizing and extra space issues
+  //TOOD: fuckin measurment scale position fuckin fuck fucking measurement bar
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: whos the idiot that made the temp id a string? oh wait it was me.... me, you're an idiot
 
