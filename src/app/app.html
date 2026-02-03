@@ -11,7 +11,7 @@
       {{ showBoxList() ? 'Hide Boxes' : 'Show Boxes' }}
     </button>
     <button (click)="toggleMagicMode()" [class.active]="isMagicMode()">
-      {{ isMagicMode() ? 'Exit Magic' : 'Magic Box' }}
+      {{ isMagicMode() ? 'Exit Magic' : 'Magic' }}
     </button>
     @if (isMagicMode()) {
       <label>
