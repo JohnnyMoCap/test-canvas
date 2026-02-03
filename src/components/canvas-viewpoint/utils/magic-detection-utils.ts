@@ -18,7 +18,7 @@ export class MagicDetectionUtils {
     imageData: ImageData,
     clickX: number,
     clickY: number,
-    tolerance: number = 30,
+    tolerance: number = 15,
     log: boolean = false,
     maxPixels: number = 500000,
   ): DetectionResult | null {
@@ -188,17 +188,6 @@ export class MagicDetectionUtils {
   }
 
   /**
-   * Check if two colors are similar within tolerance
-   */
-  private static isColorSimilar(
-    c1: { r: number; g: number; b: number },
-    c2: { r: number; g: number; b: number },
-    tolerance: number,
-  ): boolean {
-    return this.colorDistance(c1, c2) <= tolerance;
-  }
-
-  /**
    * Calculate bounding box with rotation from detected points
    */
   private static calculateBoundingBox(
@@ -294,7 +283,6 @@ export class MagicDetectionUtils {
     tempId: number,
     bgWidth: number,
     bgHeight: number,
-    type: string = 'note',
   ): Box {
     // Convert pixel coordinates to world coordinates (centered at origin)
     const worldX = result.x - bgWidth / 2;

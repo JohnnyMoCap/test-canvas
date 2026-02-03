@@ -17,7 +17,7 @@ export class App {
   isMagicMode = signal(false);
   isMeasurementMode = signal(false);
   readOnlyMode = signal(false);
-  magicTolerance = signal(30);
+  magicTolerance = signal(15);
   metricWidth = signal(10);
   metricHeight = signal(10);
   showBoxList = signal(false);
