@@ -409,10 +409,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: whos the idiot that made the temp id a string? oh wait it was me.... me, you're an idiot
   //TODO: dont forget to add low opacity for PENDING state
   //TODO: filters in history.service visibleBoxes()
+  //TODO: mobile interaction
+  //TODO: decide on both pointer flow strategy and cursor handling strategy
+  //TODO: lasso tool - full select for area - rectangle select
+  //TODO: change world to absolute
+  //TODO: fix interacting from fully zoomed out, cant detect image text I think?
 
   //the future:
-  //split component into base and add more extentions for results and coverage and crap
+  //split component into base and add more extensions for results and coverage and crap
   //full debug mode? for performance as well?
+  // Google Analytics
+  // show projections
+  // proper handling with our types
 
   //testing:
   // double check other browsers
