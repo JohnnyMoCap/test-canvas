@@ -643,12 +643,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private async loadBackground(url: string) {
     const canvas = this.canvasRef.nativeElement;
+    try {
+      await this.loadPlaceholder();
+    } catch (error) {
+      console.error('Failed to load placeholder:', error);
+    }
 
-    // Load placeholder first
-    await this.loadPlaceholder();
-
-    // Then load actual background
-    const result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
+    let result = { canvas: canvas, minZoom: 1 };
+    try {
+      result = await BackgroundUtils.loadBackground(url, canvas.width, canvas.height);
+    } catch (error) {
+      console.error('Failed to load background image:', error);
+    }
 
     this.state.updateBgCanvas(result.canvas);
     this.state.updateMinZoom(result.minZoom);

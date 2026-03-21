@@ -1,26 +1,5 @@
 # Canvas Viewport — Numbered Issues & Fix Prompts
 
-Each item is self-contained. Pass it directly to Claude with the relevant file(s) open or attached.
-
----
-
-## CRITICAL / BUG
-
----
-
-### 4. `loadPlaceholder` and `loadBackground` errors are silently swallowed
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `loadPlaceholder`, `loadBackground`
-**File:** `src/components/canvas-viewpoint/utils/background-utils.ts` — `loadPlaceholder`, `loadBackground`
-
-**Problem:** Both methods are `async` and call `BackgroundUtils` methods that can reject (on 404 or network failure). The callers in the component have no `.catch()` and no `try/catch`. A failed image load leaves the component in a broken blank state with no feedback.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, wrap the calls to `await this.loadPlaceholder()` and `await BackgroundUtils.loadBackground(...)` in try/catch blocks. On error, log a warning with `console.warn('Failed to load background:', err)` and ensure the component remains usable (e.g., keep the previous background or show an error state signal). Also check `background-utils.ts` — both `loadPlaceholder` and `loadBackground` reject via `image.onerror` but the rejection payload is the raw event which is not very useful; change `image.onerror = (err) => reject(err)` to `image.onerror = () => reject(new Error(\`Failed to load image: \${image.src}\`))`.
-
----
-
 ## ARCHITECTURE
 
 ---
@@ -250,19 +229,6 @@ These are the TODOs from the source reorganized with context and suggested appro
 **Prompt:**
 
 > Add two-finger pinch-to-zoom and one-finger pan on touch devices. In `canvas-viewpoint.ts` (or a new `touch.handler.ts`), listen for `touchstart`, `touchmove`, `touchend` on the viewport root. For two-touch `touchmove`, calculate the change in distance between the two touch points and apply it as a zoom delta (same math as `CameraHandler.zoom` but driven by pinch distance ratio). For one-touch, route to `CameraHandler.pan`. Prevent default on all touch events to stop page scroll. Do not remove the existing pointer event handlers — they continue to handle mouse/stylus.
-
----
-
-### 38. Copy-paste when mouse is outside canvas pastes at stale offset, not viewport center
-
-_(See also issue #27 — this is the underlying cause.)_
-
-**File:** `src/components/canvas-viewpoint/utils/clipboard-manager.ts`
-**File:** `src/components/canvas-viewpoint/handlers/pointer-event-handler.ts`
-
-**Prompt:**
-
-> `lastMouseScreen` is only updated during `pointermove` inside the canvas. When the user presses Ctrl+C and then Ctrl+V without moving the mouse back into the canvas, `lastMouseScreen` holds the last in-canvas position (which may be stale) or null. Fix: track `lastMouseScreen` on `window` `mousemove` in addition to canvas `pointermove`, so the most recent global cursor position is always available. In `hotkey.service.ts` or `canvas-viewpoint.ts`, add a `window.addEventListener('mousemove', ...)` that updates `state.lastMouseScreen` with the raw screen position. The canvas boundary check in `createPastedBox` already handles the out-of-canvas case correctly once the position is up-to-date.
 
 ---
 
