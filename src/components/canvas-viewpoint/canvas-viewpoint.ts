@@ -440,12 +440,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private setupEffects(): void {
     // Sync local boxes from history service (but not during active interactions)
     effect(() => {
-      if (this.state.isDraggingOrInteracting()) return;
-      const boxes = this.historyService.visibleBoxes();
-      //TODO: find a more computation friendly way to do this
-      if (JSON.stringify(boxes) === JSON.stringify(this.localBoxes())) {
+      if (this.state.isDraggingOrInteracting()) {
         return;
       }
+      const boxes = this.historyService.visibleBoxes();
       this.localBoxes.set([...boxes]);
       this.rebuildIndex();
     });

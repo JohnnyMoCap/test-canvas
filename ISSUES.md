@@ -33,33 +33,6 @@ Each item is self-contained. Pass it directly to Claude with the relevant file(s
 
 ---
 
-### 6. `JSON.stringify` used for box change detection on every reactive tick
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `setupEffects`, first effect
-
-**Problem:**
-
-```typescript
-if (JSON.stringify(boxes) === JSON.stringify(this.localBoxes())) return;
-```
-
-With 4000 boxes this serializes potentially megabytes of data on every signal emission. The effect runs frequently (on any history change), making this an O(n) string allocation hot path.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, replace the `JSON.stringify` comparison in the first effect inside `setupEffects()` with a reference equality check. The `historyService.visibleBoxes()` computed signal already returns a new array reference only when boxes actually change (because it calls `this._boxes()` which is a signal). So simply remove the stringify guard entirely — if the signal fires, the boxes changed. The effect should become:
->
-> ```typescript
-> effect(() => {
->   if (this.state.isDraggingOrInteracting()) return;
->   const boxes = this.historyService.visibleBoxes();
->   this.localBoxes.set([...boxes]);
->   this.rebuildIndex();
-> });
-> ```
-
----
-
 ### 7. `MOCK_LOADING_DELAY` dev flag baked into production code
 
 **File:** `src/components/canvas-viewpoint/utils/background-utils.ts` — top of file
