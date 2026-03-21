@@ -172,56 +172,6 @@ styleId: `style-${1 + (i % 5)}`,
 
 ---
 
-### 21. `nametagMetricsCache` is never evicted — grows unboundedly as boxes are deleted
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `nametagMetricsCache`
-**File:** `src/components/canvas-viewpoint/utils/nametag-utils.ts` — `drawNametag`
-
-**Problem:** The `nametagMetricsCache` (a `Map<string, TextMetrics>`) caches text measurements for box nametags but never removes entries when boxes are deleted. With the 4000-box test dataset and repeated add/delete operations, this map grows indefinitely.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, in the `handleDelete` method and in the undo effect (when boxes are removed), evict the corresponding entry from `nametagMetricsCache`. Add a helper:
->
-> ```typescript
-> private evictNametagCache(boxId: string | number): void {
->   this.nametagMetricsCache.delete(String(boxId));
-> }
-> ```
->
-> Call it in `handleDelete` after `historyService.recordDelete(selected)`. Also call it inside the boxes-sync effect when detecting that a box present in the cache is no longer in the new boxes array. For the sync effect, you can diff the old IDs vs new IDs: `const removed = oldIds.filter(id => !newIds.has(id))`.
-
----
-
-### 22. All boxes scanned linearly during every drag/resize/rotate frame
-
-**File:** `src/components/canvas-viewpoint/utils/quadtree-utils.ts` — `queryVisible`
-
-**Problem:** During any interaction (`isDraggingOrInteracting = true`), the quadtree is bypassed entirely and all N boxes are AABB-tested against the viewport every frame. This is intentional to handle stale quadtree entries, but for 4000 boxes at 60fps it's 240k AABB checks/sec.
-
-**Prompt:**
-
-> In `quadtree-utils.ts`, change the interaction fallback in `queryVisible` to only bypass the quadtree for the boxes directly involved in the interaction (the selected box). Keep using the (stale) quadtree for all other boxes. The selected box should always be included regardless. Logic:
->
-> ```typescript
-> if (!isDraggingOrInteracting && quadtree) {
->   // normal quadtree path
-> } else if (quadtree) {
->   // partially stale: query quadtree for background boxes, always include selected
->   results = quadtree.queryRange(...) as Box[];
->   if (selectedBoxId) {
->     const sel = boxes.find(b => getBoxId(b) == selectedBoxId);
->     if (sel && !results.includes(sel)) results.push(sel);
->   }
-> } else {
->   results = boxes; // no quadtree at all
-> }
-> ```
->
-> Accept `selectedBoxId: string | number | null` as a new parameter. The quadtree entry for the selected box may be stale, but since we always include it explicitly, the only artifact is that it stays in the quadtree at its old position — which is acceptable.
-
----
-
 ### 23. Subpixel boxes not culled during rendering — thousands of invisible draws per frame
 
 **File:** `src/components/canvas-viewpoint/utils/frame-renderer.ts` — `renderFrame`
