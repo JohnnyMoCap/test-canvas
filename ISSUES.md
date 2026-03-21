@@ -4,19 +4,6 @@
 
 ---
 
-### 11. Duplicate `queryVisible` logic — component and `QuadtreeUtils` both implement it
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `queryVisible` (private method)
-**File:** `src/components/canvas-viewpoint/utils/quadtree-utils.ts` — `QuadtreeUtils.queryVisible`
-
-**Problem:** The component has a private `queryVisible()` method that reimplements stale-quadtree fallback logic. `QuadtreeUtils.queryVisible()` does the same thing more completely (includes nametag bounds, AABB intersection). One of them is dead code. The component version also handles the "include selected box during drag" edge case that `QuadtreeUtils` doesn't.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, delete the private `queryVisible()` method entirely. In `renderFrame()`, replace the call to `this.queryVisible(viewBounds)` with a call to `QuadtreeUtils.queryVisible(...)`, passing `this.localBoxes()`, `this.quadtree`, `viewBounds`, `this.state.isDraggingOrInteracting()`, `bgc.width`, `bgc.height`, `this.state.showNametags()`. Add the missing "include selected box during drag" logic to `QuadtreeUtils.queryVisible` as an optional `selectedBoxId` parameter: if `isDraggingOrInteracting` is true and `selectedBoxId` is provided, ensure that box is always included in the results.
-
----
-
 ### 12. `camera` and `localBoxes` signals live on the component, not in `StateManager` — split ownership
 
 **File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts`
