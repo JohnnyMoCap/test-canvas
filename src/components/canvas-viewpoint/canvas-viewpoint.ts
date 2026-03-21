@@ -138,6 +138,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private quadtree?: Quadtree<Box>;
 
+  // Cleanup refs
+  private resizeObserver?: ResizeObserver;
+  private hotkeyUnsubs: (() => void)[] = [];
+
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
   contextMenuY = computed(() => this.state.contextMenuState()?.y ?? 0);
@@ -180,6 +184,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     LifecycleManager.stopRenderLoop(this.state.raf());
+    this.resizeObserver?.disconnect();
+    this.hotkeyUnsubs.forEach((fn) => fn());
   }
 
   resetCamera() {
@@ -414,6 +420,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: lasso tool - full select for area - rectangle select
   //TODO: change world to absolute
   //TODO: fix interacting from fully zoomed out, cant detect image text I think?
+  //TODO: fix the copy paste issue when mouse is not on screen, theres a todo in pointer-event-handler
 
   //the future:
   //split component into base and add more extensions for results and coverage and crap
@@ -478,12 +485,14 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private setupHotkeys(): void {
-    this.hotkeyService.on('UNDO', () => this.handleUndo());
-    this.hotkeyService.on('REDO', () => this.handleRedo());
-    this.hotkeyService.on('COPY', () => this.handleCopy());
-    this.hotkeyService.on('PASTE', () => this.handlePaste());
-    this.hotkeyService.on('DELETE', () => this.handleDelete());
-    this.hotkeyService.on('ESCAPE', () => this.handleEscape());
+    this.hotkeyUnsubs.push(
+      this.hotkeyService.on('UNDO', () => this.handleUndo()),
+      this.hotkeyService.on('REDO', () => this.handleRedo()),
+      this.hotkeyService.on('COPY', () => this.handleCopy()),
+      this.hotkeyService.on('PASTE', () => this.handlePaste()),
+      this.hotkeyService.on('DELETE', () => this.handleDelete()),
+      this.hotkeyService.on('ESCAPE', () => this.handleEscape()),
+    );
   }
 
   private initializeCanvas(): void {
@@ -497,7 +506,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private setupPageResizeObserver(): void {
     const canvas = this.canvasRef.nativeElement;
-    LifecycleManager.setupPageResizeObserver(canvas.parentElement!, () => this.onResize());
+    this.resizeObserver = LifecycleManager.setupPageResizeObserver(canvas.parentElement!, () =>
+      this.onResize(),
+    );
   }
 
   private startRenderLoop(): void {
