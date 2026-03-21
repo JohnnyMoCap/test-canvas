@@ -683,9 +683,9 @@ export class PointerEventHandler {
       historyService,
     );
 
-    if (newBox) {
+    if (newBox && newBox.tempId) {
       onBoxesUpdate([...boxes, newBox]);
-      state.updateSelectedBox(newBox.tempId!);
+      state.updateSelectedBox(newBox.tempId);
       onRebuildIndex();
     }
 

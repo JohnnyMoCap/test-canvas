@@ -105,18 +105,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.scheduleRender();
     }
   }
-  @Input() set externalSelectBoxId(
-    value: number | null, //{ boxId: number; timestamp: number } | undefined,
-  ) {
+  @Input() set externalSelectBoxId(value: number | null) {
     if (value !== null && value !== this.state.selectedBoxId()) {
-      const boxId = value; //value.boxId;
+      const boxId = value;
       this.state.updateSelectedBox(boxId);
       this.zoomToBox(boxId);
       if (this.state.readOnlyMode()) {
         this.state.updateSelectedBox(null);
       }
-      this.scheduleRender();
+    } else {
+      this.state.updateSelectedBox(null);
     }
+    this.scheduleRender();
   }
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
@@ -419,7 +419,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: fix the stupid canvas sizing and extra space issues
   //TOOD: fuckin measurment scale position fuckin fuck fucking measurement bar
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
-  //TODO: whos the idiot that made the temp id a string? oh wait it was me.... me, you're an idiot
   //TODO: dont forget to add low opacity for PENDING state
   //TODO: filters in history.service visibleBoxes()
   //TODO: mobile interaction
@@ -427,7 +426,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: lasso tool - full select for area - rectangle select
   //TODO: change world to absolute
   //TODO: fix interacting from fully zoomed out, cant detect image text I think?
-  //TODO: fix the copy paste issue when mouse is not on screen, theres a todo in pointer-event-handler
 
   //the future:
   //split component into base and add more extensions for results and coverage and crap

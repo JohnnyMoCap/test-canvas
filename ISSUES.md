@@ -8,18 +8,6 @@ Each item is self-contained. Pass it directly to Claude with the relevant file(s
 
 ---
 
-### 3. `externalSelectBoxId` input setter silently ignores `null`, cannot clear selection from parent
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `set externalSelectBoxId`
-
-**Problem:** The setter starts with `if (value !== null && ...)`, which means a parent setting this input to `null` to deselect a box has no effect. The selection can only be cleared internally.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, fix the `set externalSelectBoxId(value)` setter. Currently the guard `if (value !== null && ...)` prevents null from being processed. Change the logic so that when `value` is `null`, it clears the selection: call `this.state.updateSelectedBox(null)` and `this.scheduleRender()`. Keep the existing zoom-to-box behavior only when `value` is non-null.
-
----
-
 ### 4. `loadPlaceholder` and `loadBackground` errors are silently swallowed
 
 **File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `loadPlaceholder`, `loadBackground`
