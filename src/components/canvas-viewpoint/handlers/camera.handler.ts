@@ -26,19 +26,10 @@ export class CameraHandler {
     imageHeight: number,
     minZoom: number,
   ): Camera {
-    const worldDx = -dx / camera.zoom;
-    const worldDy = -dy / camera.zoom;
-
-    const cos = Math.cos(-camera.rotation);
-    const sin = Math.sin(-camera.rotation);
-
-    const rotatedDx = worldDx * cos - worldDy * sin;
-    const rotatedDy = worldDx * sin + worldDy * cos;
-
     const newCamera: Camera = {
       ...camera,
-      x: camera.x + rotatedDx,
-      y: camera.y + rotatedDy,
+      x: camera.x - dx / camera.zoom,
+      y: camera.y - dy / camera.zoom,
     };
 
     return CameraUtils.clampCamera(

@@ -23,12 +23,6 @@ export class RenderUtils {
       canvasWidth / 2 - camera.x * camera.zoom,
       canvasHeight / 2 - camera.y * camera.zoom,
     );
-
-    if (camera.rotation !== 0) {
-      ctx.translate(camera.x, camera.y);
-      ctx.rotate(camera.rotation);
-      ctx.translate(-camera.x, -camera.y);
-    }
   }
 
   /**

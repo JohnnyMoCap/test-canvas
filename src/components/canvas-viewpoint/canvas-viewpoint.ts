@@ -106,6 +106,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
   }
   @Input() set externalSelectBoxId(value: number | null) {
+    if (value === null) {
+      this.state.updateSelectedBox(null);
+      this.scheduleRender();
+      return;
+    }
+
     if (value !== null && value !== this.state.selectedBoxId()) {
       const boxId = value;
       this.state.updateSelectedBox(boxId);
@@ -113,10 +119,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       if (this.state.readOnlyMode()) {
         this.state.updateSelectedBox(null);
       }
-    } else {
-      this.state.updateSelectedBox(null);
+      this.scheduleRender();
     }
-    this.scheduleRender();
   }
   @Output() zoomChange = new EventEmitter<number>();
   @Output() createModeChange = new EventEmitter<boolean>();
@@ -130,7 +134,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private state: StateManager;
 
   // Signals
-  camera = signal<Camera>({ zoom: 1, x: 0, y: 0, rotation: 0 });
+  camera = signal<Camera>({ zoom: 1, x: 0, y: 0 });
   private localBoxes = signal<Box[]>([]);
   private dirty = signal(true);
 
@@ -197,7 +201,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: not used atm, is it used in prod? check.
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
-    this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });
+    this.camera.set({ zoom: defaultZoom, x: 0, y: 0 });
     this.scheduleRender();
     this.zoomChange.emit(this.camera().zoom);
   }
@@ -426,6 +430,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: lasso tool - full select for area - rectangle select
   //TODO: change world to absolute
   //TODO: fix interacting from fully zoomed out, cant detect image text I think?
+  //TODO: in color on hover when selected doesnt work sometimes?
 
   //the future:
   //split component into base and add more extensions for results and coverage and crap
@@ -628,7 +633,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     this.onResize();
-    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0, rotation: 0 });
+    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0 });
     this.scheduleRender();
   }
 
@@ -651,7 +656,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     this.onResize();
-    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0, rotation: 0 });
+    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0 });
     this.rebuildIndex();
     this.scheduleRender();
   }

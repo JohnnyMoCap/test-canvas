@@ -5,7 +5,6 @@ export interface Camera {
   zoom: number;
   x: number;
   y: number;
-  rotation: number;
 }
 
 /**

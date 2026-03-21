@@ -14,17 +14,10 @@ export class CoordinateTransform {
     canvasHeight: number,
     camera: Camera,
   ): Point {
-    // Center-based coordinates: translate screen to canvas center
     const cx = screenX - canvasWidth / 2;
     const cy = screenY - canvasHeight / 2;
 
-    // Apply inverse rotation then inverse scale then camera offset
-    const cos = Math.cos(-camera.rotation);
-    const sin = Math.sin(-camera.rotation);
-    const rx = (cx * cos - cy * sin) / camera.zoom;
-    const ry = (cx * sin + cy * cos) / camera.zoom;
-
-    return { x: rx + camera.x, y: ry + camera.y };
+    return { x: cx / camera.zoom + camera.x, y: cy / camera.zoom + camera.y };
   }
 
   /**
@@ -37,24 +30,9 @@ export class CoordinateTransform {
     canvasHeight: number,
     camera: Camera,
   ): Point {
-    // Subtract camera offset
-    const wx = worldX - camera.x;
-    const wy = worldY - camera.y;
-
-    // Apply scale
-    const sx = wx * camera.zoom;
-    const sy = wy * camera.zoom;
-
-    // Apply rotation
-    const cos = Math.cos(camera.rotation);
-    const sin = Math.sin(camera.rotation);
-    const rx = sx * cos - sy * sin;
-    const ry = sx * sin + sy * cos;
-
-    // Translate to screen coordinates (canvas center based)
     return {
-      x: rx + canvasWidth / 2,
-      y: ry + canvasHeight / 2,
+      x: (worldX - camera.x) * camera.zoom + canvasWidth / 2,
+      y: (worldY - camera.y) * camera.zoom + canvasHeight / 2,
     };
   }
 
@@ -62,13 +40,7 @@ export class CoordinateTransform {
    * Converts screen delta to world delta
    */
   static screenDeltaToWorld(dx: number, dy: number, camera: Camera): Point {
-    // Account for rotation + scale
-    const cos = Math.cos(-camera.rotation);
-    const sin = Math.sin(-camera.rotation);
-    const rx = (dx * cos - dy * sin) / camera.zoom;
-    const ry = (dx * sin + dy * cos) / camera.zoom;
-
-    return { x: rx, y: ry };
+    return { x: dx / camera.zoom, y: dy / camera.zoom };
   }
 
   /**

@@ -74,13 +74,8 @@ export class CameraUtils {
       const cx = corner.x - canvasWidth / 2;
       const cy = corner.y - canvasHeight / 2;
 
-      const cos = Math.cos(-camera.rotation);
-      const sin = Math.sin(-camera.rotation);
-      const rx = (cx * cos - cy * sin) / camera.zoom;
-      const ry = (cx * sin + cy * cos) / camera.zoom;
-
-      const wx = rx + camera.x;
-      const wy = ry + camera.y;
+      const wx = cx / camera.zoom + camera.x;
+      const wy = cy / camera.zoom + camera.y;
 
       minX = Math.min(minX, wx);
       minY = Math.min(minY, wy);
@@ -137,7 +132,6 @@ export class CameraUtils {
       zoom: finalZoom,
       x: worldBox.x,
       y: worldBox.y,
-      rotation: 0,
     };
   }
 }
