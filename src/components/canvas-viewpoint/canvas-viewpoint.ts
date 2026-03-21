@@ -454,6 +454,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         return;
       }
       const boxes = this.historyService.visibleBoxes();
+      const newIds = new Set(boxes.map((b) => String(getBoxId(b))));
+      for (const key of this.nametagMetricsCache.keys()) {
+        if (!newIds.has(key)) this.nametagMetricsCache.delete(key);
+      }
       this.localBoxes.set([...boxes]);
       this.rebuildIndex();
     });
@@ -461,7 +465,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Trigger render on camera or box changes
     effect(() => {
       const _ = this.camera();
-      const __ = this.localBoxes(); //move this to boxes effect?
+      const __ = this.localBoxes();
       this.scheduleRender();
     });
 
@@ -785,11 +789,16 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  private evictNametagCache(boxId: number): void {
+    this.nametagMetricsCache.delete(String(boxId));
+  }
+
   private handleDelete(): void {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
-    if (!(typeof selected == 'number' || typeof selected == 'string')) return;
+    if (isNullOrUndefined(selected)) return;
     this.historyService.recordDelete(selected);
+    this.evictNametagCache(selected);
     this.state.updateSelectedBox(null);
     this.rebuildIndex();
     this.scheduleRender();
