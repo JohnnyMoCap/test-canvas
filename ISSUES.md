@@ -229,15 +229,3 @@ These are the TODOs from the source reorganized with context and suggested appro
 **Prompt:**
 
 > Add two-finger pinch-to-zoom and one-finger pan on touch devices. In `canvas-viewpoint.ts` (or a new `touch.handler.ts`), listen for `touchstart`, `touchmove`, `touchend` on the viewport root. For two-touch `touchmove`, calculate the change in distance between the two touch points and apply it as a zoom delta (same math as `CameraHandler.zoom` but driven by pinch distance ratio). For one-touch, route to `CameraHandler.pan`. Prevent default on all touch events to stop page scroll. Do not remove the existing pointer event handlers — they continue to handle mouse/stylus.
-
----
-
-### 39. World coordinate system should be absolute pixels, not centered-origin (TODO in canvas-viewpoint.ts)
-
-**File:** `src/components/canvas-viewpoint/utils/coordinate-transform.ts`
-**File:** `src/components/canvas-viewpoint/utils/box-utils.ts`
-**File:** `src/components/canvas-viewpoint/utils/camera-utils.ts`
-
-**Prompt:**
-
-> Currently the world coordinate system is centered at the image center (origin = image center). This is the source of several confusing `-bgCanvas.width / 2` offsets throughout rendering and transform code. Decide whether to migrate to top-left origin (origin = top-left of image). If migrating: update `CoordinateTransform.screenToWorld` and `worldToScreen` (remove the `- canvasWidth/2` + `camera offset` and instead use a top-left to screen transform), update `box-utils.ts` `normalizeBoxToWorld` to output top-left origin world coordinates, update `frame-renderer.ts` `drawImage` call (remove the `-w/2, -h/2` offset), and update `camera-utils.ts` `clampCamera`. This is a significant refactor — do it in a branch and verify against the full render pipeline.

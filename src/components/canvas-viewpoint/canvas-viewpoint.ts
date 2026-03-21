@@ -145,6 +145,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Cleanup refs
   private resizeObserver?: ResizeObserver;
   private hotkeyUnsubs: (() => void)[] = [];
+  private _lastPinchDist: number | null = null;
 
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
@@ -415,6 +416,82 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     );
 
     // Show scale bar on movement
+    this.scaleBarRef?.show();
+  }
+
+  // ========================================
+  // FEATURE: TOUCH INTERACTION
+  // ========================================
+
+  onTouchStart(e: TouchEvent): void {
+    e.preventDefault();
+    if (e.touches.length >= 2) {
+      this._lastPinchDist = this.pinchDist(e.touches[0], e.touches[1]);
+    } else if (e.touches.length === 1) {
+      this._lastPinchDist = null;
+      this.onPointerDown(this.touchToPointer(e.touches[0]));
+    }
+  }
+
+  onTouchMove(e: TouchEvent): void {
+    e.preventDefault();
+    if (e.touches.length >= 2) {
+      this.handlePinchZoom(e.touches[0], e.touches[1]);
+    } else if (e.touches.length === 1 && this._lastPinchDist === null) {
+      this.onPointerMove(this.touchToPointer(e.touches[0]));
+    }
+  }
+
+  onTouchEnd(e: TouchEvent): void {
+    e.preventDefault();
+    this._lastPinchDist = null;
+    if (e.changedTouches.length > 0) {
+      this.onPointerUp(this.touchToPointer(e.changedTouches[0]));
+    }
+  }
+
+  private touchToPointer(touch: Touch): PointerEvent {
+    return new PointerEvent('pointermove', {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      button: 0,
+      buttons: 1,
+      bubbles: true,
+      cancelable: true,
+    });
+  }
+
+  private pinchDist(t0: Touch, t1: Touch): number {
+    const dx = t1.clientX - t0.clientX;
+    const dy = t1.clientY - t0.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  private handlePinchZoom(t0: Touch, t1: Touch): void {
+    const bgc = this.state.bgCanvas();
+    if (!bgc || this._lastPinchDist === null) return;
+
+    const newDist = this.pinchDist(t0, t1);
+    const ratio = newDist / this._lastPinchDist;
+    this._lastPinchDist = newDist;
+
+    const canvas = this.canvasRef.nativeElement;
+    const cam = this.camera();
+    const newZoom = Math.max(this.state.minZoom(), Math.min(10, cam.zoom * ratio));
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = ((t0.clientX + t1.clientX) / 2 - rect.left) * this.state.devicePixelRatio();
+    const my = ((t0.clientY + t1.clientY) / 2 - rect.top) * this.state.devicePixelRatio();
+    const worldMid = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, cam);
+
+    const dx = worldMid.x - cam.x;
+    const dy = worldMid.y - cam.y;
+    const scale = 1 - cam.zoom / newZoom;
+    const newCamera = this.clampCamera({ ...cam, zoom: newZoom, x: cam.x + dx * scale, y: cam.y + dy * scale });
+
+    this.camera.set(newCamera);
+    this.scheduleRender();
+    this.zoomChange.emit(newCamera.zoom);
     this.scaleBarRef?.show();
   }
 
