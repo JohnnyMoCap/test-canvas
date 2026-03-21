@@ -92,7 +92,7 @@ export class BoxManipulationHandler {
   }
 
   static completeManipulation(
-    boxId: string,
+    boxId: number,
     startState: WorldBoxGeometry,
     currentBox: Box,
     isRotating: boolean,

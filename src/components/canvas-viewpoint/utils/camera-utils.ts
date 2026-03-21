@@ -107,7 +107,7 @@ export class CameraUtils {
    * Zoom and pan camera to fit a specific box in view
    */
   static zoomToBox(
-    boxId: string | number | null | undefined,
+    boxId: number | null | undefined,
     boxes: Box[],
     canvasWidth: number,
     canvasHeight: number,
@@ -116,9 +116,8 @@ export class CameraUtils {
     minZoom: number,
     padding: number = 50,
   ): Camera | null {
-    if (!boxId) return null;
 
-    const box = boxes.find((b) => String(getBoxId(b)) === String(boxId));
+    const box = boxes.find((b) => getBoxId(b) === boxId);
     if (!box) return null;
 
     const worldBox = BoxUtils.normalizeBoxToWorld(box, bgWidth, bgHeight);

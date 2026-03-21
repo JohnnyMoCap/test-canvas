@@ -11,13 +11,13 @@ import { Box, getBoxId } from '../../intefaces/boxes.interface';
 })
 export class BoxListComponent {
   @Input() boxes: Box[] = [];
-  @Input() selectedBoxId: string | number | null = null;
-  @Input() hoveredBoxId: string | number | null = null;
+  @Input() selectedBoxId: number | null = null;
+  @Input() hoveredBoxId: number | null = null;
 
-  @Output() boxHover = new EventEmitter<string | number | null>();
-  @Output() boxClick = new EventEmitter<string | number>();
+  @Output() boxHover = new EventEmitter<number | null>();
+  @Output() boxClick = new EventEmitter<number>();
 
-  getBoxId(box: Box): string | number {
+  getBoxId(box: Box): number {
     return getBoxId(box);
   }
 
@@ -34,10 +34,10 @@ export class BoxListComponent {
   }
 
   isSelected(box: Box): boolean {
-    return String(getBoxId(box)) === String(this.selectedBoxId);
+    return getBoxId(box) === this.selectedBoxId;
   }
 
   isHovered(box: Box): boolean {
-    return String(getBoxId(box)) === String(this.hoveredBoxId);
+    return getBoxId(box) === this.hoveredBoxId;
   }
 }

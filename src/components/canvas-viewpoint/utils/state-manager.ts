@@ -182,6 +182,9 @@ export class StateManager {
     this._nextTempId.set(current + 1);
     return current;
   }
+  setNextTempId(n: number): void {
+    this._nextTempId.set(n);
+  }
 
   // ========================================
   // FEATURE: MAGIC DETECTION
@@ -263,10 +266,10 @@ export class StateManager {
    * Updates in real-time as mouse moves. Used to highlight boxes on hover,
    * show resize handles, and determine which box to interact with on click.
    */
-  private _hoveredBoxId = signal<string | null>(null);
+  private _hoveredBoxId = signal<number | null>(null);
   readonly hoveredBoxId = this._hoveredBoxId.asReadonly();
-  updateHoverState(boxId: string | null): boolean {
-    if (this.hoveredBoxId() != boxId) {
+  updateHoverState(boxId: number | null): boolean {
+    if (this.hoveredBoxId() !== boxId) {
       this._hoveredBoxId.set(boxId);
       return true; // State changed
     }
@@ -278,9 +281,9 @@ export class StateManager {
    * Selected box shows resize handles, rotation knob, and can be moved/edited/deleted.
    * Can be set by clicking a box, external selection from box list, or keyboard navigation.
    */
-  private _selectedBoxId = signal<string | null>(null);
+  private _selectedBoxId = signal<number | null>(null);
   readonly selectedBoxId = this._selectedBoxId.asReadonly();
-  updateSelectedBox(boxId: string | null): void {
+  updateSelectedBox(boxId: number | null): void {
     this._selectedBoxId.set(boxId);
   }
 
@@ -393,7 +396,7 @@ export class StateManager {
    * Used for undo/redo history - we record what changed from this starting state.
    */
   private _interactionStartState = signal<{
-    boxId: string;
+    boxId: number;
     x: number;
     y: number;
     w: number;
@@ -402,7 +405,7 @@ export class StateManager {
   } | null>(null);
   readonly interactionStartState = this._interactionStartState.asReadonly();
   startInteraction(
-    boxId: string,
+    boxId: number,
     x: number,
     y: number,
     w: number,

@@ -15,7 +15,7 @@ export class ClipboardHandler {
    * Copy selected box to clipboard
    */
   static copy(
-    selectedBoxId: string | null,
+    selectedBoxId: number | null,
     boxes: Box[],
     clipboardSignal: WritableSignal<Box | null>,
   ): void {
@@ -31,7 +31,7 @@ export class ClipboardHandler {
    * Cut selected box to clipboard and remove from boxes
    */
   static cut(
-    selectedBoxId: string | null,
+    selectedBoxId: number | null,
     boxes: Box[],
     clipboardSignal: WritableSignal<Box | null>,
     historyService: HistoryService,
@@ -95,7 +95,7 @@ export class ClipboardHandler {
   /**
    * Delete selected box
    */
-  static delete(selectedBoxId: string | null, boxes: Box[], historyService: HistoryService): Box[] {
+  static delete(selectedBoxId: number | null, boxes: Box[], historyService: HistoryService): Box[] {
     if (isNullOrUndefined(selectedBoxId)) return boxes;
 
     const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);

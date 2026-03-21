@@ -28,10 +28,10 @@ export class HoverHandler {
     showNametags: boolean,
     nametagMetricsCache: Map<string, TextMetrics>,
     ctx: CanvasRenderingContext2D | undefined,
-    selectedBoxId?: string | null,
-  ): string | null {
+    selectedBoxId?: number | null,
+  ): number | null {
     // Check selected box first (including rotation knob) since it might not be in the query range
-    if (selectedBoxId) {
+    if (selectedBoxId != null) {
       const selectedBox = BoxStateUtils.findBoxById(boxes, selectedBoxId);
       if (selectedBox) {
         const worldBox = BoxUtils.normalizeBoxToWorld(selectedBox, imageWidth, imageHeight);
@@ -57,11 +57,11 @@ export class HoverHandler {
         showNametags &&
         NametagUtils.pointInNametag(wx, wy, worldBox, camera, nametagMetricsCache, ctx)
       ) {
-        return String(getBoxId(rawBox));
+        return getBoxId(rawBox);
       }
 
       if (CoordinateTransform.pointInBox(wx, wy, worldBox)) {
-        return String(getBoxId(rawBox));
+        return getBoxId(rawBox);
       }
     }
 
@@ -146,8 +146,8 @@ export class HoverHandler {
   static updateCursorForHover(
     wx: number,
     wy: number,
-    hoveredBoxId: string | null,
-    selectedBoxId: string | null,
+    hoveredBoxId: number | null,
+    selectedBoxId: number | null,
     boxes: Box[],
     imageWidth: number,
     imageHeight: number,

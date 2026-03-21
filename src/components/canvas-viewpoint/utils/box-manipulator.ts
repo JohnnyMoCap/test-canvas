@@ -120,7 +120,7 @@ export class BoxManipulator {
    * Update box in array and return new array
    */
   static updateBoxInArray(boxes: Box[], updatedBox: Box): Box[] {
-    const boxId = String(getBoxId(updatedBox));
+    const boxId = getBoxId(updatedBox);
     const boxesRes = BoxStateUtils.updateBox(boxes, boxId, updatedBox);
     return boxesRes;
   }

@@ -17,7 +17,7 @@ export class BoxCreationUtils {
     camera: Camera,
     imageWidth: number,
     imageHeight: number,
-    tempId: string,
+    tempId: number,
   ): Box {
     const typeInfo = BOX_TYPES[type];
 
@@ -55,7 +55,7 @@ export class BoxCreationUtils {
     endY: number,
     imageWidth: number,
     imageHeight: number,
-    tempId: string,
+    tempId: number,
     color?: string,
     minSize: number = 10,
   ): Box | null {
@@ -96,7 +96,7 @@ export class BoxCreationUtils {
   /**
    * Generates a unique temporary ID for a new box
    */
-  static generateTempId(counter: number): string {
-    return `temp-${counter}`;
+  static generateTempId(counter: number) {
+    return 100000 + counter;
   }
 }

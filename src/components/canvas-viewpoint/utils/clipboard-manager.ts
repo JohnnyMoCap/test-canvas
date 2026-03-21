@@ -12,7 +12,7 @@ export class ClipboardManager {
   /**
    * Copy a box to clipboard
    */
-  static copyBox(boxId: string, boxes: Box[]): Box | null {
+  static copyBox(boxId: number, boxes: Box[]): Box | null {
     const box = BoxStateUtils.findBoxById(boxes, boxId);
     return box ? { ...box } : null;
   }

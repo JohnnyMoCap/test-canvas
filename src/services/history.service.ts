@@ -12,7 +12,7 @@ export type DeltaType = 'ADD' | 'DELETE' | 'ROTATE' | 'CHANGE_CLASS' | 'RESIZE' 
  */
 export interface BoxDelta {
   type: DeltaType;
-  boxId: string | number;
+  boxId: number;
   timestamp: number;
   before?: Partial<Box>;
   after?: Partial<Box>;
@@ -87,8 +87,8 @@ export class HistoryService {
   /**
    * Records a DELETE operation
    */
-  recordDelete(boxId: string | number): void {
-    const box = this._boxes().find((b) => getBoxId(b) == boxId);
+  recordDelete(boxId: number): void {
+    const box = this._boxes().find((b) => getBoxId(b) === boxId);
     if (!box) return;
 
     const delta: BoxDelta = {
@@ -106,7 +106,7 @@ export class HistoryService {
    * Records a MOVE operation
    */
   recordMove(
-    boxId: string | number,
+    boxId: number,
     beforeX: number,
     beforeY: number,
     afterX: number,
@@ -131,7 +131,7 @@ export class HistoryService {
    * Records a RESIZE operation
    */
   recordResize(
-    boxId: string | number,
+    boxId: number,
     before: { x: number; y: number; w: number; h: number },
     after: { x: number; y: number; w: number; h: number },
   ): void {
@@ -159,7 +159,7 @@ export class HistoryService {
   /**
    * Records a ROTATE operation
    */
-  recordRotate(boxId: string | number, beforeRotation: number, afterRotation: number): void {
+  recordRotate(boxId: number, beforeRotation: number, afterRotation: number): void {
     // Skip if no actual change
     if (beforeRotation === afterRotation) return;
 
@@ -178,7 +178,7 @@ export class HistoryService {
   /**
    * Records a CHANGE_CLASS operation (color change)
    */
-  recordChangeClass(boxId: string | number, beforeColor: string, afterColor: string): void {
+  recordChangeClass(boxId: number, beforeColor: string, afterColor: string): void {
     // Skip if no actual change
     if (beforeColor === afterColor) return;
 
@@ -278,7 +278,7 @@ export class HistoryService {
     switch (delta.type) {
       case 'ADD':
         // Remove the added box
-        return boxes.filter((b) => getBoxId(b) != delta.boxId);
+        return boxes.filter((b) => getBoxId(b) !== delta.boxId);
 
       case 'DELETE':
         // Restore the deleted box
@@ -289,7 +289,9 @@ export class HistoryService {
       case 'ROTATE':
       case 'CHANGE_CLASS':
         // Revert to before state
-        return boxes.map((b) => (getBoxId(b) == delta.boxId ? { ...b, ...delta.before } : b));
+        return boxes.map((b) =>
+          getBoxId(b) === delta.boxId ? ({ ...b, ...delta.before } as Box) : b,
+        );
 
       default:
         return boxes;
@@ -307,14 +309,16 @@ export class HistoryService {
 
       case 'DELETE':
         // Re-delete the box
-        return boxes.filter((b) => getBoxId(b) != delta.boxId);
+        return boxes.filter((b) => getBoxId(b) !== delta.boxId);
 
       case 'MOVE':
       case 'RESIZE':
       case 'ROTATE':
       case 'CHANGE_CLASS':
         // Apply after state
-        return boxes.map((b) => (getBoxId(b) == delta.boxId ? { ...b, ...delta.after } : b));
+        return boxes.map((b) =>
+          getBoxId(b) === delta.boxId ? ({ ...b, ...delta.after } as Box) : b,
+        );
 
       default:
         return boxes;

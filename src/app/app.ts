@@ -25,8 +25,8 @@ export class App {
   debugMagic = signal(false);
 
   // Box list state
-  selectedBoxId = signal<string | number | null>(null);
-  hoveredBoxId = signal<string | number | null>(null);
+  selectedBoxId = signal<number | null>(null);
+  hoveredBoxId = signal<number | null>(null);
 
   constructor(public historyService: HistoryService) {
     // Initialize history service with example boxes
@@ -34,20 +34,20 @@ export class App {
   }
 
   // Canvas event handlers
-  onSelectedBoxChange(boxId: string | number | null) {
+  onSelectedBoxChange(boxId: number | null) {
     this.selectedBoxId.set(boxId);
   }
 
-  onHoveredBoxChange(boxId: string | number | null) {
+  onHoveredBoxChange(boxId: number | null) {
     this.hoveredBoxId.set(boxId);
   }
 
   // Box list event handlers
-  onBoxListHover(boxId: string | number | null) {
+  onBoxListHover(boxId: number | null) {
     this.hoveredBoxId.set(boxId);
   }
 
-  onBoxListClick(boxId: string | number) {
+  onBoxListClick(boxId: number) {
     this.selectedBoxId.set(boxId);
   }
 

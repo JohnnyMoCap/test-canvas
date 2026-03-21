@@ -99,18 +99,18 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.updateMetricDimensions(this.state.measurementState().metricWidth, value);
     }
   }
-  @Input() set externalHoverBoxId(value: string | number | null) {
-    if (value !== null && value != this.state.selectedBoxId()) {
-      this.state.updateHoverState(value === null ? null : String(value));
+  @Input() set externalHoverBoxId(value: number | null) {
+    if (value !== null && value !== this.state.selectedBoxId()) {
+      this.state.updateHoverState(value);
       this.scheduleRender();
     }
   }
   @Input() set externalSelectBoxId(
-    value: string | number | null, //{ boxId: string | number; timestamp: number } | undefined,
+    value: number | null, //{ boxId: number; timestamp: number } | undefined,
   ) {
-    if (value !== null && value != this.state.selectedBoxId()) {
+    if (value !== null && value !== this.state.selectedBoxId()) {
       const boxId = value; //value.boxId;
-      this.state.updateSelectedBox(boxId === null ? null : String(boxId));
+      this.state.updateSelectedBox(boxId);
       this.zoomToBox(boxId);
       if (this.state.readOnlyMode()) {
         this.state.updateSelectedBox(null);
@@ -123,8 +123,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   @Output() magicModeChange = new EventEmitter<boolean>();
   @Output() measurementModeChange = new EventEmitter<boolean>();
   @Output() resetCameraRequest = new EventEmitter<void>();
-  @Output() selectedBoxChange = new EventEmitter<string | number | null>();
-  @Output() hoveredBoxChange = new EventEmitter<string | number | null>();
+  @Output() selectedBoxChange = new EventEmitter<number | null>();
+  @Output() hoveredBoxChange = new EventEmitter<number | null>();
 
   // State management
   private state: StateManager;
@@ -165,6 +165,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     // Initialize state manager
     this.state = new StateManager(ContextMenuUtils.close());
 
+    //TODO: make sure to do this consistantly when changing to new photo
+    // Initialize nextTempId to avoid collisions with existing box IDs
+    const existingIds = this.historyService.visibleBoxes().map((b) => getBoxId(b));
+    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+    this.state.setNextTempId(maxId + 1);
+
     this.setupEffects();
     this.setupHotkeys();
   }
@@ -198,7 +204,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   /**
    * Zoom and pan camera to fit a specific box in view
    */
-  zoomToBox(boxId: string | number | null | undefined): void {
+  zoomToBox(boxId: number | null | undefined): void {
     const bgc = this.state.bgCanvas();
     if (!bgc) return;
 
@@ -769,7 +775,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.getNextTempId();
 
     this.historyService.recordAdd(newBox);
-    this.state.updateSelectedBox(String(getBoxId(newBox)));
+    this.state.updateSelectedBox(getBoxId(newBox));
     this.state.setCursor(CursorStyles.getHoverCursor());
     this.rebuildIndex();
     this.scheduleRender();

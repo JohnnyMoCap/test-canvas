@@ -24,8 +24,8 @@ export class FrameRenderer {
     visibleBoxes: Box[],
     imageWidth: number,
     imageHeight: number,
-    hoveredBoxId: string | null,
-    selectedBoxId: string | null,
+    hoveredBoxId: number | null,
+    selectedBoxId: number | null,
     showNametags: boolean,
     nametagMetricsCache: Map<string, TextMetrics>,
     createState: CreateBoxState,
@@ -61,9 +61,9 @@ export class FrameRenderer {
     // Draw boxes
     for (const [_, boxes] of groups.entries()) {
       for (const b of boxes) {
-        RenderUtils.drawBox(ctx, b, camera, String(getBoxId(b.raw)) === hoveredBoxId);
+        RenderUtils.drawBox(ctx, b, camera, getBoxId(b.raw) === hoveredBoxId);
 
-        if (String(getBoxId(b.raw)) === selectedBoxId) {
+        if (getBoxId(b.raw) === selectedBoxId) {
           RenderUtils.drawSelectionUI(ctx, b, camera);
         }
       }

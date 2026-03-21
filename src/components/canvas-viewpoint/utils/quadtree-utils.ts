@@ -126,7 +126,7 @@ export class QuadtreeUtils {
     }
 
     // Deduplicate and maintain consistent order
-    const uniqueBoxes = new Map<string | number, Box>();
+    const uniqueBoxes = new Map<number, Box>();
     for (const box of results) {
       uniqueBoxes.set(getBoxId(box), box);
     }

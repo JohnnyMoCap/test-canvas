@@ -127,8 +127,8 @@ export class PointerEventHandler {
     state: StateManager,
     historyService: HistoryService,
   ) {
-    //TODO: ! is a no no, but whatever were having fun <3
-    const bgCanvas = state.bgCanvas()!;
+    const bgCanvas = state.bgCanvas();
+if (!bgCanvas) return;
 
     const newBox = MagicDetectionHandler.detectAndCreateBox(
       event,
