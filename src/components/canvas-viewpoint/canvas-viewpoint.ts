@@ -145,6 +145,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Cleanup refs
   private resizeObserver?: ResizeObserver;
   private hotkeyUnsubs: (() => void)[] = [];
+  /*
+  * stops rendering on destroy, gets overriden in startRenderLoop()
+  */
+  private _stopRenderLoop: () => void = () => {};
   private _lastPinchDist: number | null = null;
 
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
@@ -194,7 +198,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    LifecycleManager.stopRenderLoop(this.state.raf());
+    this._stopRenderLoop();
     this.resizeObserver?.disconnect();
     this.hotkeyUnsubs.forEach((fn) => fn());
   }
@@ -605,15 +609,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private startRenderLoop(): void {
-    LifecycleManager.startRenderLoop(
-      { value: this.state.raf() },
-      { value: this.state.lastFrameTime() },
-      this.dirty,
-      () => {
-        this.renderFrame();
-        this.dirty.set(false);
-      },
-    );
+    this._stopRenderLoop = LifecycleManager.startRenderLoop(this.dirty, () => {
+      this.renderFrame();
+      this.dirty.set(false);
+    });
   }
 
   // ========================================

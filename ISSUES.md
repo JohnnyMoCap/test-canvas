@@ -80,37 +80,6 @@ There are ~30 of these. The `asReadonly()` wrapper provides no real encapsulatio
 
 ---
 
-### 15. `LifecycleManager.startRenderLoop` uses mutable ref objects to work around signals
-
-**File:** `src/components/canvas-viewpoint/utils/lifecycle-manager.ts` — `startRenderLoop`
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `startRenderLoop`
-
-**Problem:**
-
-```typescript
-static startRenderLoop(
-  rafRef: { value: number },
-  lastFrameTimeRef: { value: number },
-  ...
-```
-
-`rafRef` and `lastFrameTimeRef` are plain mutable objects passed in because the `raf` and `lastFrameTime` signals can't be written from inside the RAF callback without an injection context. This is a workaround for a design problem.
-
-**Prompt:**
-
-> Refactor `startRenderLoop` in `lifecycle-manager.ts`. Instead of taking ref objects, have it return the RAF id so the caller can store it. For `lastFrameTime`, keep it as a local `let` variable inside the closure (it doesn't need to be observable outside the loop). New signature:
->
-> ```typescript
-> static startRenderLoop(
->   dirtySignal: Signal<boolean>,
->   renderCallback: () => void,
-> ): number  // returns the initial RAF id
-> ```
->
-> Inside the loop, use a closure-local `let lastFrameTime = 0`. The returned id is stored by the component. For stopping, `cancelAnimationFrame` on the stored id still works because the loop always replaces the id. Update `canvas-viewpoint.ts` to store the returned id and use it in `ngOnDestroy`.
-
----
-
 ## CODE QUALITY
 
 ---

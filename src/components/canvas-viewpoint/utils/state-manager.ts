@@ -48,28 +48,6 @@ export class StateManager {
   }
 
   /**
-   * RequestAnimationFrame ID returned from the render loop.
-   * Used to cancel the animation frame when the component is destroyed,
-   * preventing memory leaks and continued rendering after unmount.
-   */
-  private _raf = signal(0);
-  readonly raf = this._raf.asReadonly();
-  updateRaf(id: number): void {
-    this._raf.set(id);
-  }
-
-  /**
-   * Timestamp (in ms) of the last rendered frame.
-   * Used for frame timing calculations, performance monitoring,
-   * and potentially for animation interpolation.
-   */
-  private _lastFrameTime = signal(0);
-  readonly lastFrameTime = this._lastFrameTime.asReadonly();
-  updateLastFrameTime(time: number): void {
-    this._lastFrameTime.set(time);
-  }
-
-  /**
    * Off-screen canvas containing the background image (e.g., floor plan, photo, map).
    * Pre-loaded and cached to avoid re-decoding the image on every frame.
    * Width/height represent the actual image dimensions in pixels (world coordinates).
