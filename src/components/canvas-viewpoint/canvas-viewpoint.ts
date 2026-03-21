@@ -487,7 +487,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const dx = worldMid.x - cam.x;
     const dy = worldMid.y - cam.y;
     const scale = 1 - cam.zoom / newZoom;
-    const newCamera = this.clampCamera({ ...cam, zoom: newZoom, x: cam.x + dx * scale, y: cam.y + dy * scale });
+    const newCamera = this.clampCamera({
+      ...cam,
+      zoom: newZoom,
+      x: cam.x + dx * scale,
+      y: cam.y + dy * scale,
+    });
 
     this.camera.set(newCamera);
     this.scheduleRender();
