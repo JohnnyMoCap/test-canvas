@@ -159,19 +159,6 @@ styleId: `style-${1 + (i % 5)}`,
 
 ---
 
-### 20. Quadtree rebuilt from scratch on every single-box operation
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `rebuildIndex` calls
-**File:** `src/components/canvas-viewpoint/utils/lifecycle-manager.ts` — `rebuildIndex`
-
-**Problem:** `rebuildIndex()` is called after every add, paste, delete, and pointer-up. The quadtree is built in O(n log n). For 4000 boxes, rebuilding after pasting one box is expensive. The `Quadtree` class already supports `insert()`.
-
-**Prompt:**
-
-> Add `insertBox(box: Box)` and `removeBox(boxId: string | number)` methods to `QuadtreeUtils`. These should use the existing `quadtree.insert()` for additions, and for removals rebuild only if the quadtree exists but the box to remove was in it (or accept a full rebuild for removes as a first step — even just skipping the rebuild on add is a win). In `canvas-viewpoint.ts`, change `handleCopy` (no rebuild needed), `handlePaste` (insert the new box), and `recordAdd` follow-ups to call `this.quadtree = QuadtreeUtils.insertBox(...)` instead of full `rebuildIndex()`. Keep full rebuilds for initial load, undo/redo, and hide-toggle.
-
----
-
 ### 23. Subpixel boxes not culled during rendering — thousands of invisible draws per frame
 
 **File:** `src/components/canvas-viewpoint/utils/frame-renderer.ts` — `renderFrame`
@@ -210,45 +197,6 @@ styleId: `style-${1 + (i % 5)}`,
 > - `history.service.ts`: The `clearStorage()`/`loadFromStorage()` pair will be handled in issue #5. Remove the `// yo mama filter` joke comment from `visibleBoxes`.
 > - `canvas-viewpoint.ts`: Remove the commented-out type annotation on `externalSelectBoxId` (`//{ boxId: string | number; timestamp: number } | undefined`). Consolidate the TODO list at the bottom into a proper tracking system (GitHub issues, etc.) or keep only the most critical unresolved ones.
 > - `clipboard-manager.ts`: The `// TODO: not working, fix.` comment refers to the no-mouse-position fallback — this will remain until fixed (see issue #27), so leave it but make it actionable.
-
----
-
-### 29. `WorldBox` duplicates the `color` field that is already accessible on `raw`
-
-**File:** `src/components/canvas-viewpoint/core/types.ts` — `WorldBox`
-
-**Problem:**
-
-```typescript
-export interface WorldBox extends WorldBoxGeometry {
-  raw: Box;
-  color: string; // already accessible via raw.color
-}
-```
-
-`color` is set during `normalizeBoxToWorld` and mirrors `raw.color`. Any code that changes `raw.color` must also remember to update `WorldBox.color`, creating a potential desync. Accessing `b.raw.color` is slightly more verbose but eliminates the duplication.
-
-**Prompt:**
-
-> In `types.ts`, remove the `color` field from `WorldBox`. In `box-utils.ts` (`normalizeBoxToWorld`), remove the `color` assignment from the returned object. Update all render code that reads `b.color` to read `b.raw.color` instead — primarily in `frame-renderer.ts` (the `groups` map by color) and `render-utils.ts` (`drawBox`). This is a small change that eliminates a potential stale-color bug.
-
----
-
-### 32. `history.service.ts` — initial box state has no undo baseline entry
-
-**File:** `src/services/history.service.ts` — `initialize()`, `saveToStorage()`
-
-**Problem:**
-
-```typescript
-//TODO: add initial all boxes?
-```
-
-`initialize(boxes)` sets the box state but records nothing in the undo stack. This means undo can go back to an empty-boxes state (undoing the first ADD gets you to `[]`), but there's no way to represent "undo all the way back to how the data was when the app loaded." The localStorage snapshot also doesn't include the initial boxes.
-
-**Prompt:**
-
-> In `history.service.ts`, after `initialize(boxes)` sets `this._boxes.set(boxes)`, save a snapshot to localStorage that includes the initial boxes alongside the empty stacks. In `loadFromStorage()`, restore the initial boxes from this snapshot if the stacks are empty. This way a page refresh restores the data. The undo stack itself doesn't need an entry for the initial state — undo should simply stop when the stack is empty (current behavior), but the boxes themselves should persist across refreshes. Update `saveToStorage` to always include `boxes: this._boxes()` in the stored JSON.
 
 ---
 

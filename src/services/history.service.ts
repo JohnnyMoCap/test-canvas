@@ -67,6 +67,7 @@ export class HistoryService {
    */
   initialize(boxes: Box[]): void {
     this._boxes.set(boxes);
+    this.saveToStorage();
   }
 
   /**
@@ -331,7 +332,7 @@ export class HistoryService {
   private saveToStorage(): void {
     try {
       const data = {
-        //TODO: add initial all boxes?
+        boxes: this._boxes(),
         undoStack: this._undoStack(),
         redoStack: this._redoStack(),
         timestamp: Date.now(),
@@ -358,6 +359,7 @@ export class HistoryService {
       const age = Date.now() - (data.timestamp || 0);
       const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
       if (age < SEVEN_DAYS) {
+        if (data.boxes?.length) this._boxes.set(data.boxes);
         this._undoStack.set(data.undoStack || []);
         this._redoStack.set(data.redoStack || []);
       } else {
