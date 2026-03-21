@@ -8,8 +8,8 @@
         class="box-list-item"
         [class.selected]="isSelected(box)"
         [class.hovered]="isHovered(box)"
-        (mouseenter)="onBoxMouseEnter(box)"
-        (mouseleave)="onBoxMouseLeave()"
+        (pointerenter)="onBoxMouseEnter(box)"
+        (pointerleave)="onBoxMouseLeave()"
         (click)="onBoxClick(box)"
       >
         <div class="box-id">ID: {{ getBoxId(box) }}</div>

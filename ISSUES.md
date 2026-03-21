@@ -263,20 +263,6 @@ styleId: `style-${1 + (i % 5)}`,
 
 ---
 
-### 28. `Camera` type includes `rotation` field but camera rotation has no UI and is untested
-
-**File:** `src/components/canvas-viewpoint/core/types.ts` — `Camera`
-**File:** `src/components/canvas-viewpoint/utils/camera-utils.ts`
-**File:** `src/components/canvas-viewpoint/utils/render-utils.ts` — `applyCameraTransform`
-
-**Problem:** `Camera.rotation` is stored and applied in `applyCameraTransform`, but there is no UI to change it, no handler that modifies it, and it defaults to `0` everywhere. This is dead complexity — the rotation math is threaded through coordinate transforms and pan clamping but never exercised. It either needs an implementation or needs to be removed to reduce surface area.
-
-**Prompt:**
-
-> Make a decision on camera rotation: if it is not planned for the near term, remove `rotation` from the `Camera` interface and all related code. Specifically: remove the `rotation` parameter from `RenderUtils.applyCameraTransform`, `CameraHandler.pan` (the rotation compensation in the pan vector), `CameraHandler.calculateMinZoom`, and `CoordinateTransform.screenToWorld` and `screenDeltaToWorld`. Replace `camera.rotation` references with `0`. This simplifies the transform math significantly. If camera rotation IS planned, create a GitHub issue/TODO and document the expected UX (e.g., pinch-rotate gesture).
-
----
-
 ### 29. `WorldBox` duplicates the `color` field that is already accessible on `raw`
 
 **File:** `src/components/canvas-viewpoint/core/types.ts` — `WorldBox`
@@ -295,38 +281,6 @@ export interface WorldBox extends WorldBoxGeometry {
 **Prompt:**
 
 > In `types.ts`, remove the `color` field from `WorldBox`. In `box-utils.ts` (`normalizeBoxToWorld`), remove the `color` assignment from the returned object. Update all render code that reads `b.color` to read `b.raw.color` instead — primarily in `frame-renderer.ts` (the `groups` map by color) and `render-utils.ts` (`drawBox`). This is a small change that eliminates a potential stale-color bug.
-
----
-
-### 30. `isNullOrUndefined` utility is a single-line wrapper in its own file, used in only 2 places
-
-**File:** `src/components/canvas-viewpoint/utils/validation-utils.ts`
-
-**Problem:** The entire file is:
-
-```typescript
-export function isNullOrUndefined<T>(value: T | null | undefined): value is null | undefined {
-  return value === null || value === undefined;
-}
-```
-
-This is equivalent to `value == null` (a standard JS pattern). It has its own file, is imported in `canvas-viewpoint.ts` and `pointer-event-handler.ts`, and the two call sites use it to check a single variable. The file adds import overhead for no meaningful abstraction.
-
-**Prompt:**
-
-> Delete `validation-utils.ts`. Replace the two usages of `isNullOrUndefined(x)` with `x == null` (which is idiomatic TypeScript for null-or-undefined checks and is understood by the type narrowing system). In `canvas-viewpoint.ts`, remove the import. In `pointer-event-handler.ts`, remove the import. Run the build to confirm no other usages exist.
-
----
-
-### 31. `box-list.component` uses `mouseenter`/`mouseleave` while the rest of the app uses pointer events
-
-**File:** `src/components/box-list/box-list.component.html`
-
-**Problem:** The box list component uses `(mouseenter)` and `(mouseleave)` for hover tracking. The canvas viewport uses pointer events throughout. On touch devices, mouse events don't fire, so the box list hover won't work on mobile even once mobile support is added.
-
-**Prompt:**
-
-> In `box-list.component.html`, replace `(mouseenter)="onBoxMouseEnter(getBoxId(box))"` with `(pointerenter)="onBoxMouseEnter(getBoxId(box))"` and `(mouseleave)="onBoxMouseLeave()"` with `(pointerleave)="onBoxMouseLeave()"`. In `box-list.component.ts`, update the method signatures if needed (the parameter types won't change — `pointerenter` provides the same element target). This makes hover tracking consistent and touch-compatible.
 
 ---
 
