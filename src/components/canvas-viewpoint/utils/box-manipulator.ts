@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { ResizeCorner } from '../core/types';
 import { BoxUtils } from './box-utils';
 import { BoxStateUtils } from './box-state-utils';

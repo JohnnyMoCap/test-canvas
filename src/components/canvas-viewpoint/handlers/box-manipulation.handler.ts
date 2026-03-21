@@ -1,5 +1,5 @@
 import { WritableSignal } from '@angular/core';
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { ResizeCorner, WorldBoxGeometry } from '../core/types';
 import { BoxManipulator } from '../utils/box-manipulator';
 import { HistoryService } from '../../../services/history.service';

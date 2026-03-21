@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from './box-utils';
 import { CoordinateTransform } from './coordinate-transform';

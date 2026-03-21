@@ -3,7 +3,6 @@
     <button (click)="toggleReadOnlyMode()" [class.active]="readOnlyMode()">
       {{ readOnlyMode() ? 'Exit Read-Only' : 'Read-Only Mode' }}
     </button>
-    <button (click)="resetCamera()">Reset</button>
     <button (click)="toggleCreateMode()" [class.active]="isCreateMode()">
       {{ isCreateMode() ? 'Exit Create' : 'Create Mode' }}
     </button>

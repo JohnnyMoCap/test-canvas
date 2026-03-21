@@ -1,4 +1,5 @@
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
+import { BoxCreationUtils } from './box-creation-utils';
 import { BoxUtils } from './box-utils';
 
 interface DetectionResult {
@@ -298,7 +299,7 @@ export class MagicDetectionUtils {
     );
 
     return {
-      tempId: `temp_${tempId}`,
+      tempId: BoxCreationUtils.generateTempId(tempId),
       x: normalizedPos.x,
       y: normalizedPos.y,
       w: normalizedDims.w,

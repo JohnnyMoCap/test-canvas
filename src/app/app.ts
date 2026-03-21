@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
 import { BoxListComponent } from '../components/box-list/box-list.component';
-import { Box } from '../intefaces/boxes.interface';
+import { Box } from '../inteface/boxes.interface';
 import { HistoryService } from '../services/history.service';
 
 @Component({
@@ -49,10 +49,6 @@ export class App {
 
   onBoxListClick(boxId: number) {
     this.selectedBoxId.set(boxId);
-  }
-
-  resetCamera() {
-    // This will trigger via the component
   }
 
   toggleCreateMode() {

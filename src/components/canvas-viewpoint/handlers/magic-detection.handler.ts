@@ -1,4 +1,4 @@
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { MagicDetectionUtils } from '../utils/magic-detection-utils';

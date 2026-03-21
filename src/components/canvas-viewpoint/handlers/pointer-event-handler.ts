@@ -1,4 +1,4 @@
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
 import { Camera, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
@@ -128,7 +128,7 @@ export class PointerEventHandler {
     historyService: HistoryService,
   ) {
     const bgCanvas = state.bgCanvas();
-if (!bgCanvas) return;
+    if (!bgCanvas) return;
 
     const newBox = MagicDetectionHandler.detectAndCreateBox(
       event,

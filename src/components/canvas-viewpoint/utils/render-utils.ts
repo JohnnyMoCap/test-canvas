@@ -1,6 +1,6 @@
 import { Camera, WorldBox } from '../core/types';
 import { QTNode } from '../core/quadtree';
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 
 /**
  * Canvas rendering utilities

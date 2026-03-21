@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Camera, TextMetrics, MeasurementState } from '../core/types';
 import { BOX_TYPES } from '../core/creation-state';
 import { CreateBoxState } from '../core/creation-state';

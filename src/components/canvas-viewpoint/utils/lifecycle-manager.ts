@@ -1,6 +1,6 @@
 import { Signal, WritableSignal } from '@angular/core';
 import { Quadtree } from '../core/quadtree';
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { QuadtreeUtils } from './quadtree-utils';
 import { PerformanceConfig } from '../core/performance-config';

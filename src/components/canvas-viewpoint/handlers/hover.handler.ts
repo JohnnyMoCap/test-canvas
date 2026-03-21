@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Camera, ResizeCorner, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from '../utils/box-utils';

@@ -11,7 +11,7 @@ import {
   effect,
   computed,
 } from '@angular/core';
-import { Box, getBoxId } from '../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../inteface/boxes.interface';
 import { Quadtree } from './core/quadtree';
 import { Camera, TextMetrics } from './core/types';
 import { BoxType } from './core/creation-state';
@@ -194,6 +194,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.hotkeyUnsubs.forEach((fn) => fn());
   }
 
+  //TODO: not used atm, is it used in prod? check.
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
     this.camera.set({ zoom: defaultZoom, x: 0, y: 0, rotation: 0 });

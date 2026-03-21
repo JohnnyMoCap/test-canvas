@@ -1,4 +1,4 @@
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { BoxType, BOX_TYPES } from '../core/creation-state';
 import { BoxUtils } from './box-utils';

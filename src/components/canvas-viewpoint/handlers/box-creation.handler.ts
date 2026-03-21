@@ -1,5 +1,5 @@
 import { WritableSignal } from '@angular/core';
-import { Box } from '../../../intefaces/boxes.interface';
+import { Box } from '../../../inteface/boxes.interface';
 import { CreateBoxState } from '../core/creation-state';
 import { BoxType } from '../core/creation-state';
 import { Camera } from '../core/types';

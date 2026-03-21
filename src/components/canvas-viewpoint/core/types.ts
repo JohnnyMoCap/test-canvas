@@ -101,7 +101,7 @@ export interface WorldBoxGeometry {
  * - Custom metadata
  */
 export interface WorldBox extends WorldBoxGeometry {
-  raw: import('../../../intefaces/boxes.interface').Box;
+  raw: import('../../../inteface/boxes.interface').Box;
   color: string;
 }
 

@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { Box, getBoxId } from '../intefaces/boxes.interface';
+import { Box, getBoxId } from '../inteface/boxes.interface';
 import { HotkeyService } from './hotkey.service';
 
 /**

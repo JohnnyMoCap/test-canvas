@@ -1,5 +1,5 @@
 import { Camera, ResizeCorner, TextMetrics, WorldBox } from '../core/types';
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 
 /**
  * Nametag rendering and hit detection utilities

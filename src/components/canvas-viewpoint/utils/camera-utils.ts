@@ -1,6 +1,6 @@
 import { Camera } from '../core/types';
 import { QuadtreeUtils } from './quadtree-utils';
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { BoxUtils } from './box-utils';
 
 /**
@@ -116,7 +116,6 @@ export class CameraUtils {
     minZoom: number,
     padding: number = 50,
   ): Camera | null {
-
     const box = boxes.find((b) => getBoxId(b) === boxId);
     if (!box) return null;
 

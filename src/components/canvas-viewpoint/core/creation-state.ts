@@ -8,6 +8,7 @@ export interface CreateBoxState {
   currentPoint: { x: number; y: number } | null;
 }
 
+// TODO: need to change this to be dynamic with the ml classes eventually, but for now we can hardcode some types for fun
 export type BoxType = 'you tellin' | 'me a' | 'shrimp fried' | 'this rice' | 'magic';
 
 export interface BoxTypeInfo {

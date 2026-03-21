@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../intefaces/boxes.interface';
+import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { CoordinateTransform } from './coordinate-transform';
 import { BoxUtils } from './box-utils';
@@ -63,15 +63,40 @@ export class ClipboardManager {
         newX = normalizedMouse.x;
         newY = normalizedMouse.y;
       } else {
-        // Mouse is outside canvas - use fallback with visible offset
-        newX = clipboard.x + 0.05; // 5% offset for visibility
-        newY = clipboard.y + 0.05;
+        // Mouse is outside canvas - paste at viewport center
+        const worldCenter = CoordinateTransform.screenToWorld(
+          canvas.width / 2,
+          canvas.height / 2,
+          canvas.width,
+          canvas.height,
+          camera,
+        );
+        const normalized = BoxUtils.worldToNormalized(
+          worldCenter.x,
+          worldCenter.y,
+          bgWidth,
+          bgHeight,
+        );
+        newX = normalized.x;
+        newY = normalized.y;
       }
     } else {
-      // TODO: not working, fix.
-      // No mouse position tracked - use fallback with visible offset
-      newX = clipboard.x + 0.05;
-      newY = clipboard.y + 0.05;
+      // No mouse position tracked - paste at viewport center
+      const worldCenter = CoordinateTransform.screenToWorld(
+        canvas.width / 2,
+        canvas.height / 2,
+        canvas.width,
+        canvas.height,
+        camera,
+      );
+      const normalized = BoxUtils.worldToNormalized(
+        worldCenter.x,
+        worldCenter.y,
+        bgWidth,
+        bgHeight,
+      );
+      newX = normalized.x;
+      newY = normalized.y;
     }
 
     return {

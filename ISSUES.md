@@ -148,34 +148,6 @@ static startRenderLoop(
 
 ---
 
-### 16. `Box` can have neither `id` nor `tempId` — both are optional, should be a discriminated union
-
-**File:** `src/intefaces/boxes.interface.ts`
-
-**Problem:** The interface has `id?: number` and `tempId?: string`. Both are optional, so TypeScript allows `{}` as a valid `Box`. `getBoxId()` uses a non-null assertion as a workaround. Every comparison uses `==` instead of `===` because the return type is `string | number`.
-
-**Prompt:**
-
-> Refactor `boxes.interface.ts` to use a discriminated union:
->
-> ```typescript
-> interface BoxBase {
->   x: number;
->   y: number;
->   w: number;
->   h: number;
->   rotation?: number;
->   color?: string;
-> }
-> export type Box =
->   | (BoxBase & { id: number; tempId?: never })
->   | (BoxBase & { tempId: string; id?: never });
-> ```
->
-> Update `getBoxId` to return `number | string` based on which branch is active. This lets TypeScript enforce that every Box has a valid ID. Update all comparison sites to use `===` instead of `==`. The `historyService` `BoxDelta.boxId` type can stay as `string | number` for record-keeping.
-
----
-
 ### 17. `styleId` field used in test data but absent from `Box` interface
 
 **File:** `src/app/app.ts` — `exampleBoxes`
@@ -192,37 +164,6 @@ styleId: `style-${1 + (i % 5)}`,
 **Prompt:**
 
 > Add `styleId?: string` to the `Box` interface in `boxes.interface.ts`. This field is used in the test data in `app.ts` and will likely be needed for production rendering (box categorization/styling). Adding it to the interface now ensures it flows through the type system correctly and is preserved through copy/paste/undo operations.
-
----
-
-### 18. `BoxType` values are lorem ipsum placeholder strings
-
-**File:** `src/components/canvas-viewpoint/core/creation-state.ts`
-
-**Problem:**
-
-```typescript
-export type BoxType = 'you tellin' | 'me a' | 'shrimp fried' | 'this rice' | 'magic';
-```
-
-These are clearly placeholder names from an internet meme. Any real integration (API calls, database storage, analytics) will break when these get renamed, because they are used as literal string keys in `BOX_TYPES`, as the context menu display labels, and stored in box state.
-
-**Prompt:**
-
-> In `creation-state.ts`, rename the `BoxType` union values to meaningful semantic names that reflect the actual use case (e.g., `'type-a' | 'type-b' | 'type-c' | 'type-d' | 'magic'` as a placeholder until real names are decided, or use the actual domain names). Update the `BOX_TYPES` record keys, the `label` fields, and all usages in `context-menu.handler.ts`, `box-context-menu.component.ts`, `box-creation.handler.ts`, and `frame-renderer.ts`. The `label` field (human-readable display string) is separate from the type key — the key should be stable and slug-like.
-
----
-
-### 19. `FrameRenderer.renderFrame` accepts `hoveredBoxId: string | null` but `StateManager` stores it as `string | null` while IDs can be `number`
-
-**File:** `src/components/canvas-viewpoint/utils/frame-renderer.ts` — `renderFrame` signature
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `renderFrame` call site
-
-**Problem:** The render function signature takes `hoveredBoxId: string | null` and `selectedBoxId: string | null`, but IDs can be `number` (for saved boxes). The comparison inside is `String(getBoxId(b.raw)) === hoveredBoxId` — manually stringifying on every box every frame to compensate for the type mismatch.
-
-**Prompt:**
-
-> In `frame-renderer.ts`, change the `hoveredBoxId` and `selectedBoxId` parameters from `string | null` to `string | number | null`. Remove the `String(getBoxId(b.raw)) ===` coercions inside the render loop — use `getBoxId(b.raw) === hoveredBoxId` directly. Update the call site in `canvas-viewpoint.ts` to pass `this.state.hoveredBoxId()` and `this.state.selectedBoxId()` without any String() wrapping. This removes per-box string allocation on every frame.
 
 ---
 
@@ -317,37 +258,6 @@ These are clearly placeholder names from an internet meme. Any real integration 
 
 ---
 
-### 24. Typo: directory named `intefaces` instead of `interfaces`
-
-**File:** `src/intefaces/boxes.interface.ts` and all imports referencing it
-
-**Problem:** The directory `src/intefaces/` is missing an `r`. Every import across the codebase imports from `'../../intefaces/boxes.interface'`. This is a cosmetic issue but looks unprofessional and may cause confusion.
-
-**Prompt:**
-
-> Rename the directory `src/intefaces/` to `src/interfaces/`. Then do a project-wide find-and-replace of `'../intefaces/` and `'../../intefaces/` with the corrected path. Files to update include: `canvas-viewpoint.ts`, `box-utils.ts`, `box-state-utils.ts`, `box-manipulator.ts`, `clipboard-manager.ts`, `box-creation-utils.ts`, `boundary-utils.ts`, `quadtree-utils.ts`, `history.service.ts`, `app.ts`, and any others importing from that path. Run the build after to confirm no missed references.
-
----
-
-### 25. `resetCamera()` in `app.ts` is empty — `resetCameraRequest` output is wired to nothing
-
-**File:** `src/app/app.ts` — `resetCamera()`
-**File:** `src/app/app.html` — wherever `resetCameraRequest` is bound
-
-**Problem:**
-
-```typescript
-resetCamera() {}
-```
-
-The button that triggers camera reset emits `resetCameraRequest` from the component, but the handler in the parent is an empty method. The feature is completely non-functional.
-
-**Prompt:**
-
-> In `app.ts`, implement `resetCamera()` to call a method on the canvas viewport component. Add a `@ViewChild` reference to `CanvasViewportComponent` in `app.ts`: `@ViewChild(CanvasViewportComponent) canvasViewport?: CanvasViewportComponent`. Then implement: `resetCamera() { this.canvasViewport?.resetCamera(); }`. The `resetCamera()` method already exists and is implemented in `canvas-viewpoint.ts`.
-
----
-
 ### 26. Commented-out code left in production files
 
 **Files:** `src/intefaces/boxes.interface.ts`, `src/services/history.service.ts`, `src/components/canvas-viewpoint/canvas-viewpoint.ts`, `src/components/canvas-viewpoint/utils/clipboard-manager.ts`
@@ -362,18 +272,6 @@ The button that triggers camera reset emits `resetCameraRequest` from the compon
 > - `history.service.ts`: The `clearStorage()`/`loadFromStorage()` pair will be handled in issue #5. Remove the `// yo mama filter` joke comment from `visibleBoxes`.
 > - `canvas-viewpoint.ts`: Remove the commented-out type annotation on `externalSelectBoxId` (`//{ boxId: string | number; timestamp: number } | undefined`). Consolidate the TODO list at the bottom into a proper tracking system (GitHub issues, etc.) or keep only the most critical unresolved ones.
 > - `clipboard-manager.ts`: The `// TODO: not working, fix.` comment refers to the no-mouse-position fallback — this will remain until fixed (see issue #27), so leave it but make it actionable.
-
----
-
-### 27. Paste with no tracked mouse position uses a hardcoded 5% offset regardless of viewport
-
-**File:** `src/components/canvas-viewpoint/utils/clipboard-manager.ts` — `createPastedBox`
-
-**Problem:** When the mouse isn't over the canvas at paste time, the box is placed at `clipboard.x + 0.05 / clipboard.y + 0.05`. The 5% offset is in normalized coordinates and may place the box outside the image bounds at the edges, or be invisible at high zoom if the current viewport doesn't include that area.
-
-**Prompt:**
-
-> In `clipboard-manager.ts`, improve the fallback paste position. Instead of a fixed 5% offset, paste the box at the center of the current viewport. The method already receives `camera` and `canvas` — use `CoordinateTransform.screenToWorld(canvas.width / 2, canvas.height / 2, canvas.width, canvas.height, camera)` to get the world center, then convert to normalized coordinates with `BoxUtils.worldToNormalized(...)`. Apply this as the paste position for both the no-mouse and out-of-canvas cases.
 
 ---
 
