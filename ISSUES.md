@@ -111,53 +111,6 @@ static startRenderLoop(
 
 ---
 
-## TYPE SAFETY
-
----
-
-### 17. `styleId` field used in test data but absent from `Box` interface
-
-**File:** `src/app/app.ts` — `exampleBoxes`
-**File:** `src/intefaces/boxes.interface.ts`
-
-**Problem:**
-
-```typescript
-styleId: `style-${1 + (i % 5)}`,
-```
-
-`styleId` is set on every example box but doesn't exist on the `Box` interface. TypeScript may not catch this depending on how the array is typed. When `styleId` is eventually used in rendering logic, it will appear to work in tests and fail in production.
-
-**Prompt:**
-
-> Add `styleId?: string` to the `Box` interface in `boxes.interface.ts`. This field is used in the test data in `app.ts` and will likely be needed for production rendering (box categorization/styling). Adding it to the interface now ensures it flows through the type system correctly and is preserved through copy/paste/undo operations.
-
----
-
-## PERFORMANCE
-
----
-
-### 23. Subpixel boxes not culled during rendering — thousands of invisible draws per frame
-
-**File:** `src/components/canvas-viewpoint/utils/frame-renderer.ts` — `renderFrame`
-
-**Problem:** The test app generates boxes with `w: Math.random() / 100` — many are effectively subpixel at normal zoom. They still go through the full `drawBox` path (transform + strokeRect + fill). No minimum screen-size cull exists.
-
-**Prompt:**
-
-> In `frame-renderer.ts`, before calling `RenderUtils.drawBox(ctx, b, camera, ...)`, check if the box's screen-space size is worth rendering. Add a minimum size threshold (e.g., 1 pixel):
->
-> ```typescript
-> const screenW = b.w * camera.zoom;
-> const screenH = b.h * camera.zoom;
-> if (screenW < 1 && screenH < 1) continue;
-> ```
->
-> This check happens in world/pixel space so `b.w` and `b.h` are already in pixels (`WorldBox`). Adjust the threshold as needed — 0.5px is probably the right cutoff before a box is visually meaningless.
-
----
-
 ## CODE QUALITY
 
 ---
@@ -221,11 +174,3 @@ These are the TODOs from the source reorganized with context and suggested appro
 **Prompt:**
 
 > Implement a rectangle selection tool. When no box is selected and the user drags in non-create mode (without Ctrl), draw a selection rectangle (dashed border, 10% fill) from drag start to current pointer position. On pointer up, collect all boxes whose AABBs intersect the selection rectangle using the quadtree. Store the result as a `selectedBoxIds: Set<string | number>` signal on `StateManager` (replacing the single `selectedBoxId`). Update `drawSelectionUI` in `render-utils.ts` to draw selection handles for all selected boxes. Update manipulation handlers to apply rotation/resize/drag to all selected boxes simultaneously.
-
----
-
-### 37. Mobile / touch interaction not implemented (TODO in canvas-viewpoint.ts)
-
-**Prompt:**
-
-> Add two-finger pinch-to-zoom and one-finger pan on touch devices. In `canvas-viewpoint.ts` (or a new `touch.handler.ts`), listen for `touchstart`, `touchmove`, `touchend` on the viewport root. For two-touch `touchmove`, calculate the change in distance between the two touch points and apply it as a zoom delta (same math as `CameraHandler.zoom` but driven by pinch distance ratio). For one-touch, route to `CameraHandler.pan`. Prevent default on all touch events to stop page scroll. Do not remove the existing pointer event handlers — they continue to handle mouse/stylus.

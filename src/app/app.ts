@@ -101,9 +101,6 @@ export class App {
     // Random rotation (0–360 degrees)
     const rotation = Math.random() * Math.PI * 2;
 
-    // Style groups for batching (5 styles)
-    const styleId = `style-${1 + (i % 5)}`;
-
     const color = predefinedColors[Math.floor(Math.random() * predefinedColors.length)];
 
     return {
@@ -113,7 +110,6 @@ export class App {
       w,
       h,
       rotation,
-      styleId,
       color,
     };
   });

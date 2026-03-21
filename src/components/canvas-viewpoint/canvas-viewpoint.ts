@@ -506,7 +506,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: dont forget to add low opacity for PENDING state
   //TODO: filters in history.service visibleBoxes()
-  //TODO: mobile interaction
   //TODO: decide on both pointer flow strategy and cursor handling strategy
   //TODO: lasso tool - full select for area - rectangle select
   //TODO: change world to absolute
