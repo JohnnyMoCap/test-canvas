@@ -1,5 +1,6 @@
 import { CameraUtils } from './camera-utils';
 
+//TODO: remove all these before shipping
 // Toggle this to enable/disable mock loading delay
 const MOCK_LOADING_DELAY = false;
 const MOCK_DELAY_MS = 2000; // 2 seconds

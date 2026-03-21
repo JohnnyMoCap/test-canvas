@@ -33,25 +33,6 @@ Each item is self-contained. Pass it directly to Claude with the relevant file(s
 
 ---
 
-### 7. `MOCK_LOADING_DELAY` dev flag baked into production code
-
-**File:** `src/components/canvas-viewpoint/utils/background-utils.ts` — top of file
-
-**Problem:**
-
-```typescript
-const MOCK_LOADING_DELAY = false;
-const MOCK_DELAY_MS = 2000;
-```
-
-A dead code branch that adds a 2-second artificial delay is shipped with production code. If someone accidentally flips it, the app appears broken.
-
-**Prompt:**
-
-> In `background-utils.ts`, remove the `MOCK_LOADING_DELAY` constant, `MOCK_DELAY_MS` constant, and the `if (MOCK_LOADING_DELAY)` block inside `loadBackground`. If you need to simulate slow loading in development, use the browser's DevTools network throttling instead.
-
----
-
 ### 8. `getBoxId()` uses non-null assertion on an optional field — runtime crash if box has neither `id` nor `tempId`
 
 **File:** `src/intefaces/boxes.interface.ts`
@@ -103,18 +84,6 @@ const bgCanvas = state.bgCanvas()!;
 > ```
 >
 > This is safe because the branch is only reached when `bgCanvas` is truthy anyway, but it removes the assertion and makes the function self-guarding.
-
----
-
-### 10. `scheduleRender()` called redundantly in `onPointerMove`
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `onPointerMove`
-
-**Problem:** `scheduleRender()` is called once at the end of `onPointerMove` AND indirectly inside the two callbacks passed into `PointerEventHandler.handlePointerMove`. Since it just sets a dirty flag this is harmless but noisy and suggests the caller/callee contract is unclear.
-
-**Prompt:**
-
-> In `canvas-viewpoint.ts`, in the `onPointerMove` method, remove the explicit `this.scheduleRender()` call at the very end of the method (after the `PointerEventHandler.handlePointerMove(...)` call). The two inline callbacks already call `this.scheduleRender()`. Also remove the explicit `this.scheduleRender()` at the end of `onPointerDown` for the same reason — the handler works through state mutations that trigger their own render via the effect.
 
 ---
 

@@ -330,7 +330,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.ctx(),
       this.historyService,
     );
-    this.scheduleRender();
+    //this.scheduleRender();
   }
 
   onPointerUp(e: PointerEvent) {
@@ -402,7 +402,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.scheduleRender();
       },
     );
-    this.scheduleRender();
+    //this.scheduleRender();
 
     // Show scale bar on movement
     this.scaleBarRef?.show();
