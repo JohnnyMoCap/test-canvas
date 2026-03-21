@@ -413,7 +413,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
         this.scheduleRender();
       },
     );
-    //this.scheduleRender();
 
     // Show scale bar on movement
     this.scaleBarRef?.show();
@@ -466,6 +465,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       const _ = this.camera();
       const __ = this.localBoxes();
+      const ___ = this.state.createState();
       this.scheduleRender();
     });
 
