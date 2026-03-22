@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, effect, DestroyRef, inject } from '@angular/core';
+import { Injectable, signal, computed, DestroyRef, inject } from '@angular/core';
 
 /**
  * Hotkey command types

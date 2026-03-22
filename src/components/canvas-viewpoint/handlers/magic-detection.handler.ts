@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+import { Box } from '../../../interface/boxes.interface';
 import { BoxCreationUtils } from '../utils/box-creation-utils';
 import { BoxUtils } from '../utils/box-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';

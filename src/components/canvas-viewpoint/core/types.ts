@@ -1,4 +1,4 @@
-﻿import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../interface/boxes.interface';
 import { HistoryService } from '../../../services/history.service';
 import { StateManager } from '../utils/state-manager';
 import { Quadtree } from './quadtree';
@@ -105,7 +105,7 @@ export interface AbsoluteBoxGeometry {
  * - Custom metadata
  */
 export interface AbsoluteBox extends AbsoluteBoxGeometry {
-  raw: import('../../../inteface/boxes.interface').Box;
+  raw: import('../../../interface/boxes.interface').Box;
   color: string;
 }
 

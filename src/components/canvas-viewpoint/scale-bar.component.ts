@@ -90,7 +90,7 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
   position = signal({ x: 0, y: 0 });
   scaleText = signal('10 m');
 
-  private hideTimeout: any = null;
+  private hideTimeout: ReturnType<typeof setTimeout> | null = null;
   private isDragging = false;
   private dragOffset = { x: 0, y: 0 };
   private hasBeenManuallyMoved = false;
@@ -269,15 +269,15 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
    * Add global pointer listeners for dragging
    */
   private addGlobalListeners(): void {
-    document.addEventListener('pointermove', this.onDragMove as any);
-    document.addEventListener('pointerup', this.onDragEnd as any);
+    document.addEventListener('pointermove', this.onDragMove);
+    document.addEventListener('pointerup', this.onDragEnd);
   }
 
   /**
    * Remove global pointer listeners
    */
   private removeGlobalListeners(): void {
-    document.removeEventListener('pointermove', this.onDragMove as any);
-    document.removeEventListener('pointerup', this.onDragEnd as any);
+    document.removeEventListener('pointermove', this.onDragMove);
+    document.removeEventListener('pointerup', this.onDragEnd);
   }
 }

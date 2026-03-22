@@ -1,4 +1,4 @@
-﻿import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../interface/boxes.interface';
 import { BoxUtils } from './box-utils';
 
 /**

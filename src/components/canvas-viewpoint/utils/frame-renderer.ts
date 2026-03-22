@@ -1,4 +1,4 @@
-﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { Camera, TextMetrics, MeasurementState } from '../core/types';
 import { BOX_TYPES } from '../core/creation-state';
 import { CreateBoxState } from '../core/creation-state';
@@ -74,7 +74,15 @@ export class FrameRenderer {
     // Draw nametags
     if (showNametags) {
       for (const b of absBoxes) {
-        NametagUtils.drawNametag(ctx, b, camera, canvas.width, canvas.height, nametagMetricsCache, showPendingState && b.raw.state === 'pending');
+        NametagUtils.drawNametag(
+          ctx,
+          b,
+          camera,
+          canvas.width,
+          canvas.height,
+          nametagMetricsCache,
+          showPendingState && b.raw.state === 'pending',
+        );
       }
     }
 

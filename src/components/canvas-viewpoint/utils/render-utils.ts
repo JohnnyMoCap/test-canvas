@@ -1,6 +1,6 @@
 ﻿import { Camera, AbsoluteBox } from '../core/types';
 import { QTNode } from '../core/quadtree';
-import { Box } from '../../../inteface/boxes.interface';
+import { Box } from '../../../interface/boxes.interface';
 
 /**
  * Canvas rendering utilities

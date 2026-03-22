@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CanvasViewportComponent } from '../components/canvas-viewpoint/canvas-viewpoint';
 import { BoxListComponent } from '../components/box-list/box-list.component';
-import { Box } from '../inteface/boxes.interface';
+import { Box } from '../interface/boxes.interface';
 import { HistoryService } from '../services/history.service';
 
 @Component({

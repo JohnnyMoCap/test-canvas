@@ -1,5 +1,5 @@
 ﻿import { WritableSignal } from '@angular/core';
-import { Box } from '../../../inteface/boxes.interface';
+import { Box } from '../../../interface/boxes.interface';
 import { CreateBoxState } from '../core/creation-state';
 import { BoxType } from '../core/creation-state';
 import { Camera } from '../core/types';
@@ -25,11 +25,7 @@ export class BoxCreationHandler {
   /**
    * Update preview during drag-to-create
    */
-  static updatePreview(
-    absX: number,
-    absY: number,
-    currentState: CreateBoxState,
-  ): CreateBoxState {
+  static updatePreview(absX: number, absY: number, currentState: CreateBoxState): CreateBoxState {
     if (currentState.isCreating && currentState.startPoint) {
       return {
         ...currentState,

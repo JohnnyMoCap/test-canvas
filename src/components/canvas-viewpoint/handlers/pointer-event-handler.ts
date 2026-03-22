@@ -1,4 +1,4 @@
-﻿import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../interface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
 import { PointerHandlerContext, TextMetrics, AbsoluteBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
@@ -26,7 +26,11 @@ export class PointerEventHandler {
    * Handle pointer down event
    * Routes to handlers based on priority: measurement > magic detection > context menu > creation > interaction > selection > camera
    */
-  static handlePointerDown(event: PointerEvent, magicHandler: MagicDetectionHandler, hctx: PointerHandlerContext): void {
+  static handlePointerDown(
+    event: PointerEvent,
+    magicHandler: MagicDetectionHandler,
+    hctx: PointerHandlerContext,
+  ): void {
     const { canvas, state, quadtree, nametagMetricsCache, historyService } = hctx;
     const bgc = state.bgCanvas();
     if (!bgc) return;

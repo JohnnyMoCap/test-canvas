@@ -1,4 +1,4 @@
-﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { AbsoluteBox } from '../core/types';
 
 /**
@@ -8,7 +8,11 @@ export class BoxUtils {
   /**
    * Converts a normalized box (0..1 coords & sizes) into absolute units (pixels centered at origin)
    */
-  static normalizeBoxToAbsolute(box: Box, imageWidth: number, imageHeight: number): AbsoluteBox | null {
+  static normalizeBoxToAbsolute(
+    box: Box,
+    imageWidth: number,
+    imageHeight: number,
+  ): AbsoluteBox | null {
     if (!imageWidth || !imageHeight) return null;
 
     return {

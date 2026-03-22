@@ -1,5 +1,5 @@
 ﻿import { signal, computed, Signal, WritableSignal } from '@angular/core';
-import { Box } from '../../../inteface/boxes.interface';
+import { Box } from '../../../interface/boxes.interface';
 import { Camera, ResizeCorner, MeasurementState } from '../core/types';
 import { CreateBoxState } from '../core/creation-state';
 import { ContextMenuState } from './context-menu-utils';
