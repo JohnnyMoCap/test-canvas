@@ -1,4 +1,4 @@
-import { ResizeCorner, WorldBoxGeometry } from '../core/types';
+﻿import { ResizeCorner, AbsoluteBoxGeometry } from '../core/types';
 
 /**
  * Cursor style utilities - Layer between business logic and utils
@@ -9,7 +9,7 @@ export class CursorStyles {
    * Returns appropriate cursor style for a resize corner based on its actual world position
    * Takes into account the box's rotation to show the correct resize direction
    */
-  static getResizeCursor(corner: ResizeCorner, boxGeometry: WorldBoxGeometry): string {
+  static getResizeCursor(corner: ResizeCorner, boxGeometry: AbsoluteBoxGeometry): string {
     // Get the actual world position of the corner
     const cornerOffsets = {
       nw: { x: -boxGeometry.w / 2, y: -boxGeometry.h / 2 },
@@ -26,7 +26,7 @@ export class CursorStyles {
     const rotatedX = offset.x * cos - offset.y * sin;
     const rotatedY = offset.x * sin + offset.y * cos;
 
-    // Calculate angle from box center to this corner in world space
+    // Calculate angle from box center to this corner in absolute space
     const angle = Math.atan2(rotatedY, rotatedX);
 
     // Normalize angle to 0-360 degrees

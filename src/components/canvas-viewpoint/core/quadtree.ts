@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lightweight Quadtree implementation for spatial indexing of bounding boxes
  *
  * QUADTREE OVERVIEW:
@@ -116,7 +116,7 @@ export class QTNode<T> {
  * Main Quadtree class for efficient spatial indexing and querying
  *
  * USAGE FLOW:
- * 1. Create quadtree with world bounds: new Quadtree(0, 0, imageWidth, imageHeight)
+ * 1. Create quadtree with absolute bounds: new Quadtree(0, 0, imageWidth, imageHeight)
  * 2. Insert boxes: quadtree.insert({ x, y, w, h, payload: boxData })
  * 3. Query visible area: quadtree.queryRange(viewX, viewY, viewWidth, viewHeight)
  *

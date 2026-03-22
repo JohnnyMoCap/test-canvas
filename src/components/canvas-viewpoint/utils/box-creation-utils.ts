@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { BoxType, BOX_TYPES } from '../core/creation-state';
 import { BoxUtils } from './box-utils';
@@ -12,8 +12,8 @@ export class BoxCreationUtils {
    */
   static createBoxFromContextMenu(
     type: BoxType,
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     camera: Camera,
     imageWidth: number,
     imageHeight: number,
@@ -22,14 +22,14 @@ export class BoxCreationUtils {
     const typeInfo = BOX_TYPES[type];
 
     // Scale default size based on zoom (larger at low zoom, smaller at high zoom)
-    const worldW = typeInfo.defaultSize.w / camera.zoom;
-    const worldH = typeInfo.defaultSize.h / camera.zoom;
+    const absW = typeInfo.defaultSize.w / camera.zoom;
+    const absH = typeInfo.defaultSize.h / camera.zoom;
 
     // Convert world position (center of box) to normalized coordinates
-    const normalizedPos = BoxUtils.worldToNormalized(worldX, worldY, imageWidth, imageHeight);
-    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
-      worldW,
-      worldH,
+    const normalizedPos = BoxUtils.absoluteToNormalized(absX, absY, imageWidth, imageHeight);
+    const normalizedDims = BoxUtils.absoluteDimensionsToNormalized(
+      absW,
+      absH,
       imageWidth,
       imageHeight,
     );
@@ -74,8 +74,8 @@ export class BoxCreationUtils {
     const centerX = left + width / 2;
     const centerY = top + height / 2;
 
-    const normalizedPos = BoxUtils.worldToNormalized(centerX, centerY, imageWidth, imageHeight);
-    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
+    const normalizedPos = BoxUtils.absoluteToNormalized(centerX, centerY, imageWidth, imageHeight);
+    const normalizedDims = BoxUtils.absoluteDimensionsToNormalized(
       width,
       height,
       imageWidth,

@@ -1,6 +1,6 @@
-import { WritableSignal } from '@angular/core';
+﻿import { WritableSignal } from '@angular/core';
 import { Box, getBoxId } from '../../../inteface/boxes.interface';
-import { ResizeCorner, WorldBoxGeometry } from '../core/types';
+import { ResizeCorner, AbsoluteBoxGeometry } from '../core/types';
 import { BoxManipulator } from '../utils/box-manipulator';
 import { HistoryService } from '../../../services/history.service';
 
@@ -13,11 +13,11 @@ export class BoxManipulationHandler {
    * Start box rotation
    */
   static startRotation(
-    worldX: number,
-    worldY: number,
-    boxGeometry: WorldBoxGeometry,
+    absX: number,
+    absY: number,
+    boxGeometry: AbsoluteBoxGeometry,
   ): { angle: number; boxRotation: number } {
-    const angle = Math.atan2(worldY - boxGeometry.y, worldX - boxGeometry.x);
+    const angle = Math.atan2(absY - boxGeometry.y, absX - boxGeometry.x);
     return { angle, boxRotation: boxGeometry.rotation };
   }
 
@@ -25,8 +25,8 @@ export class BoxManipulationHandler {
    * Perform box rotation
    */
   static rotate(
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     box: Box,
     bgWidth: number,
     bgHeight: number,
@@ -35,8 +35,8 @@ export class BoxManipulationHandler {
   ): Box {
     return BoxManipulator.rotateBox(
       box,
-      worldX,
-      worldY,
+      absX,
+      absY,
       bgWidth,
       bgHeight,
       rotationStartAngle,
@@ -48,26 +48,26 @@ export class BoxManipulationHandler {
    * Perform box resize
    */
   static resize(
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     box: Box,
     bgWidth: number,
     bgHeight: number,
     resizeCorner: ResizeCorner,
   ): Box {
-    return BoxManipulator.resizeBox(box, worldX, worldY, bgWidth, bgHeight, resizeCorner);
+    return BoxManipulator.resizeBox(box, absX, absY, bgWidth, bgHeight, resizeCorner);
   }
 
   /**
    * Start box drag
    */
   static startDrag(
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     box: { x: number; y: number; w: number; h: number },
   ): { dragStart: { x: number; y: number }; boxStart: { x: number; y: number } } {
     return {
-      dragStart: { x: worldX, y: worldY },
+      dragStart: { x: absX, y: absY },
       boxStart: { x: box.x, y: box.y },
     };
   }
@@ -76,16 +76,16 @@ export class BoxManipulationHandler {
    * Perform box drag
    */
   static drag(
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     box: Box,
     bgWidth: number,
     bgHeight: number,
-    dragStartWorld: { x: number; y: number },
+    dragStartAbsolute: { x: number; y: number },
     boxStartPos: { x: number; y: number },
   ): Box {
-    const deltaX = worldX - dragStartWorld.x;
-    const deltaY = worldY - dragStartWorld.y;
+    const deltaX = absX - dragStartAbsolute.x;
+    const deltaY = absY - dragStartAbsolute.y;
     const newWorldX = boxStartPos.x + deltaX;
     const newWorldY = boxStartPos.y + deltaY;
     return BoxManipulator.moveBox(box, newWorldX, newWorldY, bgWidth, bgHeight);
@@ -93,7 +93,7 @@ export class BoxManipulationHandler {
 
   static completeManipulation(
     boxId: number,
-    startState: WorldBoxGeometry,
+    startState: AbsoluteBoxGeometry,
     currentBox: Box,
     isRotating: boolean,
     isResizing: boolean,

@@ -1,4 +1,4 @@
-import { ContextMenuState, ContextMenuUtils } from '../utils/context-menu-utils';
+﻿import { ContextMenuState, ContextMenuUtils } from '../utils/context-menu-utils';
 
 /**
  * Handler for context menu operations
@@ -8,8 +8,8 @@ export class ContextMenuHandler {
   /**
    * Open context menu at specified position
    */
-  static open(screenX: number, screenY: number, worldX: number, worldY: number): ContextMenuState {
-    return ContextMenuUtils.open(screenX, screenY, worldX, worldY);
+  static open(screenX: number, screenY: number, absX: number, absY: number): ContextMenuState {
+    return ContextMenuUtils.open(screenX, screenY, absX, absY);
   }
 
   /**

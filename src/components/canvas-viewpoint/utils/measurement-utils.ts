@@ -1,4 +1,4 @@
-import { MeasurementPoint, MeasurementState } from '../core/types';
+﻿import { MeasurementPoint, MeasurementState } from '../core/types';
 
 /**
  * Measurement tool utilities for calculating and managing measurements
@@ -16,7 +16,7 @@ export class MeasurementUtils {
 
   /**
    * Calculate metric distance based on canvas distance and image dimensions
-   * @param canvasDistance - Distance in world coordinates (same scale as image pixels)
+   * @param canvasDistance - Distance in absolute coordinates (same scale as image pixels)
    * @param imageWidth - Width of the background image in pixels
    * @param imageHeight - Height of the background image in pixels
    * @param metricWidth - Real-world width in meters
@@ -39,7 +39,7 @@ export class MeasurementUtils {
     const avgPixelsPerMeter = (pixelsPerMeterX + pixelsPerMeterY) / 2;
 
     // Convert world distance to meters
-    // World coordinates are at the same scale as image pixels (at zoom=1)
+    // absolute coordinates are at the same scale as image pixels (at zoom=1)
     return canvasDistance / avgPixelsPerMeter;
   }
 
@@ -70,7 +70,7 @@ export class MeasurementUtils {
    * Check if a point is near another point (for hit detection)
    * @param point - Point to check
    * @param target - Target point
-   * @param threshold - Distance threshold in world coordinates
+   * @param threshold - Distance threshold in absolute coordinates
    */
   static isPointNear(
     point: MeasurementPoint,

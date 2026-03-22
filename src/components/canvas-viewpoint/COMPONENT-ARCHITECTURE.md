@@ -1,4 +1,4 @@
-# Canvas Viewpoint - Component Architecture
+﻿# Canvas Viewpoint - Component Architecture
 
 ## Overview
 
@@ -34,7 +34,7 @@ The Canvas Viewpoint component is a feature-rich, interactive canvas for viewing
 
 **Responsibilities:**
 
-- Convert screen coordinates to world coordinates
+- Convert screen coordinates to absolute coordinates
 - Route events to handlers based on priority order
 - Determine which interaction should handle the event
 - Pass necessary context to handlers
@@ -113,7 +113,7 @@ Eight specialized handlers:
 3. **Box Creation** - Create mode active, creation state, temp ID counter
 4. **Magic Detection** - Magic mode, tolerance, debug flag
 5. **Measurement Tool** - Measurement points, metric dimensions
-6. **Context Menu** - Menu visibility, position, worldPos
+6. **Context Menu** - Menu visibility, position, absPos
 7. **Selection & Hover** - Hovered box ID, selected box ID
 8. **Box Interaction** - Pointer down, dragging, resizing, rotating, drag/resize/rotate state
 9. **Clipboard** - Copied box
@@ -149,7 +149,7 @@ updateStateName(value) { this._stateName.set(value); }
 2. onPointerDown(event) - Component
    ↓
 3. PointerEventHandler.handlePointerDown()
-   - Convert screen → world coordinates
+   - Convert screen → absolute coordinates
    - Check CTRL/CMD key
    - Check active modes (measurement, magic, create)
    - Check selected box interactions
@@ -233,11 +233,11 @@ On pointer up: HistoryService.recordMove()
 
 1. **Screen Space** - Pixels relative to browser viewport
 2. **Canvas Space** - Pixels on the canvas element (accounting for devicePixelRatio)
-3. **World Space** - Pixels on the background image (independent of zoom/pan)
+3. **absolute space** - Pixels on the background image (independent of zoom/pan)
 
 **Box Storage:** Boxes stored in **normalized coordinates** (0-1 range)
 
-- Converted to world space for calculations
+- Converted to absolute space for calculations
 - Converted back to normalized for storage
 
 **CoordinateTransform utility** handles all conversions.

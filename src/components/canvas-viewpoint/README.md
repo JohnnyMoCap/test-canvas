@@ -1,4 +1,4 @@
-# Canvas Viewpoint Component
+﻿# Canvas Viewpoint Component
 
 An interactive canvas component for viewing and editing bounding boxes on background images, built with Angular 17+ signals and standalone components.
 
@@ -93,7 +93,7 @@ Three coordinate spaces with transformations:
 
 1. **Screen Space** - Browser viewport pixels (event.clientX/Y)
 2. **Canvas Space** - Canvas element pixels (accounting for devicePixelRatio)
-3. **World Space** - Background image pixels (normalized 0-1 for storage)
+3. **absolute space** - Background image pixels (normalized 0-1 for storage)
 
 **CoordinateTransform utility** handles all conversions.
 
@@ -125,7 +125,7 @@ canvas-viewpoint/
 ├── scale-bar.component.ts                  Scale bar UI
 │
 ├── core/
-│   ├── types.ts                 TypeScript interfaces (WorldBoxGeometry, etc.)
+│   ├── types.ts                 TypeScript interfaces (AbsoluteBoxGeometry, etc.)
 │   ├── creation-state.ts        Box type definitions, creation state
 │   ├── quadtree.ts              Spatial index implementation
 │   └── performance-config.ts    Performance constants
@@ -198,7 +198,7 @@ export class AppComponent {
   readOnly = false;
   selectedId: string | null = null;
 
-  onBoxesChange(boxes: WorldBoxGeometry[]) {
+  onBoxesChange(boxes: AbsoluteBoxGeometry[]) {
     console.log('Boxes changed:', boxes);
   }
 
@@ -224,7 +224,7 @@ export class AppComponent {
 
 | Output              | Type               | Description                  |
 | ------------------- | ------------------ | ---------------------------- |
-| boxesChange         | WorldBoxGeometry[] | Emits when boxes change      |
+| boxesChange         | AbsoluteBoxGeometry[] | Emits when boxes change      |
 | selectedBoxIdChange | string \| null     | Emits when selection changes |
 
 ### Public Methods
@@ -272,13 +272,13 @@ Add new types by extending `BOX_TYPES` constant.
 
 ```typescript
 // Screen → World
-const worldPos = CoordinateTransform.screenToWorld(screenX, screenY, camera, state);
+const absPos = CoordinateTransform.screenToAbsolute(screenX, screenY, camera, state);
 
 // World → Normalized (for storage)
-const normalized = BoxUtils.worldToNormalized(worldBox, bgSize);
+const normalized = BoxUtils.absoluteToNormalized(AbsoluteBox, bgSize);
 
 // Normalized → World (for rendering)
-const worldBox = BoxUtils.toWorld(normalized, bgSize);
+const AbsoluteBox = BoxUtils.toWorld(normalized, bgSize);
 ```
 
 ---

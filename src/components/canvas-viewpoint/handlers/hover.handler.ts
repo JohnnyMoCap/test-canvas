@@ -1,5 +1,5 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
-import { Camera, ResizeCorner, TextMetrics, WorldBoxGeometry } from '../core/types';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+import { Camera, ResizeCorner, TextMetrics, AbsoluteBoxGeometry } from '../core/types';
 import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
@@ -34,10 +34,10 @@ export class HoverHandler {
     if (selectedBoxId != null) {
       const selectedBox = BoxStateUtils.findBoxById(boxes, selectedBoxId);
       if (selectedBox) {
-        const worldBox = BoxUtils.normalizeBoxToWorld(selectedBox, imageWidth, imageHeight);
-        if (worldBox) {
+        const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(selectedBox, imageWidth, imageHeight);
+        if (AbsoluteBox) {
           // Check rotation knob first (it can be outside the small query range)
-          if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
+          if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera)) {
             return selectedBoxId;
           }
         }
@@ -49,18 +49,18 @@ export class HoverHandler {
     for (let i = candidates.length - 1; i >= 0; i--) {
       const rawBox = candidates[i];
 
-      const worldBox = BoxUtils.normalizeBoxToWorld(rawBox, imageWidth, imageHeight);
+      const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(rawBox, imageWidth, imageHeight);
 
-      if (!worldBox) continue;
+      if (!AbsoluteBox) continue;
 
       if (
         showNametags &&
-        NametagUtils.pointInNametag(wx, wy, worldBox, camera, nametagMetricsCache, ctx)
+        NametagUtils.pointInNametag(wx, wy, AbsoluteBox, camera, nametagMetricsCache, ctx)
       ) {
         return getBoxId(rawBox);
       }
 
-      if (CoordinateTransform.pointInBox(wx, wy, worldBox)) {
+      if (CoordinateTransform.pointInBox(wx, wy, AbsoluteBox)) {
         return getBoxId(rawBox);
       }
     }
@@ -74,7 +74,7 @@ export class HoverHandler {
   static detectRotationKnob(
     wx: number,
     wy: number,
-    boxGeometry: WorldBoxGeometry,
+    boxGeometry: AbsoluteBoxGeometry,
     camera: Camera,
   ): boolean {
     const knobDistance = 30 / camera.zoom;
@@ -90,14 +90,14 @@ export class HoverHandler {
     const finalKnobX = boxGeometry.w < boxGeometry.h ? localKnobX2 : localKnobX;
     const finalKnobY = boxGeometry.w < boxGeometry.h ? localKnobY2 : localKnobY;
 
-    // Rotate knob position to world space
+    // Rotate knob position to absolute space
     const cos = Math.cos(boxGeometry.rotation);
     const sin = Math.sin(boxGeometry.rotation);
-    const knobWorldX = boxGeometry.x + (finalKnobX * cos - finalKnobY * sin);
-    const knobWorldY = boxGeometry.y + (finalKnobX * sin + finalKnobY * cos);
+    const knobAbsX = boxGeometry.x + (finalKnobX * cos - finalKnobY * sin);
+    const knobAbsY = boxGeometry.y + (finalKnobX * sin + finalKnobY * cos);
 
     // Check if point is within knob radius
-    const dist = Math.sqrt((wx - knobWorldX) ** 2 + (wy - knobWorldY) ** 2);
+    const dist = Math.sqrt((wx - knobAbsX) ** 2 + (wy - knobAbsY) ** 2);
     return dist < knobSize;
   }
 
@@ -169,21 +169,21 @@ export class HoverHandler {
         return;
       }
 
-      const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+      const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, imageWidth, imageHeight);
 
-      if (!isNullOrUndefined(hoveredBoxId) && hoveredBoxId === selectedBoxId && worldBox) {
+      if (!isNullOrUndefined(hoveredBoxId) && hoveredBoxId === selectedBoxId && AbsoluteBox) {
         // Check rotation knob first
-        if (this.detectRotationKnob(wx, wy, worldBox, camera)) {
+        if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera)) {
           state.setCursor(CursorStyles.getRotationKnobCursor());
           return;
         }
       }
 
-      if (worldBox) {
+      if (AbsoluteBox) {
         // Check corner handles, corners are clickable outside the internal box area
-        const corner = this.detectCornerHandle(wx, wy, worldBox, camera);
+        const corner = this.detectCornerHandle(wx, wy, AbsoluteBox, camera);
         if (corner) {
-          const cursor = CursorStyles.getResizeCursor(corner, worldBox);
+          const cursor = CursorStyles.getResizeCursor(corner, AbsoluteBox);
           state.setCursor(cursor);
           return;
         }

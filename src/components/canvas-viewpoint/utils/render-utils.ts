@@ -1,4 +1,4 @@
-import { Camera, WorldBox } from '../core/types';
+﻿import { Camera, AbsoluteBox } from '../core/types';
 import { QTNode } from '../core/quadtree';
 import { Box } from '../../../inteface/boxes.interface';
 
@@ -30,7 +30,7 @@ export class RenderUtils {
    */
   static drawBox(
     ctx: CanvasRenderingContext2D,
-    box: WorldBox,
+    box: AbsoluteBox,
     camera: Camera,
     isHovered: boolean,
   ): void {
@@ -57,7 +57,7 @@ export class RenderUtils {
   /**
    * Draws selection UI (corner handles and rotation knob)
    */
-  static drawSelectionUI(ctx: CanvasRenderingContext2D, box: WorldBox, camera: Camera): void {
+  static drawSelectionUI(ctx: CanvasRenderingContext2D, box: AbsoluteBox, camera: Camera): void {
     ctx.save();
     ctx.translate(box.x, box.y);
     if (box.rotation) ctx.rotate(box.rotation);
@@ -116,7 +116,7 @@ export class RenderUtils {
   static drawQuadtreeNode(ctx: CanvasRenderingContext2D, node: QTNode<Box>, camera: Camera): void {
     const { x, y, w, h } = node.bounds;
 
-    // Draw bounds in world coordinates
+    // Draw bounds in absolute coordinates
     ctx.save();
     ctx.strokeStyle = 'rgba(89, 247, 255, 0.25)';
     ctx.lineWidth = 1 / camera.zoom;

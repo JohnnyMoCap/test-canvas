@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { MagicDetectionUtils } from '../utils/magic-detection-utils';
@@ -34,7 +34,7 @@ export class MagicDetectionHandler {
     const screenX = (e.clientX - rect.left) * devicePixelRatio;
     const screenY = (e.clientY - rect.top) * devicePixelRatio;
 
-    const worldPos = CoordinateTransform.screenToWorld(
+    const absPos = CoordinateTransform.screenToAbsolute(
       screenX,
       screenY,
       canvas.width,
@@ -42,9 +42,9 @@ export class MagicDetectionHandler {
       camera,
     );
 
-    // Convert world coordinates (centered at 0,0) back to pixel coordinates (0,0 at top-left)
-    const pixelX = worldPos.x + bgCanvas.width / 2;
-    const pixelY = worldPos.y + bgCanvas.height / 2;
+    // Convert absolute coordinates (centered at 0,0) back to pixel coordinates (0,0 at top-left)
+    const pixelX = absPos.x + bgCanvas.width / 2;
+    const pixelY = absPos.y + bgCanvas.height / 2;
 
     // Clamp to background bounds
     const clampedX = Math.max(0, Math.min(bgCanvas.width - 1, Math.floor(pixelX)));
@@ -53,7 +53,7 @@ export class MagicDetectionHandler {
     if (debug) {
       console.log('Click position:', {
         screen: { x: e.clientX, y: e.clientY },
-        world: { x: worldPos.x.toFixed(1), y: worldPos.y.toFixed(1) },
+        world: { x: absPos.x.toFixed(1), y: absPos.y.toFixed(1) },
         pixel: { x: pixelX.toFixed(1), y: pixelY.toFixed(1) },
         clamped: { x: clampedX, y: clampedY },
         backgroundSize: { w: bgCanvas.width, h: bgCanvas.height },
@@ -85,8 +85,8 @@ export class MagicDetectionHandler {
       //TODO: make it use this
       // const newBox = BoxCreationUtils.createBoxFromContextMenu(
       //       'magic',
-      //       wp.worldPos.x,
-      //       wp.worldPos.y,
+      //       wp.absPos.x,
+      //       wp.absPos.y,
       //       this.camera(),
       //       bgc.width,
       //       bgc.height,

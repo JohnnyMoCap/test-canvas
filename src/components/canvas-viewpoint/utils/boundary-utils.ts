@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { BoxUtils } from './box-utils';
 
 /**
@@ -10,22 +10,22 @@ export class BoundaryUtils {
    * Accounts for rotation by checking if the box's AABB fits within 0-1 range
    */
   static isBoxWithinBounds(box: Box, imageWidth: number, imageHeight: number): boolean {
-    const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
-    if (!worldBox) return false;
+    const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, imageWidth, imageHeight);
+    if (!AbsoluteBox) return false;
 
     // Calculate axis-aligned bounding box (AABB) for rotated box
-    const cos = Math.abs(Math.cos(worldBox.rotation));
-    const sin = Math.abs(Math.sin(worldBox.rotation));
-    const aabbWidth = worldBox.w * cos + worldBox.h * sin;
-    const aabbHeight = worldBox.w * sin + worldBox.h * cos;
+    const cos = Math.abs(Math.cos(AbsoluteBox.rotation));
+    const sin = Math.abs(Math.sin(AbsoluteBox.rotation));
+    const aabbWidth = AbsoluteBox.w * cos + AbsoluteBox.h * sin;
+    const aabbHeight = AbsoluteBox.w * sin + AbsoluteBox.h * cos;
 
-    // AABB bounds in world space
-    const minX = worldBox.x - aabbWidth / 2;
-    const maxX = worldBox.x + aabbWidth / 2;
-    const minY = worldBox.y - aabbHeight / 2;
-    const maxY = worldBox.y + aabbHeight / 2;
+    // AABB bounds in absolute space
+    const minX = AbsoluteBox.x - aabbWidth / 2;
+    const maxX = AbsoluteBox.x + aabbWidth / 2;
+    const minY = AbsoluteBox.y - aabbHeight / 2;
+    const maxY = AbsoluteBox.y + aabbHeight / 2;
 
-    // Canvas bounds in world space (centered at origin)
+    // Canvas bounds in absolute space (centered at origin)
     const canvasMinX = -imageWidth / 2;
     const canvasMaxX = imageWidth / 2;
     const canvasMinY = -imageHeight / 2;
@@ -40,24 +40,24 @@ export class BoundaryUtils {
    * Returns a new box with clamped position
    */
   static clampBoxToBounds(box: Box, imageWidth: number, imageHeight: number): Box {
-    const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
-    if (!worldBox) return box;
+    const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, imageWidth, imageHeight);
+    if (!AbsoluteBox) return box;
 
     // Calculate AABB for rotated box
-    const cos = Math.abs(Math.cos(worldBox.rotation));
-    const sin = Math.abs(Math.sin(worldBox.rotation));
-    const aabbWidth = worldBox.w * cos + worldBox.h * sin;
-    const aabbHeight = worldBox.w * sin + worldBox.h * cos;
+    const cos = Math.abs(Math.cos(AbsoluteBox.rotation));
+    const sin = Math.abs(Math.sin(AbsoluteBox.rotation));
+    const aabbWidth = AbsoluteBox.w * cos + AbsoluteBox.h * sin;
+    const aabbHeight = AbsoluteBox.w * sin + AbsoluteBox.h * cos;
 
-    // Canvas bounds in world space
+    // Canvas bounds in absolute space
     const canvasMinX = -imageWidth / 2;
     const canvasMaxX = imageWidth / 2;
     const canvasMinY = -imageHeight / 2;
     const canvasMaxY = imageHeight / 2;
 
     // Clamp center position to keep AABB within bounds
-    let clampedX = worldBox.x;
-    let clampedY = worldBox.y;
+    let clampedX = AbsoluteBox.x;
+    let clampedY = AbsoluteBox.y;
 
     const halfAABBWidth = aabbWidth / 2;
     const halfAABBHeight = aabbHeight / 2;
@@ -76,7 +76,7 @@ export class BoundaryUtils {
     }
 
     // Convert back to normalized coordinates
-    const normalized = BoxUtils.worldToNormalized(clampedX, clampedY, imageWidth, imageHeight);
+    const normalized = BoxUtils.absoluteToNormalized(clampedX, clampedY, imageWidth, imageHeight);
 
     return {
       ...box,

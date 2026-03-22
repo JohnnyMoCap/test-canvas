@@ -1,14 +1,14 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
-import { WorldBox } from '../core/types';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+import { AbsoluteBox } from '../core/types';
 
 /**
  * Box normalization and transformation utilities
  */
 export class BoxUtils {
   /**
-   * Converts a normalized box (0..1 coords & sizes) into world units (pixels centered at origin)
+   * Converts a normalized box (0..1 coords & sizes) into absolute units (pixels centered at origin)
    */
-  static normalizeBoxToWorld(box: Box, imageWidth: number, imageHeight: number): WorldBox | null {
+  static normalizeBoxToAbsolute(box: Box, imageWidth: number, imageHeight: number): AbsoluteBox | null {
     if (!imageWidth || !imageHeight) return null;
 
     return {
@@ -23,32 +23,32 @@ export class BoxUtils {
   }
 
   /**
-   * Converts world coordinates back to normalized coordinates (0..1)
+   * Converts absolute coordinates back to normalized coordinates (0..1)
    */
-  static worldToNormalized(
-    worldX: number,
-    worldY: number,
+  static absoluteToNormalized(
+    absX: number,
+    absY: number,
     imageWidth: number,
     imageHeight: number,
   ): { x: number; y: number } {
     return {
-      x: (worldX + imageWidth / 2) / imageWidth,
-      y: (worldY + imageHeight / 2) / imageHeight,
+      x: (absX + imageWidth / 2) / imageWidth,
+      y: (absY + imageHeight / 2) / imageHeight,
     };
   }
 
   /**
    * Converts world dimensions back to normalized dimensions (0..1)
    */
-  static worldDimensionsToNormalized(
-    worldW: number,
-    worldH: number,
+  static absoluteDimensionsToNormalized(
+    absW: number,
+    absH: number,
     imageWidth: number,
     imageHeight: number,
   ): { w: number; h: number } {
     return {
-      w: worldW / imageWidth,
-      h: worldH / imageHeight,
+      w: absW / imageWidth,
+      h: absH / imageHeight,
     };
   }
 }

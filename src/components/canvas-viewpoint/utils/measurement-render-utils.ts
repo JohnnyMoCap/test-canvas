@@ -1,4 +1,4 @@
-import { Camera, MeasurementPoint, MeasurementState } from '../core/types';
+﻿import { Camera, MeasurementPoint, MeasurementState } from '../core/types';
 import { CoordinateTransform } from './coordinate-transform';
 import { MeasurementUtils } from './measurement-utils';
 
@@ -18,7 +18,7 @@ export class MeasurementRenderUtils {
     canvasHeight: number,
     imageWidth: number,
     imageHeight: number,
-    currentMouseWorld: MeasurementPoint | null,
+    currentMouseAbs: MeasurementPoint | null,
   ): void {
     if (!state.isActive) return;
 
@@ -26,12 +26,12 @@ export class MeasurementRenderUtils {
     const pointTwo = state.pointTwo;
 
     // Draw line from point one to cursor (if point one exists but not point two)
-    if (pointOne && !pointTwo && currentMouseWorld) {
-      this.renderLine(ctx, pointOne, currentMouseWorld, camera, canvasWidth, canvasHeight, true);
+    if (pointOne && !pointTwo && currentMouseAbs) {
+      this.renderLine(ctx, pointOne, currentMouseAbs, camera, canvasWidth, canvasHeight, true);
       this.renderDistance(
         ctx,
         pointOne,
-        currentMouseWorld,
+        currentMouseAbs,
         camera,
         canvasWidth,
         canvasHeight,
@@ -80,14 +80,14 @@ export class MeasurementRenderUtils {
     canvasHeight: number,
     dashed: boolean,
   ): void {
-    const screen1 = CoordinateTransform.worldToScreen(
+    const screen1 = CoordinateTransform.absoluteToScreen(
       p1.x,
       p1.y,
       canvasWidth,
       canvasHeight,
       camera,
     );
-    const screen2 = CoordinateTransform.worldToScreen(
+    const screen2 = CoordinateTransform.absoluteToScreen(
       p2.x,
       p2.y,
       canvasWidth,
@@ -121,7 +121,7 @@ export class MeasurementRenderUtils {
     canvasHeight: number,
     color: string,
   ): void {
-    const screen = CoordinateTransform.worldToScreen(
+    const screen = CoordinateTransform.absoluteToScreen(
       point.x,
       point.y,
       canvasWidth,
@@ -162,7 +162,7 @@ export class MeasurementRenderUtils {
     metricHeight: number,
   ): void {
     const midpoint = MeasurementUtils.getMidpoint(p1, p2);
-    const screen = CoordinateTransform.worldToScreen(
+    const screen = CoordinateTransform.absoluteToScreen(
       midpoint.x,
       midpoint.y,
       canvasWidth,

@@ -1,4 +1,4 @@
-# Canvas Viewpoint - Flow Diagrams
+﻿# Canvas Viewpoint - Flow Diagrams
 
 ## Pointer Event Flow
 
@@ -12,7 +12,7 @@
                ▼
 ┌─────────────────────────────────────┐
 │  onPointerDown(event) - Component   │
-│  - Get world coordinates            │
+│  - Get absolute coordinates            │
 │  - Set pointer capture              │
 │  - Call PointerEventHandler         │
 └──────────────┬──────────────────────┘
@@ -254,7 +254,7 @@
                ▼
 ┌─────────────────────────────────────┐
 │ PointerEventHandler.handleWheel     │
-│ - Get world coordinates at pointer  │
+│ - Get absolute coordinates at pointer  │
 └──────────────┬──────────────────────┘
                │
                ▼
@@ -723,7 +723,7 @@
                ▼
 ┌─────────────────────────────────────┐
 │  CoordinateTransform                │
-│  .screenToWorld()                   │
+│  .screenToAbsolute()                   │
 └──────────────┬──────────────────────┘
                │
          ┌─────┴─────┐
@@ -751,7 +751,7 @@
                │
                ▼
 ┌─────────────────────────────────────┐
-│  World Coordinates (pixels on image)│
+│  absolute coordinates (pixels on image)│
 │  Used for all calculations          │
 └─────────────────────────────────────┘
 ```

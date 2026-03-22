@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { HistoryService } from '../../../services/history.service';
 import { StateManager } from '../utils/state-manager';
 import { Quadtree } from './quadtree';
@@ -13,7 +13,7 @@ export interface Camera {
 }
 
 /**
- * 2D point in world space
+ * 2D point in absolute space
  */
 export interface Point {
   x: number;
@@ -44,29 +44,29 @@ export interface TextMetrics {
 }
 
 /**
- * Geometric properties of a box in world space
+ * Geometric properties of a box in absolute space
  * ONLY contains spatial data - no metadata, no styling, no business logic properties
  * Used for purely geometric calculations (hit detection, transformations, etc.)
  */
-export interface WorldBoxGeometry {
+export interface AbsoluteBoxGeometry {
   /**
-   * X coordinate of the box's top-left corner in world space (pixels from image origin).
-   * World space means coordinates relative to the background image, not the viewport.
+   * X coordinate of the box's top-left corner in absolute space (pixels from image origin).
+   * absolute space means coordinates relative to the background image, not the viewport.
    * Example: x=500 means 500 pixels from the left edge of the background image,
    * regardless of zoom level or camera pan position.
    */
   x: number;
 
   /**
-   * Y coordinate of the box's top-left corner in world space (pixels from image origin).
-   * World space means coordinates relative to the background image, not the viewport.
+   * Y coordinate of the box's top-left corner in absolute space (pixels from image origin).
+   * absolute space means coordinates relative to the background image, not the viewport.
    * Example: y=300 means 300 pixels from the top edge of the background image.
    * Note: Increases downward (standard canvas coordinate system).
    */
   y: number;
 
   /**
-   * Width of the box in world space pixels.
+   * Width of the box in absolute space pixels.
    * Represents the actual size on the background image, independent of viewport zoom.
    * Example: w=100 means the box is 100 pixels wide on the background image.
    * When zoomed in 2x, this still reads 100 but appears 200 pixels on screen.
@@ -74,7 +74,7 @@ export interface WorldBoxGeometry {
   w: number;
 
   /**
-   * Height of the box in world space pixels.
+   * Height of the box in absolute space pixels.
    * Represents the actual size on the background image, independent of viewport zoom.
    * Example: h=80 means the box is 80 pixels tall on the background image.
    * Combined with width, defines the box's unrotated bounding rectangle.
@@ -95,7 +95,7 @@ export interface WorldBoxGeometry {
 
 /**
  * Complete world box with all metadata
- * Extends WorldBoxGeometry and adds all non-geometric properties
+ * Extends AbsoluteBoxGeometry and adds all non-geometric properties
  * Used for rendering and operations that need access to the original box data
  *
  * Future properties may include:
@@ -104,13 +104,13 @@ export interface WorldBoxGeometry {
  * - Real-world measurement metrics
  * - Custom metadata
  */
-export interface WorldBox extends WorldBoxGeometry {
+export interface AbsoluteBox extends AbsoluteBoxGeometry {
   raw: import('../../../inteface/boxes.interface').Box;
   color: string;
 }
 
 /**
- * Measurement point in world space
+ * Measurement point in absolute space
  */
 export interface MeasurementPoint {
   x: number;

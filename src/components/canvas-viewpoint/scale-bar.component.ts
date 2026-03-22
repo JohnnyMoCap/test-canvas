@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   Input,
   OnInit,
@@ -149,8 +149,8 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
     const barWidthPx = 100;
 
     // Calculate how many world coordinate units this represents
-    // World coordinates are the same scale as image pixels
-    const worldDistance = barWidthPx / this.zoom;
+    // absolute coordinates are the same scale as image pixels
+    const absDistance = barWidthPx / this.zoom;
 
     // Calculate pixels per meter ratio (same as measurement tool)
     const pixelsPerMeterX = this.imageWidth / this.metricWidth;
@@ -159,7 +159,7 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
 
     // Convert world distance to pixels (world coords = image pixels at zoom 1)
     // Then convert to meters
-    const meters = worldDistance / avgPixelsPerMeter;
+    const meters = absDistance / avgPixelsPerMeter;
 
     // Show exact value, not rounded
     this.scaleText.set(this.formatDistance(meters));

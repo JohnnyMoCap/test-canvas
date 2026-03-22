@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   ElementRef,
   ViewChild,
@@ -272,12 +272,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (this.state.readOnlyMode()) return;
     const wp = this.state.contextMenuState();
     const bgc = this.state.bgCanvas();
-    if (!wp?.worldPos || !bgc) return;
+    if (!wp?.absPos || !bgc) return;
 
     const newBox = BoxCreationUtils.createBoxFromContextMenu(
       type,
-      wp.worldPos.x,
-      wp.worldPos.y,
+      wp.absPos.x,
+      wp.absPos.y,
       this.state.camera(),
       bgc.width,
       bgc.height,
@@ -416,10 +416,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const rect = canvas.getBoundingClientRect();
     const mx = ((t0.clientX + t1.clientX) / 2 - rect.left) * this.state.devicePixelRatio();
     const my = ((t0.clientY + t1.clientY) / 2 - rect.top) * this.state.devicePixelRatio();
-    const worldMid = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, cam);
+    const absMid = CoordinateTransform.screenToAbsolute(mx, my, canvas.width, canvas.height, cam);
 
-    const dx = worldMid.x - cam.x;
-    const dy = worldMid.y - cam.y;
+    const dx = absMid.x - cam.x;
+    const dy = absMid.y - cam.y;
     const scale = 1 - cam.zoom / newZoom;
     const newCamera = this.clampCamera({
       ...cam,
@@ -437,9 +437,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //features
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: dont forget to add low opacity for PENDING state
-  //TODO: change world to absolute
   //TODO: fix interacting from fully zoomed out, cant detect image text I think?
   //TODO: in color on hover when selected doesnt work sometimes?
+  //TODO: make sure the new resizing stuff works with browser zoom
 
   //the future:
   //split component into base and add more extensions for results and coverage and crap
@@ -556,17 +556,17 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     const canvas = this.canvasRef.nativeElement;
     const cam = this.state.camera();
-    const viewBounds = CameraUtils.getViewBoundsInWorld(canvas.width, canvas.height, cam);
+    const viewBounds = CameraUtils.getViewBoundsInAbsolute(canvas.width, canvas.height, cam);
     const visibleBoxes = this.queryVisible(viewBounds);
 
-    // Get current mouse position in world coordinates
-    let currentMouseWorld: { x: number; y: number } | null = null;
+    // Get current mouse position in absolute coordinates
+    let currentMouseAbs: { x: number; y: number } | null = null;
     const lastMouse = this.state.lastMouseScreen();
     if (lastMouse) {
       const rect = canvas.getBoundingClientRect();
       const mx = (lastMouse.x - rect.left) * this.state.devicePixelRatio();
       const my = (lastMouse.y - rect.top) * this.state.devicePixelRatio();
-      currentMouseWorld = CoordinateTransform.screenToWorld(
+      currentMouseAbs = CoordinateTransform.screenToAbsolute(
         mx,
         my,
         canvas.width,
@@ -591,7 +591,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.debugShowQuadtree(),
       this.quadtree,
       this.state.measurementState(),
-      currentMouseWorld,
+      currentMouseAbs,
     );
   }
 

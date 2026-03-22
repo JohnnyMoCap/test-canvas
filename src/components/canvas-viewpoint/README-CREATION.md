@@ -1,4 +1,4 @@
-# Canvas Viewport - Box Creation
+﻿# Canvas Viewport - Box Creation
 
 ## Overview
 
@@ -42,7 +42,7 @@ When create mode is **inactive**:
 ### Process
 
 1. **Pointer Down** → `BoxCreationHandler.startCreate()`
-   - Store start position (world coordinates)
+   - Store start position (absolute coordinates)
    - Generate temporary ID
    - Update creation state in StateManager
 
@@ -89,7 +89,7 @@ The context menu provides these box types:
 | 1234569    | Yellow | 100 × 75        | hsl(55, 90%, 55%)  |
 | 1234560    | Green  | 120 × 90        | hsl(100, 50%, 45%) |
 
-**Note:** Sizes are in world coordinates (pixels on the background image), not screen pixels.
+**Note:** Sizes are in absolute coordinates (pixels on the background image), not screen pixels.
 
 ### Size Scaling
 
@@ -106,9 +106,9 @@ This ensures boxes remain visually consistent on screen regardless of zoom.
 ### Process
 
 1. **Right Click** → `ContextMenuHandler.open()`
-   - Convert screen coords to world coords
+   - Convert screen coords to absolute coords
    - Store world position
-   - Update context menu state (visible, position, worldPos)
+   - Update context menu state (visible, position, absPos)
 
 2. **User Selects Type** → `onBoxTypeSelect()`
    - Call `BoxCreationHandler.createBoxAt()`
@@ -123,7 +123,7 @@ This ensures boxes remain visually consistent on screen regardless of zoom.
 
 ### Menu Behavior
 
-- Appears at cursor position (world coordinates)
+- Appears at cursor position (absolute coordinates)
 - Can appear anywhere on canvas (even outside image bounds, but box creation will clamp to bounds)
 - Closes when:
   - User selects a box type
@@ -182,7 +182,7 @@ export const BOX_TYPES: Record<BoxType, BoxTypeInfo> = {
   - `creationState` - Current creation (start point, preview box, temp ID)
   - `contextMenuOpen` - Whether context menu is visible
   - `contextMenuPosition` - Screen coordinates for menu
-  - `contextMenuWorldPos` - World coordinates for box creation
+  - `contextMenuWorldPos` - absolute coordinates for box creation
 
 ### Rendering
 
@@ -197,16 +197,16 @@ All boxes are stored in **normalized coordinates** (0-1 range):
 
 - Independent of image size
 - Easy to scale to different resolutions
-- Converted to world coordinates for rendering
+- Converted to absolute coordinates for rendering
 
 **Conversion Flow**:
 
 1. User drags → Screen coordinates
-2. Convert to World coordinates → Pixels on image
-3. Create box → World coordinates
+2. Convert to absolute coordinates → Pixels on image
+3. Create box → absolute coordinates
 4. Convert to Normalized → 0-1 range
 5. Store in HistoryService → Normalized
-6. Render → Convert back to World → Screen
+6. Render → Convert back to absolute → Screen
 
 ---
 
@@ -234,7 +234,7 @@ All box creation methods record to HistoryService:
 ### Core
 
 - [core/creation-state.ts](core/creation-state.ts) - Box type definitions, creation state interface
-- [core/types.ts](core/types.ts) - TypeScript interfaces (WorldBoxGeometry, BoxType)
+- [core/types.ts](core/types.ts) - TypeScript interfaces (AbsoluteBoxGeometry, BoxType)
 
 ### Handlers
 
@@ -243,7 +243,7 @@ All box creation methods record to HistoryService:
 ### Utilities
 
 - [utils/box-creation-utils.ts](utils/box-creation-utils.ts) - Preview rendering (deprecated - logic moved to handler)
-- [utils/box-utils.ts](utils/box-utils.ts) - Coordinate conversion (worldToNormalized, toWorld)
+- [utils/box-utils.ts](utils/box-utils.ts) - Coordinate conversion (absoluteToNormalized, toWorld)
 
 ### Components
 

@@ -1,4 +1,4 @@
-import { signal, computed, Signal, WritableSignal } from '@angular/core';
+﻿import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { Box } from '../../../inteface/boxes.interface';
 import { Camera, ResizeCorner, MeasurementState } from '../core/types';
 import { CreateBoxState } from '../core/creation-state';
@@ -50,7 +50,7 @@ export class StateManager {
   /**
    * Off-screen canvas containing the background image (e.g., floor plan, photo, map).
    * Pre-loaded and cached to avoid re-decoding the image on every frame.
-   * Width/height represent the actual image dimensions in pixels (world coordinates).
+   * Width/height represent the actual image dimensions in pixels (absolute coordinates).
    */
   private _bgCanvas = signal<HTMLCanvasElement | undefined>(undefined);
   readonly bgCanvas = this._bgCanvas.asReadonly();
@@ -81,7 +81,7 @@ export class StateManager {
   }
 
   /**
-   * Current camera state: zoom level and world-space pan offset (x/y).
+   * Current camera state: zoom level and absolute-space pan offset (x/y).
    * Updated on pan, zoom, and any operation that changes the viewport.
    */
   private _camera = signal<Camera>({ zoom: 1, x: 0, y: 0 });
@@ -297,9 +297,9 @@ export class StateManager {
    */
   private _isDraggingBox = signal(false);
   readonly isDraggingBox = this._isDraggingBox.asReadonly();
-  startDragging(worldX: number, worldY: number, boxX: number, boxY: number): void {
+  startDragging(absX: number, absY: number, boxX: number, boxY: number): void {
     this._isDraggingBox.set(true);
-    this._dragStartWorld.set({ x: worldX, y: worldY });
+    this._dragStartAbsolute.set({ x: absX, y: absY });
     this._boxStartPos.set({ x: boxX, y: boxY });
   }
   stopDragging(): void {
@@ -307,15 +307,15 @@ export class StateManager {
   }
 
   /**
-   * World coordinates where the drag operation began.
+   * absolute coordinates where the drag operation began.
    * Used to calculate delta (how far mouse has moved) during drag.
-   * Stored in world space to remain consistent across zoom/pan changes.
+   * Stored in absolute space to remain consistent across zoom/pan changes.
    */
-  private _dragStartWorld = signal({ x: 0, y: 0 });
-  readonly dragStartWorld = this._dragStartWorld.asReadonly();
+  private _dragStartAbsolute = signal({ x: 0, y: 0 });
+  readonly dragStartAbsolute = this._dragStartAbsolute.asReadonly();
 
   /**
-   * Original position (world coordinates) of the box when drag started.
+   * Original position (absolute coordinates) of the box when drag started.
    * Combined with drag delta to calculate new box position.
    * Allows smooth dragging that updates the box position continuously.
    */
@@ -444,7 +444,7 @@ export class StateManager {
   }
 
   /**
-   * Last known pointer position in canvas-relative coordinates (not world coordinates).
+   * Last known pointer position in canvas-relative coordinates (not absolute coordinates).
    * Updated on every pointer move. Used for operations that need current mouse position
    * like hover detection, cursor updates, and coordinate transformations.
    */

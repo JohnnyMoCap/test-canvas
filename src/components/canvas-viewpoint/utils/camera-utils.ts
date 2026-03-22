@@ -1,4 +1,4 @@
-import { Camera } from '../core/types';
+﻿import { Camera } from '../core/types';
 import { QuadtreeUtils } from './quadtree-utils';
 import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { BoxUtils } from './box-utils';
@@ -50,14 +50,14 @@ export class CameraUtils {
   }
 
   /**
-   * Gets the view bounds in world coordinates
+   * Gets the view bounds in absolute coordinates
    */
-  static getViewBoundsInWorld(
+  static getViewBoundsInAbsolute(
     canvasWidth: number,
     canvasHeight: number,
     camera: Camera,
   ): { minX: number; minY: number; maxX: number; maxY: number } {
-    // Transform all four corners of the canvas to world space
+    // Transform all four corners of the canvas to absolute space
     const corners = [
       { x: 0, y: 0 },
       { x: canvasWidth, y: 0 },
@@ -83,7 +83,7 @@ export class CameraUtils {
       maxY = Math.max(maxY, wy);
     }
 
-    // Add margin to prevent pop-in at edges (in world space)
+    // Add margin to prevent pop-in at edges (in absolute space)
     // Margin accounts for the maximum AABB extension from nametags
     // Use the larger of width/height to ensure full coverage
     const margin =
@@ -114,12 +114,12 @@ export class CameraUtils {
     const box = boxes.find((b) => getBoxId(b) === boxId);
     if (!box) return null;
 
-    const worldBox = BoxUtils.normalizeBoxToWorld(box, bgWidth, bgHeight);
-    if (!worldBox) return null;
+    const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, bgWidth, bgHeight);
+    if (!AbsoluteBox) return null;
 
     // Calculate zoom to fit box with padding
-    const boxScreenWidth = worldBox.w;
-    const boxScreenHeight = worldBox.h;
+    const boxScreenWidth = AbsoluteBox.w;
+    const boxScreenHeight = AbsoluteBox.h;
 
     const zoomX = (canvasWidth - padding * 2) / boxScreenWidth;
     const zoomY = (canvasHeight - padding * 2) / boxScreenHeight;
@@ -130,8 +130,8 @@ export class CameraUtils {
 
     return {
       zoom: finalZoom,
-      x: worldBox.x,
-      y: worldBox.y,
+      x: AbsoluteBox.x,
+      y: AbsoluteBox.y,
     };
   }
 }

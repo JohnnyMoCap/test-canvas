@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { ResizeCorner } from '../core/types';
 import { BoxUtils } from './box-utils';
 import { BoxStateUtils } from './box-state-utils';
@@ -13,17 +13,17 @@ export class BoxManipulator {
    */
   static rotateBox(
     box: Box,
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     bgWidth: number,
     bgHeight: number,
     rotationStartAngle: number,
     boxStartRotation: number,
   ): Box {
-    const wb = BoxUtils.normalizeBoxToWorld(box, bgWidth, bgHeight);
+    const wb = BoxUtils.normalizeBoxToAbsolute(box, bgWidth, bgHeight);
     if (!wb) return box;
 
-    const currentAngle = Math.atan2(worldY - wb.y, worldX - wb.x);
+    const currentAngle = Math.atan2(absY - wb.y, absX - wb.x);
     const deltaAngle = currentAngle - rotationStartAngle;
     const newRotation = boxStartRotation + deltaAngle;
 
@@ -35,18 +35,18 @@ export class BoxManipulator {
    */
   static resizeBox(
     box: Box,
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     bgWidth: number,
     bgHeight: number,
     resizeCorner: ResizeCorner,
   ): Box {
-    const wb = BoxUtils.normalizeBoxToWorld(box, bgWidth, bgHeight);
+    const wb = BoxUtils.normalizeBoxToAbsolute(box, bgWidth, bgHeight);
     if (!wb) return box;
 
     // Transform mouse to local space
-    const dx = worldX - wb.x;
-    const dy = worldY - wb.y;
+    const dx = absX - wb.x;
+    const dy = absY - wb.y;
     const rot = -wb.rotation;
     const cos = Math.cos(rot);
     const sin = Math.sin(rot);
@@ -69,20 +69,20 @@ export class BoxManipulator {
     const newLocalCenterX = anchor.x + deltaX / 2;
     const newLocalCenterY = anchor.y + deltaY / 2;
 
-    // Transform back to world
+    // Transform back to absolute
     const cosRot = Math.cos(wb.rotation);
     const sinRot = Math.sin(wb.rotation);
-    const newWorldCenterX = wb.x + (newLocalCenterX * cosRot - newLocalCenterY * sinRot);
-    const newWorldCenterY = wb.y + (newLocalCenterX * sinRot + newLocalCenterY * cosRot);
+    const newAbsCenterX = wb.x + (newLocalCenterX * cosRot - newLocalCenterY * sinRot);
+    const newAbsCenterY = wb.y + (newLocalCenterX * sinRot + newLocalCenterY * cosRot);
 
     // Convert to normalized
-    const normalizedPos = BoxUtils.worldToNormalized(
-      newWorldCenterX,
-      newWorldCenterY,
+    const normalizedPos = BoxUtils.absoluteToNormalized(
+      newAbsCenterX,
+      newAbsCenterY,
       bgWidth,
       bgHeight,
     );
-    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
+    const normalizedDims = BoxUtils.absoluteDimensionsToNormalized(
       Math.max(1, Math.abs(deltaX)),
       Math.max(1, Math.abs(deltaY)),
       bgWidth,
@@ -104,8 +104,8 @@ export class BoxManipulator {
   /**
    * Move a box to a new position, clamped to canvas bounds
    */
-  static moveBox(box: Box, worldX: number, worldY: number, bgWidth: number, bgHeight: number): Box {
-    const normalized = BoxUtils.worldToNormalized(worldX, worldY, bgWidth, bgHeight);
+  static moveBox(box: Box, absX: number, absY: number, bgWidth: number, bgHeight: number): Box {
+    const normalized = BoxUtils.absoluteToNormalized(absX, absY, bgWidth, bgHeight);
     const movedBox = {
       ...box,
       x: normalized.x,

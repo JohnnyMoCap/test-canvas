@@ -1,4 +1,4 @@
-import { MeasurementPoint, MeasurementState, Camera } from '../core/types';
+﻿import { MeasurementPoint, MeasurementState, Camera } from '../core/types';
 import { MeasurementUtils } from '../utils/measurement-utils';
 import { StateManager } from '../utils/state-manager';
 
@@ -12,7 +12,7 @@ export class MeasurementHandler {
    * Returns true if the event was handled
    */
   static handlePointerDown(
-    worldPos: MeasurementPoint,
+    absPos: MeasurementPoint,
     camera: Camera,
     state: StateManager,
   ) {
@@ -22,12 +22,12 @@ export class MeasurementHandler {
     const pointOne = measurementState.pointOne;
     const pointTwo = measurementState.pointTwo;
 
-    // Calculate hit detection threshold - use a fixed world-space size that represents ~15 pixels on screen
+    // Calculate hit detection threshold - use a fixed absolute-space size that represents ~15 pixels on screen
     // This ensures consistent clicking regardless of zoom level
     const hitThreshold = 15 / camera.zoom;
 
     // Check if clicking on point two (higher priority)
-    if (pointTwo && MeasurementUtils.isPointNear(worldPos, pointTwo, hitThreshold)) {
+    if (pointTwo && MeasurementUtils.isPointNear(absPos, pointTwo, hitThreshold)) {
       state.updateMeasurementState({
         ...measurementState,
         isDraggingPoint: 'two',
@@ -36,7 +36,7 @@ export class MeasurementHandler {
     }
 
     // Check if clicking on point one
-    if (pointOne && MeasurementUtils.isPointNear(worldPos, pointOne, hitThreshold)) {
+    if (pointOne && MeasurementUtils.isPointNear(absPos, pointOne, hitThreshold)) {
       state.updateMeasurementState({
         ...measurementState,
         isDraggingPoint: 'one',
@@ -52,19 +52,19 @@ export class MeasurementHandler {
 
     // If only point one exists, set point two
     if (pointOne && !pointTwo) {
-      state.updateMeasurementState(MeasurementUtils.setPointTwo(measurementState, worldPos));
+      state.updateMeasurementState(MeasurementUtils.setPointTwo(measurementState, absPos));
       return;
     }
 
     // If no points exist, set point one
-    state.updateMeasurementState(MeasurementUtils.setPointOne(measurementState, worldPos));
+    state.updateMeasurementState(MeasurementUtils.setPointOne(measurementState, absPos));
     return;
   }
 
   /**
    * Handle pointer move in measurement mode
    */
-  static handlePointerMove(worldPos: MeasurementPoint, state: StateManager): boolean {
+  static handlePointerMove(absPos: MeasurementPoint, state: StateManager): boolean {
     const measurementState = state.measurementState();
     if (!measurementState.isActive) return false;
 
@@ -74,7 +74,7 @@ export class MeasurementHandler {
     if (draggingPoint === 'one') {
       state.updateMeasurementState({
         ...measurementState,
-        pointOne: worldPos,
+        pointOne: absPos,
       });
       return true;
     }
@@ -82,7 +82,7 @@ export class MeasurementHandler {
     if (draggingPoint === 'two') {
       state.updateMeasurementState({
         ...measurementState,
-        pointTwo: worldPos,
+        pointTwo: absPos,
       });
       return true;
     }
@@ -113,23 +113,23 @@ export class MeasurementHandler {
    * Get cursor style for measurement mode
    */
   static getCursorStyle(
-    worldPos: MeasurementPoint | null,
+    absPos: MeasurementPoint | null,
     camera: Camera,
     state: StateManager,
   ): string {
     const measurementState = state.measurementState();
-    if (!measurementState.isActive || !worldPos) return 'crosshair';
+    if (!measurementState.isActive || !absPos) return 'crosshair';
 
     const pointOne = measurementState.pointOne;
     const pointTwo = measurementState.pointTwo;
     const hitThreshold = 15 / camera.zoom;
 
     // Check if hovering over a point
-    if (pointTwo && MeasurementUtils.isPointNear(worldPos, pointTwo, hitThreshold)) {
+    if (pointTwo && MeasurementUtils.isPointNear(absPos, pointTwo, hitThreshold)) {
       return 'move';
     }
 
-    if (pointOne && MeasurementUtils.isPointNear(worldPos, pointOne, hitThreshold)) {
+    if (pointOne && MeasurementUtils.isPointNear(absPos, pointOne, hitThreshold)) {
       return 'move';
     }
 

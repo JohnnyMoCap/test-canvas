@@ -1,13 +1,13 @@
-import { Camera, Point, WorldBoxGeometry } from '../core/types';
+﻿import { Camera, Point, AbsoluteBoxGeometry } from '../core/types';
 
 /**
  * Coordinate transformation utilities for canvas rendering
  */
 export class CoordinateTransform {
   /**
-   * Converts screen coordinates to world coordinates
+   * Converts screen coordinates to absolute coordinates
    */
-  static screenToWorld(
+  static screenToAbsolute(
     screenX: number,
     screenY: number,
     canvasWidth: number,
@@ -21,25 +21,25 @@ export class CoordinateTransform {
   }
 
   /**
-   * Converts world coordinates to screen coordinates (inverse of screenToWorld)
+   * Converts absolute coordinates to screen coordinates (inverse of screenToAbsolute)
    */
-  static worldToScreen(
-    worldX: number,
-    worldY: number,
+  static absoluteToScreen(
+    absX: number,
+    absY: number,
     canvasWidth: number,
     canvasHeight: number,
     camera: Camera,
   ): Point {
     return {
-      x: (worldX - camera.x) * camera.zoom + canvasWidth / 2,
-      y: (worldY - camera.y) * camera.zoom + canvasHeight / 2,
+      x: (absX - camera.x) * camera.zoom + canvasWidth / 2,
+      y: (absY - camera.y) * camera.zoom + canvasHeight / 2,
     };
   }
 
   /**
-   * Converts screen delta to world delta
+   * Converts screen delta to absolute delta
    */
-  static screenDeltaToWorld(dx: number, dy: number, camera: Camera): Point {
+  static screenDeltaToAbsolute(dx: number, dy: number, camera: Camera): Point {
     return { x: dx / camera.zoom, y: dy / camera.zoom };
   }
 
@@ -47,7 +47,7 @@ export class CoordinateTransform {
    * Checks if a point is inside a rotated box
    * Logic: Translate point to box center, un-rotate point, check AABB
    */
-  static pointInBox(wx: number, wy: number, boxGeometry: WorldBoxGeometry): boolean {
+  static pointInBox(wx: number, wy: number, boxGeometry: AbsoluteBoxGeometry): boolean {
     // 1. Translate point so box center is at (0,0)
     const dx = wx - boxGeometry.x;
     const dy = wy - boxGeometry.y;
@@ -70,7 +70,7 @@ export class CoordinateTransform {
   /**
    * Calculates the axis-aligned bounding box (AABB) of a rotated box
    */
-  static calculateRotatedAABB(boxGeometry: WorldBoxGeometry): {
+  static calculateRotatedAABB(boxGeometry: AbsoluteBoxGeometry): {
     x: number;
     y: number;
     w: number;
@@ -100,7 +100,7 @@ export class CoordinateTransform {
       const rx = p.x * cos - p.y * sin;
       const ry = p.x * sin + p.y * cos;
 
-      // Translate to world
+      // Translate to absolute
       const wx = boxGeometry.x + rx;
       const wy = boxGeometry.y + ry;
 

@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Camera, TextMetrics, MeasurementState } from '../core/types';
 import { BOX_TYPES } from '../core/creation-state';
 import { CreateBoxState } from '../core/creation-state';
@@ -32,7 +32,7 @@ export class FrameRenderer {
     debugShowQuadtree: boolean,
     quadtree: Quadtree<Box> | undefined,
     measurementState: MeasurementState,
-    currentMouseWorld: { x: number; y: number } | null,
+    currentMouseAbs: { x: number; y: number } | null,
   ): void {
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -46,14 +46,14 @@ export class FrameRenderer {
       ctx.drawImage(bgCanvas, -bgCanvas.width / 2, -bgCanvas.height / 2);
     }
 
-    // Convert to world boxes
-    const worldBoxes = visibleBoxes
-      .map((b) => (bgCanvas ? BoxUtils.normalizeBoxToWorld(b, imageWidth, imageHeight) : null))
+    // Convert to absolute boxes
+    const absBoxes = visibleBoxes
+      .map((b) => (bgCanvas ? BoxUtils.normalizeBoxToAbsolute(b, imageWidth, imageHeight) : null))
       .filter((b): b is NonNullable<typeof b> => !!b);
 
     // Group by color for efficient rendering
-    const groups = new Map<string, typeof worldBoxes>();
-    for (const b of worldBoxes) {
+    const groups = new Map<string, typeof absBoxes>();
+    for (const b of absBoxes) {
       if (!groups.has(b.color)) groups.set(b.color, []);
       groups.get(b.color)!.push(b);
     }
@@ -71,7 +71,7 @@ export class FrameRenderer {
 
     // Draw nametags
     if (showNametags) {
-      for (const b of worldBoxes) {
+      for (const b of absBoxes) {
         NametagUtils.drawNametag(ctx, b, camera, canvas.width, canvas.height, nametagMetricsCache);
       }
     }
@@ -111,7 +111,7 @@ export class FrameRenderer {
         canvas.height,
         imageWidth,
         imageHeight,
-        currentMouseWorld,
+        currentMouseAbs,
       );
       ctx.restore();
     }

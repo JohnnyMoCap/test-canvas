@@ -1,4 +1,4 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { BoxCreationUtils } from './box-creation-utils';
 import { BoxUtils } from './box-utils';
 
@@ -285,13 +285,13 @@ export class MagicDetectionUtils {
     bgWidth: number,
     bgHeight: number,
   ): Box {
-    // Convert pixel coordinates to world coordinates (centered at origin)
-    const worldX = result.x - bgWidth / 2;
-    const worldY = result.y - bgHeight / 2;
+    // Convert pixel coordinates to absolute coordinates (centered at origin)
+    const absX = result.x - bgWidth / 2;
+    const absY = result.y - bgHeight / 2;
 
     // Convert to normalized coordinates
-    const normalizedPos = BoxUtils.worldToNormalized(worldX, worldY, bgWidth, bgHeight);
-    const normalizedDims = BoxUtils.worldDimensionsToNormalized(
+    const normalizedPos = BoxUtils.absoluteToNormalized(absX, absY, bgWidth, bgHeight);
+    const normalizedDims = BoxUtils.absoluteDimensionsToNormalized(
       result.width,
       result.height,
       bgWidth,

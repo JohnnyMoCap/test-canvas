@@ -1,6 +1,6 @@
-import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../inteface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
-import { PointerHandlerContext, TextMetrics, WorldBoxGeometry } from '../core/types';
+import { PointerHandlerContext, TextMetrics, AbsoluteBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
@@ -34,7 +34,7 @@ export class PointerEventHandler {
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(
+    const absPos = CoordinateTransform.screenToAbsolute(
       mx,
       my,
       canvas.width,
@@ -51,7 +51,7 @@ export class PointerEventHandler {
     }
 
     if (state.measurementState().isActive && event.button == 0) {
-      this.handleMeasurementMode(worldPos, state);
+      this.handleMeasurementMode(absPos, state);
       return;
     }
 
@@ -62,29 +62,29 @@ export class PointerEventHandler {
 
     //works but still build in a very stupid way, fix this
     if (state.contextMenuState()?.visible || event.button === 2) {
-      this.handleContextMenu(event, worldPos, state);
+      this.handleContextMenu(event, absPos, state);
       return;
     }
 
     // Box Creation (blocked in read-only and when CTRL pressed)
     if (state.isCreateMode() && event.button === 0) {
-      this.handleCreateMode(event, worldPos, canvas, state);
+      this.handleCreateMode(event, absPos, canvas, state);
       return;
     }
 
     //Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
-    if (this.handleSelectedBoxInteraction(event, worldPos, canvas, state)) return;
+    if (this.handleSelectedBoxInteraction(event, absPos, canvas, state)) return;
 
     // Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
-    if (this.handleBoxSelection(worldPos, state, quadtree, nametagMetricsCache)) return;
+    if (this.handleBoxSelection(absPos, state, quadtree, nametagMetricsCache)) return;
 
     // PRIORITY 8: Camera Pan
     this.handleCameraPanStart(event, state);
     return;
   }
 
-  private static handleMeasurementMode(worldPos: { x: number; y: number }, state: StateManager) {
-    MeasurementHandler.handlePointerDown(worldPos, state.camera(), state);
+  private static handleMeasurementMode(absPos: { x: number; y: number }, state: StateManager) {
+    MeasurementHandler.handlePointerDown(absPos, state.camera(), state);
   }
 
   private static handleMagicDetection(
@@ -117,7 +117,7 @@ export class PointerEventHandler {
 
   private static handleContextMenu(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
   ) {
     // Don't handle if clicking on context menu
@@ -138,7 +138,7 @@ export class PointerEventHandler {
     if (event.button === 2) {
       event.preventDefault();
       state.updateContextMenu(
-        ContextMenuHandler.open(event.clientX, event.clientY, worldPos.x, worldPos.y),
+        ContextMenuHandler.open(event.clientX, event.clientY, absPos.x, absPos.y),
       );
       return;
     }
@@ -148,17 +148,17 @@ export class PointerEventHandler {
 
   private static handleCreateMode(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     canvas: HTMLCanvasElement,
     state: StateManager,
   ) {
-    state.updateCreateState(BoxCreationHandler.startCreate(worldPos.x, worldPos.y));
+    state.updateCreateState(BoxCreationHandler.startCreate(absPos.x, absPos.y));
     canvas.setPointerCapture(event.pointerId);
   }
 
   private static handleSelectedBoxInteraction(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     canvas: HTMLCanvasElement,
     state: StateManager,
   ): boolean {
@@ -173,33 +173,33 @@ export class PointerEventHandler {
     const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
     if (!box) return false;
 
-    const worldBox = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
-    if (!worldBox) return false;
+    const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, bgc.width, bgc.height);
+    if (!AbsoluteBox) return false;
 
     // Try rotation
-    if (this.handleRotationStart(event, worldPos, worldBox, canvas, box, state)) return true;
+    if (this.handleRotationStart(event, absPos, AbsoluteBox, canvas, box, state)) return true;
 
     // Try resize
-    if (this.handleResizeStart(event, worldPos, worldBox, canvas, box, state)) return true;
+    if (this.handleResizeStart(event, absPos, AbsoluteBox, canvas, box, state)) return true;
 
     // Try drag
-    if (this.handleDragStart(event, worldPos, worldBox, canvas, box, state)) return true;
+    if (this.handleDragStart(event, absPos, AbsoluteBox, canvas, box, state)) return true;
 
     return false;
   }
 
   private static handleRotationStart(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
-    boxGeometry: WorldBoxGeometry,
+    absPos: { x: number; y: number },
+    boxGeometry: AbsoluteBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     state: StateManager,
   ): boolean {
-    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, boxGeometry, state.camera()))
+    if (!HoverHandler.detectRotationKnob(absPos.x, absPos.y, boxGeometry, state.camera()))
       return false;
 
-    const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, boxGeometry);
+    const rotationInfo = BoxManipulationHandler.startRotation(absPos.x, absPos.y, boxGeometry);
     state.startRotating(rotationInfo.angle, rotationInfo.boxRotation);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
     state.setCursor(CursorStyles.getRotateCursor());
@@ -209,15 +209,15 @@ export class PointerEventHandler {
 
   private static handleResizeStart(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
-    boxGeometry: WorldBoxGeometry,
+    absPos: { x: number; y: number },
+    boxGeometry: AbsoluteBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     state: StateManager,
   ): boolean {
     const corner = HoverHandler.detectCornerHandle(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       boxGeometry,
       state.camera(),
     );
@@ -226,7 +226,7 @@ export class PointerEventHandler {
 
     state.startResizing(corner);
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    state.updateLastPointer(worldPos.x, worldPos.y);
+    state.updateLastPointer(absPos.x, absPos.y);
     const resizeCursor = CursorStyles.getResizeCursor(corner, boxGeometry);
     state.setCursor(resizeCursor);
     canvas.setPointerCapture(event.pointerId);
@@ -235,16 +235,16 @@ export class PointerEventHandler {
 
   private static handleDragStart(
     event: PointerEvent,
-    worldPos: { x: number; y: number },
-    boxGeometry: WorldBoxGeometry,
+    absPos: { x: number; y: number },
+    boxGeometry: AbsoluteBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
     state: StateManager,
   ): boolean {
-    if (!CoordinateTransform.pointInBox(worldPos.x, worldPos.y, boxGeometry)) return false;
+    if (!CoordinateTransform.pointInBox(absPos.x, absPos.y, boxGeometry)) return false;
 
     state.startInteraction(state.selectedBoxId()!, box.x, box.y, box.w, box.h, box.rotation || 0);
-    const dragInfo = BoxManipulationHandler.startDrag(worldPos.x, worldPos.y, boxGeometry);
+    const dragInfo = BoxManipulationHandler.startDrag(absPos.x, absPos.y, boxGeometry);
     state.startDragging(
       dragInfo.dragStart.x,
       dragInfo.dragStart.y,
@@ -257,7 +257,7 @@ export class PointerEventHandler {
   }
 
   private static handleBoxSelection(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
@@ -269,8 +269,8 @@ export class PointerEventHandler {
     const ctx = state.ctx();
 
     const hoveredBoxId = HoverHandler.detectHoveredBox(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       boxes,
       quadtree,
       bgc.width,
@@ -288,16 +288,16 @@ export class PointerEventHandler {
       // Prepare for potential drag - find the box and initialize drag state
       const box = BoxStateUtils.findBoxById(boxes, hoveredBoxId);
       if (box) {
-        const worldBox = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
-        if (worldBox) {
+        const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(box, bgc.width, bgc.height);
+        if (AbsoluteBox) {
           // Check if clicking on box OR nametag - both should enable dragging
-          const clickedOnBox = CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox);
+          const clickedOnBox = CoordinateTransform.pointInBox(absPos.x, absPos.y, AbsoluteBox);
           const clickedOnNametag =
             state.showNametags() &&
             NametagUtils.pointInNametag(
-              worldPos.x,
-              worldPos.y,
-              worldBox,
+              absPos.x,
+              absPos.y,
+              AbsoluteBox,
               camera,
               nametagMetricsCache,
               ctx,
@@ -306,7 +306,7 @@ export class PointerEventHandler {
           if (clickedOnBox || clickedOnNametag) {
             // Start interaction state so the box can be immediately dragged
             state.startInteraction(hoveredBoxId, box.x, box.y, box.w, box.h, box.rotation || 0);
-            state.startDragging(worldPos.x, worldPos.y, worldBox.x, worldBox.y);
+            state.startDragging(absPos.x, absPos.y, AbsoluteBox.x, AbsoluteBox.y);
           }
         }
       }
@@ -336,7 +336,7 @@ export class PointerEventHandler {
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(
+    const absPos = CoordinateTransform.screenToAbsolute(
       mx,
       my,
       canvas.width,
@@ -347,47 +347,47 @@ export class PointerEventHandler {
     state.updateMouseScreenPosition(event.clientX, event.clientY);
 
     // Handle measurement mode
-    if (this.handleMeasurementMove(worldPos, state)) return;
+    if (this.handleMeasurementMove(absPos, state)) return;
 
     // Handle active interactions
-    if (this.handleCreatePreview(worldPos, state)) return;
-    if (this.handleRotation(worldPos, state)) return;
-    if (this.handleResize(worldPos, state)) return;
-    if (this.handleDrag(worldPos, state)) return;
+    if (this.handleCreatePreview(absPos, state)) return;
+    if (this.handleRotation(absPos, state)) return;
+    if (this.handleResize(absPos, state)) return;
+    if (this.handleDrag(absPos, state)) return;
     if (this.handleCameraPan(event, canvas, state)) return;
 
     // Handle hover detection (skip in measurement mode)
     if (!state.measurementState().isActive) {
-      this.handleHoverDetection(worldPos, state, quadtree, nametagMetricsCache);
+      this.handleHoverDetection(absPos, state, quadtree, nametagMetricsCache);
     } else {
       // Update cursor for measurement mode
-      const cursor = MeasurementHandler.getCursorStyle(worldPos, state.camera(), state);
+      const cursor = MeasurementHandler.getCursorStyle(absPos, state.camera(), state);
       state.setCursor(cursor);
     }
   }
 
   private static handleMeasurementMove(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
   ): boolean {
     if (!state.measurementState().isActive) return false;
 
-    return MeasurementHandler.handlePointerMove(worldPos, state);
+    return MeasurementHandler.handlePointerMove(absPos, state);
   }
 
   private static handleCreatePreview(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
   ): boolean {
     if (!state.createState().isCreating) return false;
 
     state.updateCreateState(
-      BoxCreationHandler.updatePreview(worldPos.x, worldPos.y, state.createState()),
+      BoxCreationHandler.updatePreview(absPos.x, absPos.y, state.createState()),
     );
     return true;
   }
 
-  private static handleRotation(worldPos: { x: number; y: number }, state: StateManager): boolean {
+  private static handleRotation(absPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isRotating()) return false;
 
     const boxes = state.localBoxes();
@@ -398,8 +398,8 @@ export class PointerEventHandler {
     if (!box) return true;
 
     const rotatedBox = BoxManipulationHandler.rotate(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       box,
       bgc.width,
       bgc.height,
@@ -411,7 +411,7 @@ export class PointerEventHandler {
     return true;
   }
 
-  private static handleResize(worldPos: { x: number; y: number }, state: StateManager): boolean {
+  private static handleResize(absPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isResizing() || !state.resizeCorner()) return false;
 
     const boxes = state.localBoxes();
@@ -422,8 +422,8 @@ export class PointerEventHandler {
     if (!box) return true;
 
     const resizedBox = BoxManipulationHandler.resize(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       box,
       bgc.width,
       bgc.height,
@@ -434,7 +434,7 @@ export class PointerEventHandler {
     return true;
   }
 
-  private static handleDrag(worldPos: { x: number; y: number }, state: StateManager): boolean {
+  private static handleDrag(absPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isDraggingBox()) return false;
 
     const boxes = state.localBoxes();
@@ -445,12 +445,12 @@ export class PointerEventHandler {
     if (!box) return true;
 
     const draggedBox = BoxManipulationHandler.drag(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       box,
       bgc.width,
       bgc.height,
-      state.dragStartWorld(),
+      state.dragStartAbsolute(),
       state.boxStartPos(),
     );
     const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, draggedBox);
@@ -487,7 +487,7 @@ export class PointerEventHandler {
   }
 
   private static handleHoverDetection(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
@@ -499,8 +499,8 @@ export class PointerEventHandler {
     const ctx = state.ctx();
 
     const hoveredBoxId = HoverHandler.detectHoveredBox(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       boxes,
       quadtree,
       bgc.width,
@@ -516,8 +516,8 @@ export class PointerEventHandler {
 
     if (hoveredBoxId || (Number(hoveredBoxId) ?? -1) === 0) {
       HoverHandler.updateCursorForHover(
-        worldPos.x,
-        worldPos.y,
+        absPos.x,
+        absPos.y,
         hoveredBoxId,
         state.selectedBoxId(),
         boxes,
@@ -541,7 +541,7 @@ export class PointerEventHandler {
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(
+    const absPos = CoordinateTransform.screenToAbsolute(
       mx,
       my,
       canvas.width,
@@ -553,11 +553,11 @@ export class PointerEventHandler {
     if (this.completeMeasurement(state)) return;
 
     // Complete interactions
-    if (this.completeBoxCreation(worldPos, state, historyService)) return;
-    if (this.completeBoxManipulation(worldPos, state, historyService)) return;
+    if (this.completeBoxCreation(absPos, state, historyService)) return;
+    if (this.completeBoxManipulation(absPos, state, historyService)) return;
 
     // Complete camera pan
-    this.completeCameraPan(worldPos, state);
+    this.completeCameraPan(absPos, state);
   }
 
   private static completeMeasurement(state: StateManager): boolean {
@@ -567,7 +567,7 @@ export class PointerEventHandler {
   }
 
   private static completeBoxCreation(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
     historyService: HistoryService,
   ): boolean {
@@ -580,8 +580,8 @@ export class PointerEventHandler {
     const newBox = BoxCreationHandler.completeCreate(
       start.x,
       start.y,
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       bgc.width,
       bgc.height,
       state.getNextTempId(),
@@ -598,7 +598,7 @@ export class PointerEventHandler {
   }
 
   private static completeBoxManipulation(
-    worldPos: { x: number; y: number },
+    absPos: { x: number; y: number },
     state: StateManager,
     historyService: HistoryService,
   ): boolean {
@@ -627,8 +627,8 @@ export class PointerEventHandler {
     state.resetInteractionStates();
 
     HoverHandler.updateCursorForHover(
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       state.hoveredBoxId(),
       state.selectedBoxId(),
       boxes,
@@ -641,7 +641,7 @@ export class PointerEventHandler {
     return true;
   }
 
-  private static completeCameraPan(worldPos: { x: number; y: number }, state: StateManager): void {
+  private static completeCameraPan(absPos: { x: number; y: number }, state: StateManager): void {
     const boxes = state.localBoxes();
     const bgc = state.bgCanvas();
     const camera = state.camera();
@@ -650,8 +650,8 @@ export class PointerEventHandler {
 
     if (bgc) {
       HoverHandler.updateCursorForHover(
-        worldPos.x,
-        worldPos.y,
+        absPos.x,
+        absPos.y,
         state.hoveredBoxId(),
         state.selectedBoxId(),
         boxes,
@@ -677,12 +677,12 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const camera = state.camera();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
+    const absPos = CoordinateTransform.screenToAbsolute(mx, my, canvas.width, canvas.height, camera);
 
     const newCamera = CameraHandler.zoom(
       event.deltaY,
-      worldPos.x,
-      worldPos.y,
+      absPos.x,
+      absPos.y,
       camera,
       canvas.width,
       canvas.height,

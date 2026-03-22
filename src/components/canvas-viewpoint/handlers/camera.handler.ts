@@ -1,4 +1,4 @@
-import { Camera } from '../core/types';
+﻿import { Camera } from '../core/types';
 import { CameraUtils } from '../utils/camera-utils';
 
 /**
@@ -47,8 +47,8 @@ export class CameraHandler {
    */
   static zoom(
     delta: number,
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     camera: Camera,
     canvasWidth: number,
     canvasHeight: number,
@@ -62,8 +62,8 @@ export class CameraHandler {
     const newZoom = Math.max(minZoom, Math.min(maxZoom, camera.zoom * zoomFactor));
 
     // Calculate new camera position to zoom towards world point
-    const dx = worldX - camera.x;
-    const dy = worldY - camera.y;
+    const dx = absX - camera.x;
+    const dy = absY - camera.y;
 
     // When zooming in (newZoom > camera.zoom), we want to move camera towards the point
     // scale should be positive and < 1 when zooming in

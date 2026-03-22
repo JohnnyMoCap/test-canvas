@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Camera } from '../core/types';
 import { CoordinateTransform } from './coordinate-transform';
 import { BoxUtils } from './box-utils';
@@ -43,10 +43,10 @@ export class ClipboardManager {
         mouseScreenPos.y <= canvasRect.bottom;
 
       if (isOverCanvas) {
-        // Mouse is over canvas - convert current position to world coordinates
+        // Mouse is over canvas - convert current position to absolute coordinates
         const mx = (mouseScreenPos.x - canvasRect.left) * devicePixelRatio;
         const my = (mouseScreenPos.y - canvasRect.top) * devicePixelRatio;
-        const worldPos = CoordinateTransform.screenToWorld(
+        const absPos = CoordinateTransform.screenToAbsolute(
           mx,
           my,
           canvas.width,
@@ -54,9 +54,9 @@ export class ClipboardManager {
           camera,
         );
 
-        const normalizedMouse = BoxUtils.worldToNormalized(
-          worldPos.x,
-          worldPos.y,
+        const normalizedMouse = BoxUtils.absoluteToNormalized(
+          absPos.x,
+          absPos.y,
           bgWidth,
           bgHeight,
         );
@@ -64,14 +64,14 @@ export class ClipboardManager {
         newY = normalizedMouse.y;
       } else {
         // Mouse is outside canvas - paste at viewport center
-        const worldCenter = CoordinateTransform.screenToWorld(
+        const worldCenter = CoordinateTransform.screenToAbsolute(
           canvas.width / 2,
           canvas.height / 2,
           canvas.width,
           canvas.height,
           camera,
         );
-        const normalized = BoxUtils.worldToNormalized(
+        const normalized = BoxUtils.absoluteToNormalized(
           worldCenter.x,
           worldCenter.y,
           bgWidth,
@@ -82,14 +82,14 @@ export class ClipboardManager {
       }
     } else {
       // No mouse position tracked - paste at viewport center
-      const worldCenter = CoordinateTransform.screenToWorld(
+      const worldCenter = CoordinateTransform.screenToAbsolute(
         canvas.width / 2,
         canvas.height / 2,
         canvas.width,
         canvas.height,
         camera,
       );
-      const normalized = BoxUtils.worldToNormalized(
+      const normalized = BoxUtils.absoluteToNormalized(
         worldCenter.x,
         worldCenter.y,
         bgWidth,

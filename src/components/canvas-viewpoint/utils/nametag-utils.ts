@@ -1,4 +1,4 @@
-import { Camera, ResizeCorner, TextMetrics, WorldBox } from '../core/types';
+﻿import { Camera, ResizeCorner, TextMetrics, AbsoluteBox } from '../core/types';
 import { Box, getBoxId } from '../../../inteface/boxes.interface';
 
 /**
@@ -6,10 +6,10 @@ import { Box, getBoxId } from '../../../inteface/boxes.interface';
  */
 export class NametagUtils {
   /**
-   * Gets nametag bounds in world space
+   * Gets nametag bounds in absolute space
    */
   static getNametagBounds(
-    box: WorldBox,
+    box: AbsoluteBox,
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D,
@@ -45,17 +45,17 @@ export class NametagUtils {
       { lx: box.w / 2, ly: box.h / 2 },
     ];
 
-    // Transform corners to world space
+    // Transform corners to absolute space
     const cos = Math.cos(box.rotation);
     const sin = Math.sin(box.rotation);
-    const worldCorners = corners.map((c) => ({
+    const absCorners = corners.map((c) => ({
       x: box.x + (c.lx * cos - c.ly * sin),
       y: box.y + (c.lx * sin + c.ly * cos),
     }));
 
     // Find topmost corner
-    let topmostCorner = worldCorners[0];
-    for (const corner of worldCorners) {
+    let topmostCorner = absCorners[0];
+    for (const corner of absCorners) {
       if (corner.y < topmostCorner.y) {
         topmostCorner = corner;
       }
@@ -73,7 +73,7 @@ export class NametagUtils {
   static pointInNametag(
     wx: number,
     wy: number,
-    box: WorldBox,
+    box: AbsoluteBox,
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D,
@@ -92,7 +92,7 @@ export class NametagUtils {
    */
   static drawNametag(
     ctx: CanvasRenderingContext2D,
-    box: WorldBox,
+    box: AbsoluteBox,
     camera: Camera,
     canvasWidth: number,
     canvasHeight: number,
@@ -127,17 +127,17 @@ export class NametagUtils {
       { lx: box.w / 2, ly: box.h / 2 },
     ];
 
-    // Transform corners to world space
+    // Transform corners to absolute space
     const cos = Math.cos(box.rotation);
     const sin = Math.sin(box.rotation);
-    const worldCorners = corners.map((c) => ({
+    const absCorners = corners.map((c) => ({
       x: box.x + (c.lx * cos - c.ly * sin),
       y: box.y + (c.lx * sin + c.ly * cos),
     }));
 
-    // Find topmost corner in world space (smallest y)
-    let topmostCorner = worldCorners[0];
-    for (const corner of worldCorners) {
+    // Find topmost corner in absolute space (smallest y)
+    let topmostCorner = absCorners[0];
+    for (const corner of absCorners) {
       if (corner.y < topmostCorner.y) {
         topmostCorner = corner;
       }

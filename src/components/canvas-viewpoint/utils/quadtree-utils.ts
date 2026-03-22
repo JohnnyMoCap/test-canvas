@@ -1,4 +1,4 @@
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
 import { BoxUtils } from './box-utils';
 import { CoordinateTransform } from './coordinate-transform';
@@ -33,7 +33,7 @@ export class QuadtreeUtils {
     const items = [];
 
     for (const raw of boxes) {
-      const b = BoxUtils.normalizeBoxToWorld(raw, imageWidth, imageHeight);
+      const b = BoxUtils.normalizeBoxToAbsolute(raw, imageWidth, imageHeight);
       if (!b) continue;
 
       let aabb = CoordinateTransform.calculateRotatedAABB(b);

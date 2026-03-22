@@ -1,4 +1,4 @@
-import { WritableSignal } from '@angular/core';
+﻿import { WritableSignal } from '@angular/core';
 import { Box } from '../../../inteface/boxes.interface';
 import { CreateBoxState } from '../core/creation-state';
 import { BoxType } from '../core/creation-state';
@@ -14,11 +14,11 @@ export class BoxCreationHandler {
   /**
    * Start creating a box via drag-to-create
    */
-  static startCreate(worldX: number, worldY: number): CreateBoxState {
+  static startCreate(absX: number, absY: number): CreateBoxState {
     return {
       isCreating: true,
-      startPoint: { x: worldX, y: worldY },
-      currentPoint: { x: worldX, y: worldY },
+      startPoint: { x: absX, y: absY },
+      currentPoint: { x: absX, y: absY },
     };
   }
 
@@ -26,14 +26,14 @@ export class BoxCreationHandler {
    * Update preview during drag-to-create
    */
   static updatePreview(
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     currentState: CreateBoxState,
   ): CreateBoxState {
     if (currentState.isCreating && currentState.startPoint) {
       return {
         ...currentState,
-        currentPoint: { x: worldX, y: worldY },
+        currentPoint: { x: absX, y: absY },
       };
     }
     return currentState;
@@ -79,8 +79,8 @@ export class BoxCreationHandler {
    */
   static createFromContextMenu(
     type: BoxType,
-    worldX: number,
-    worldY: number,
+    absX: number,
+    absY: number,
     camera: Camera,
     imageWidth: number,
     imageHeight: number,
@@ -90,8 +90,8 @@ export class BoxCreationHandler {
     const tempId = BoxCreationUtils.generateTempId(nextTempId);
     const newBox = BoxCreationUtils.createBoxFromContextMenu(
       type,
-      worldX,
-      worldY,
+      absX,
+      absY,
       camera,
       imageWidth,
       imageHeight,
