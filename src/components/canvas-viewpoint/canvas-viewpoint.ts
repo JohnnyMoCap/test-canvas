@@ -89,6 +89,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.updateContrast(value);
     }
   }
+  @Input() set showPendingStateInput(value: boolean) {
+    if (value !== this.state.showPendingState()) {
+      this.state.updateShowPendingState(value);
+    }
+  }
   @Input() set readOnlyMode(value: boolean) {
     if (value !== this.state.readOnlyMode()) {
       this.state.updateReadOnlyMode(value);
@@ -164,6 +169,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private magicHandler!: MagicDetectionHandler;
 
+  // DPR (browser zoom) change listener cleanup
+  private dprQueryCleanup: (() => void) | null = null;
+
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
   contextMenuY = computed(() => this.state.contextMenuState()?.y ?? 0);
@@ -207,6 +215,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.state.setCanvas(this.canvasRef.nativeElement);
     this.initializeCanvas();
     this.setupPageResizeObserver();
+    this.setupDprChangeDetection();
     if (this.backgroundUrl) {
       this.loadBackground(this.backgroundUrl);
     } else {
@@ -219,6 +228,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this._stopRenderLoop();
     this.resizeObserver?.disconnect();
+    this.dprQueryCleanup?.();
     this.hotkeyUnsubs.forEach((fn) => fn());
     this.magicHandler.destroy();
   }
@@ -455,13 +465,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.scaleBarRef?.show();
   }
 
-  //features
-  //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
-  //TODO: dont forget to add low opacity for PENDING state
-  //TODO: make sure the new resizing stuff works with browser zoom
-  //TODO: make sure the measurment highlighter gets put in the right spot when changing browser zoom or resizing window
-
   //the future:
+  //Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //split component into base and add more extensions for results and coverage and crap
   // Google Analytics
   // proper handling with our types
@@ -551,6 +556,29 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver = LifecycleManager.setupPageResizeObserver(wrapper, () => this.onResize());
   }
 
+  /**
+   * Listens for browser zoom changes (devicePixelRatio changes) using matchMedia.
+   * Re-registers itself each time so it always tracks the current DPR.
+   * On change: updates stored DPR, resizes the canvas, and resets the camera to default.
+   */
+  private setupDprChangeDetection(): void {
+    const handleDprChange = () => {
+      this.state.updateDevicePixelRatio(window.devicePixelRatio || 1);
+      this.onResize();
+      this.zoomChange.emit(this.state.camera().zoom);
+      // Re-register — the media query condition is now stale (DPR has moved)
+      this.setupDprChangeDetection();
+    };
+
+    const mqString = `(resolution: ${window.devicePixelRatio}dppx)`;
+    const mq = window.matchMedia(mqString);
+    mq.addEventListener('change', handleDprChange);
+
+    // Replace any previous listener
+    this.dprQueryCleanup?.();
+    this.dprQueryCleanup = () => mq.removeEventListener('change', handleDprChange);
+  }
+
   private startRenderLoop(): void {
     this._stopRenderLoop = LifecycleManager.startRenderLoop(this.dirty, () => {
       this.renderFrame();
@@ -610,6 +638,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.quadtree,
       this.state.measurementState(),
       currentMouseAbs,
+      this.state.showPendingState(),
     );
   }
 
@@ -713,7 +742,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (!wrapper) return;
 
     const rect = wrapper.getBoundingClientRect();
-    const dpr = this.state.devicePixelRatio();
+    const dpr = this.state.devicePixelRatio(); // up-to-date (DPR detection handler updates it first)
     const containerWidth = rect.width * dpr;
     const containerHeight = rect.height * dpr;
 
@@ -731,11 +760,20 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     canvas.width = w;
     canvas.height = h;
+    // Setting canvas.width resets ALL 2D context state (transform, smoothing, etc.).
+    // Re-apply the settings we always want.
+    const ctx = this.state.ctx();
+    if (ctx) ctx.imageSmoothingEnabled = false;
 
-    // Shrink the host element to exactly the canvas CSS pixel size so no
-    // background or parent color bleeds through around the canvas.
+    // Explicitly set the canvas CSS display size to CSS pixels (not physical pixels).
+    // Without this, at DPR > 1 the canvas element defaults to `w` CSS pixels wide,
+    // which makes it visually larger than the container and causes stretched rendering.
     const cssW = w / dpr;
     const cssH = h / dpr;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+
+    // Shrink the host element to exactly the canvas CSS pixel size.
     const host = this.el.nativeElement as HTMLElement;
     host.style.width = cssW + 'px';
     host.style.height = cssH + 'px';
@@ -760,12 +798,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           this.state.bgCanvas()!.height,
         ),
       );
-      this.state.updateCamera(
-        this.clampCamera({
-          ...this.state.camera(),
-          zoom: Math.max(this.state.camera().zoom, this.state.minZoom()),
-        }),
-      );
+      // Always reset the camera to a clean fit-to-canvas view on every resize
+      // (window resize or browser zoom). The user can re-pan/zoom after.
+      this.state.updateCamera({ zoom: this.state.minZoom(), x: 0, y: 0 });
     }
     this.scheduleRender();
   }

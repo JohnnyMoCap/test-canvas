@@ -174,6 +174,7 @@ export class MagicDetectionHandler {
       h: normalizedDims.h,
       rotation: result.rotation,
       color: `hsl(${Math.floor((25 / 50) * 360)}, 70%, 50%)`,
+      state: 'accepted',
     };
   }
 }

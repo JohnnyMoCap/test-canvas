@@ -91,7 +91,7 @@ export class App {
     this.isMeasurementMode.set(isMeasurementMode);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 10 }, (_, i) => {
+  exampleBoxes: Box[] = Array.from({ length: 1000 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 
@@ -111,6 +111,7 @@ export class App {
       h,
       rotation,
       color,
+      state: Math.random() < 0.5 ? 'pending' : 'accepted',
     };
   });
 }

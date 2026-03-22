@@ -5,6 +5,8 @@ interface BoxBase {
   h: number; // normalized 0–1 (relative to bg height)
   rotation?: number; // Rotation in degrees
   color?: string;
+  /** Lifecycle state of the box. 'pending' = not yet user-confirmed (renders faded when showPendingState is on); 'accepted' = user has interacted with it. Omitting the field is equivalent to 'pending'. */
+  state?: 'pending' | 'accepted';
 }
 export type Box =
   | (BoxBase & { id: number; tempId?: never }) // Only set when saved to database

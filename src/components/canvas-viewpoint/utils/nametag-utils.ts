@@ -97,6 +97,7 @@ export class NametagUtils {
     canvasWidth: number,
     canvasHeight: number,
     metricsCache: Map<string, TextMetrics>,
+    isPending: boolean,
   ): void {
     const text = String(getBoxId(box.raw));
 
@@ -158,7 +159,7 @@ export class NametagUtils {
     const tagY = topmostCorner.y - tagHeight;
 
     // Draw nametag background
-    ctx.fillStyle = box.color;
+    ctx.fillStyle = isPending ? box.color.replace(')', ', 0.4)') : box.color;
     ctx.fillRect(tagX, tagY, tagWidth, tagHeight);
 
     // Draw nametag text

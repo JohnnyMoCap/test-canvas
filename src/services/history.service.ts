@@ -116,12 +116,16 @@ export class HistoryService {
     // Skip if no actual change
     if (beforeX === afterX && beforeY === afterY) return;
 
+    const box = this._boxes().find((b) => getBoxId(b) === boxId);
+    const wasPending = box?.state === 'pending';
     const delta: BoxDelta = {
       type: 'MOVE',
       boxId,
       timestamp: Date.now(),
-      before: { x: beforeX, y: beforeY },
-      after: { x: afterX, y: afterY },
+      before: wasPending
+        ? { x: beforeX, y: beforeY, state: 'pending' }
+        : { x: beforeX, y: beforeY },
+      after: wasPending ? { x: afterX, y: afterY, state: 'accepted' } : { x: afterX, y: afterY },
     };
     this.pushDelta(delta);
     // Apply the delta to update boxes
@@ -145,12 +149,14 @@ export class HistoryService {
     )
       return;
 
+    const box = this._boxes().find((b) => getBoxId(b) === boxId);
+    const wasPending = box?.state === 'pending';
     const delta: BoxDelta = {
       type: 'RESIZE',
       boxId,
       timestamp: Date.now(),
-      before,
-      after,
+      before: wasPending ? { ...before, state: 'pending' } : before,
+      after: wasPending ? { ...after, state: 'accepted' } : after,
     };
     this.pushDelta(delta);
     // Apply the delta to update boxes
@@ -164,12 +170,18 @@ export class HistoryService {
     // Skip if no actual change
     if (beforeRotation === afterRotation) return;
 
+    const box = this._boxes().find((b) => getBoxId(b) === boxId);
+    const wasPending = box?.state === 'pending';
     const delta: BoxDelta = {
       type: 'ROTATE',
       boxId,
       timestamp: Date.now(),
-      before: { rotation: beforeRotation },
-      after: { rotation: afterRotation },
+      before: wasPending
+        ? { rotation: beforeRotation, state: 'pending' }
+        : { rotation: beforeRotation },
+      after: wasPending
+        ? { rotation: afterRotation, state: 'accepted' }
+        : { rotation: afterRotation },
     };
     this.pushDelta(delta);
     // Apply the delta to update boxes
@@ -183,12 +195,14 @@ export class HistoryService {
     // Skip if no actual change
     if (beforeColor === afterColor) return;
 
+    const box = this._boxes().find((b) => getBoxId(b) === boxId);
+    const wasPending = box?.state === 'pending';
     const delta: BoxDelta = {
       type: 'CHANGE_CLASS',
       boxId,
       timestamp: Date.now(),
-      before: { color: beforeColor },
-      after: { color: afterColor },
+      before: wasPending ? { color: beforeColor, state: 'pending' } : { color: beforeColor },
+      after: wasPending ? { color: afterColor, state: 'accepted' } : { color: afterColor },
     };
     this.pushDelta(delta);
     // Apply the delta to update boxes

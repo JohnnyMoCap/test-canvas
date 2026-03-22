@@ -93,7 +93,7 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
   private hideTimeout: any = null;
   private isDragging = false;
   private dragOffset = { x: 0, y: 0 };
-  private hasSetInitialPosition = false;
+  private hasBeenManuallyMoved = false;
 
   ngOnInit(): void {
     this.resetHideTimer();
@@ -110,8 +110,8 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
       this.updateScale();
     }
 
-    // Update position when viewport size changes
-    if ((changes['viewportWidth'] || changes['viewportHeight']) && !this.hasSetInitialPosition) {
+    // Reposition to bottom-right whenever the viewport changes, unless the user dragged it somewhere
+    if ((changes['viewportWidth'] || changes['viewportHeight']) && !this.hasBeenManuallyMoved) {
       setTimeout(() => this.updateDefaultPosition(), 0);
     }
   }
@@ -135,8 +135,6 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
       x: this.viewportWidth - containerWidth - padding,
       y: this.viewportHeight - containerHeight - padding,
     });
-
-    this.hasSetInitialPosition = true;
   }
 
   /**
@@ -216,6 +214,7 @@ export class ScaleBarComponent implements OnInit, OnDestroy, OnChanges {
     event.stopPropagation();
     event.stopImmediatePropagation();
 
+    this.hasBeenManuallyMoved = true;
     this.isDragging = true;
     const pos = this.position();
     this.dragOffset = {

@@ -33,15 +33,18 @@ export class RenderUtils {
     box: AbsoluteBox,
     camera: Camera,
     isHovered: boolean,
+    isPending = false,
   ): void {
     ctx.save();
     ctx.translate(box.x, box.y);
     if (box.rotation) ctx.rotate(box.rotation);
 
     // Draw box border with consistent line width
+    ctx.globalAlpha = isPending ? 0.4 : 1.0;
     ctx.strokeStyle = box.color;
     ctx.lineWidth = 3 / camera.zoom;
     ctx.strokeRect(-box.w / 2, -box.h / 2, box.w, box.h);
+    ctx.globalAlpha = 1.0;
 
     // Hover effect: semi-transparent fill
     if (isHovered) {

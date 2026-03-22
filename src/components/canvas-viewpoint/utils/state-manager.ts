@@ -499,6 +499,17 @@ export class StateManager {
   }
 
   /**
+   * Controls whether pending boxes (not yet user-confirmed) are rendered at reduced opacity.
+   * When true, pending boxes are drawn at 40% opacity so they stand out from accepted boxes.
+   * When false, all boxes render at full opacity regardless of pending status.
+   */
+  private _showPendingState = signal(true);
+  readonly showPendingState = this._showPendingState.asReadonly();
+  updateShowPendingState(value: boolean): void {
+    this._showPendingState.set(value);
+  }
+
+  /**
    * Debug visualization: when true, renders the quadtree spatial index structure
    * showing how the canvas is subdivided for efficient box queries.
    * Useful for understanding performance or debugging spatial queries.

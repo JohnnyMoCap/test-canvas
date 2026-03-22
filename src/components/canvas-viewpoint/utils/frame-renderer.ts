@@ -33,6 +33,7 @@ export class FrameRenderer {
     quadtree: Quadtree<Box> | undefined,
     measurementState: MeasurementState,
     currentMouseAbs: { x: number; y: number } | null,
+    showPendingState: boolean,
   ): void {
     // Clear
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -61,7 +62,8 @@ export class FrameRenderer {
     // Draw boxes
     for (const [_, boxes] of groups.entries()) {
       for (const b of boxes) {
-        RenderUtils.drawBox(ctx, b, camera, getBoxId(b.raw) === hoveredBoxId);
+        const isPending = showPendingState && b.raw.state === 'pending';
+        RenderUtils.drawBox(ctx, b, camera, getBoxId(b.raw) === hoveredBoxId, isPending);
 
         if (getBoxId(b.raw) === selectedBoxId) {
           RenderUtils.drawSelectionUI(ctx, b, camera);
@@ -72,7 +74,7 @@ export class FrameRenderer {
     // Draw nametags
     if (showNametags) {
       for (const b of absBoxes) {
-        NametagUtils.drawNametag(ctx, b, camera, canvas.width, canvas.height, nametagMetricsCache);
+        NametagUtils.drawNametag(ctx, b, camera, canvas.width, canvas.height, nametagMetricsCache, showPendingState && b.raw.state === 'pending');
       }
     }
 
