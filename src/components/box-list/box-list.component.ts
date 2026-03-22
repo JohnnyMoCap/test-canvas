@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Box, getBoxId } from '../../inteface/boxes.interface';
+import { Box, getBoxId } from '../../interface/boxes.interface';
 
 @Component({
   selector: 'app-box-list',

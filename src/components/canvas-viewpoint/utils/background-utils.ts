@@ -1,7 +1,6 @@
 import { CameraUtils } from './camera-utils';
 
-//TODO: remove all these before shipping
-// Toggle this to enable/disable mock loading delay
+// Set to true to simulate a slow network/image load during development
 const MOCK_LOADING_DELAY = false;
 const MOCK_DELAY_MS = 2000; // 2 seconds
 const PLACEHOLDER_IMAGE = '/assets/photo-front-end-error.svg';
@@ -27,7 +26,11 @@ export class BackgroundUtils {
         const c = document.createElement('canvas');
         c.width = image.width;
         c.height = image.height;
-        const ctx = c.getContext('2d')!;
+        const ctx = c.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get 2D canvas context'));
+          return;
+        }
         ctx.drawImage(image, 0, 0);
 
         const minZoom = CameraUtils.calculateMinZoom(canvasWidth, canvasHeight, c.width, c.height);
@@ -63,7 +66,11 @@ export class BackgroundUtils {
         const c = document.createElement('canvas');
         c.width = image.width;
         c.height = image.height;
-        const ctx = c.getContext('2d')!;
+        const ctx = c.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get 2D canvas context'));
+          return;
+        }
         ctx.drawImage(image, 0, 0);
 
         const minZoom = CameraUtils.calculateMinZoom(canvasWidth, canvasHeight, c.width, c.height);

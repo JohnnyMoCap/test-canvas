@@ -1,18 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { CanvasViewpoint } from './canvas-viewpoint';
+import { CanvasViewportComponent } from './canvas-viewpoint';
 
-describe('CanvasViewpoint', () => {
-  let component: CanvasViewpoint;
-  let fixture: ComponentFixture<CanvasViewpoint>;
+describe('CanvasViewportComponent', () => {
+  let component: CanvasViewportComponent;
+  let fixture: ComponentFixture<CanvasViewportComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CanvasViewpoint]
-    })
-    .compileComponents();
+      imports: [CanvasViewportComponent],
+    }).compileComponents();
 
-    fixture = TestBed.createComponent(CanvasViewpoint);
+    fixture = TestBed.createComponent(CanvasViewportComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

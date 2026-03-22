@@ -1,4 +1,4 @@
-﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { Camera } from '../core/types';
 import { CoordinateTransform } from './coordinate-transform';
 import { BoxUtils } from './box-utils';

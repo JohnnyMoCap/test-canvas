@@ -1,5 +1,5 @@
 import { WritableSignal } from '@angular/core';
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { Camera } from '../core/types';
 import { ClipboardManager as ClipboardUtils } from '../utils/clipboard-manager';
 import { HistoryService } from '../../../services/history.service';

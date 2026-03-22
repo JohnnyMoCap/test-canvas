@@ -1,6 +1,6 @@
 ﻿import { Camera } from '../core/types';
 import { QuadtreeUtils } from './quadtree-utils';
-import { Box, getBoxId } from '../../../inteface/boxes.interface';
+import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { BoxUtils } from './box-utils';
 
 /**

@@ -1,4 +1,4 @@
-﻿import { Box, getBoxId } from '../../../inteface/boxes.interface';
+﻿import { Box, getBoxId } from '../../../interface/boxes.interface';
 import { AbsoluteBox } from '../core/types';
 
 /**

@@ -1,4 +1,4 @@
-﻿import { Box } from '../../../inteface/boxes.interface';
+﻿import { Box } from '../../../interface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
 import { PointerHandlerContext, TextMetrics, AbsoluteBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
@@ -60,7 +60,7 @@ export class PointerEventHandler {
       return;
     }
 
-    //works but still build in a very stupid way, fix this
+    // Context menu: handle right-click or when context menu is already visible
     if (state.contextMenuState()?.visible || event.button === 2) {
       this.handleContextMenu(event, absPos, state);
       return;

@@ -11,7 +11,7 @@
   effect,
   computed,
 } from '@angular/core';
-import { Box, getBoxId } from '../../inteface/boxes.interface';
+import { Box, getBoxId } from '../../interface/boxes.interface';
 import { Quadtree } from './core/quadtree';
 import { Camera, PointerHandlerContext, TextMetrics } from './core/types';
 import { BoxType } from './core/creation-state';

@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { Box, getBoxId } from '../inteface/boxes.interface';
+import { Box, getBoxId } from '../interface/boxes.interface';
 import { HotkeyService } from './hotkey.service';
 
 /**
@@ -46,7 +46,6 @@ export class HistoryService {
     //TODO: add more filters here
     // PENDING / ACCEPTED filter
     // ML CLASSES filter
-    // yo mama filter
 
     // Otherwise return all boxes
     return allBoxes;
@@ -359,15 +358,15 @@ export class HistoryService {
   }
 
   /**
-   * HAAAANK! HAAAANK! YOU NEED THIS! ITS COMMENTED OUT IN LINE 57! HAAAANK!
-   * Loads history from localStorage
+   * Loads history from localStorage for crash recovery.
+   * NOTE: Currently disabled — enable this (and remove clearStorage from constructor)
+   * once the app is ready to persist state across page reloads.
    */
   private loadFromStorage(): void {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) return;
 
-      //I swear if aikido complains about this I will call a few favours from the IDF
       const data = JSON.parse(stored);
 
       const age = Date.now() - (data.timestamp || 0);
