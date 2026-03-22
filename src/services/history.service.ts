@@ -43,7 +43,7 @@ export class HistoryService {
     if (shouldHide) {
       return [];
     }
-
+    //TODO: add more filters here
     // PENDING / ACCEPTED filter
     // ML CLASSES filter
     // yo mama filter

@@ -13,9 +13,13 @@
   overflow: hidden;
 }
 
-app-canvas-viewport {
+.canvas-wrapper {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 app-box-list {

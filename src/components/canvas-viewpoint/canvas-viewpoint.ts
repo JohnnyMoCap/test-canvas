@@ -168,6 +168,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   constructor(
     private historyService: HistoryService,
     private hotkeyService: HotkeyService,
+    private el: ElementRef,
   ) {
     // Initialize state manager
     this.state = new StateManager(ContextMenuUtils.close());
@@ -434,13 +435,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   //features
-  //TODO: fix the stupid canvas sizing and extra space issues
-  //TOOD: fuckin measurment scale position fuckin fuck fucking measurement bar
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: dont forget to add low opacity for PENDING state
-  //TODO: filters in history.service visibleBoxes()
-  //TODO: decide on both pointer flow strategy and cursor handling strategy
-  //TODO: lasso tool - full select for area - rectangle select
   //TODO: change world to absolute
   //TODO: fix interacting from fully zoomed out, cant detect image text I think?
   //TODO: in color on hover when selected doesnt work sometimes?
@@ -531,10 +527,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   }
 
   private setupPageResizeObserver(): void {
-    const canvas = this.canvasRef.nativeElement;
-    this.resizeObserver = LifecycleManager.setupPageResizeObserver(canvas.parentElement!, () =>
-      this.onResize(),
-    );
+    // Observe the wrapper (parent of the host element). Its size is driven by
+    // outer flex layout, never by this component's size — no resize loop.
+    const wrapper = this.el.nativeElement.parentElement as HTMLElement;
+    this.resizeObserver = LifecycleManager.setupPageResizeObserver(wrapper, () => this.onResize());
   }
 
   private startRenderLoop(): void {
@@ -695,18 +691,15 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private onResize() {
     const canvas = this.canvasRef.nativeElement;
-    const container = canvas.parentElement;
-    if (!container) return;
+    const wrapper = this.el.nativeElement.parentElement as HTMLElement;
+    if (!wrapper) return;
 
-    const rect = container.getBoundingClientRect();
-    const containerWidth = rect.width * this.state.devicePixelRatio();
-    const containerHeight = rect.height * this.state.devicePixelRatio();
+    const rect = wrapper.getBoundingClientRect();
+    const dpr = this.state.devicePixelRatio();
+    const containerWidth = rect.width * dpr;
+    const containerHeight = rect.height * dpr;
 
-    // Update viewport dimensions for scale bar
-    this.viewportWidth.set(rect.width);
-    this.viewportHeight.set(rect.height);
-
-    // Calculate canvas size maintaining aspect ratio
+    // Calculate canvas physical pixel dimensions maintaining the image aspect ratio
     let w: number, h: number;
     const containerAspectRatio = containerWidth / containerHeight;
 
@@ -720,6 +713,25 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
     canvas.width = w;
     canvas.height = h;
+
+    // Shrink the host element to exactly the canvas CSS pixel size so no
+    // background or parent color bleeds through around the canvas.
+    const cssW = w / dpr;
+    const cssH = h / dpr;
+    const host = this.el.nativeElement as HTMLElement;
+    host.style.width = cssW + 'px';
+    host.style.height = cssH + 'px';
+
+    // Keep .viewport-root the same size as the host
+    const root = host.querySelector('.viewport-root') as HTMLElement | null;
+    if (root) {
+      root.style.width = cssW + 'px';
+      root.style.height = cssH + 'px';
+    }
+
+    // Update viewport dimensions for scale bar
+    this.viewportWidth.set(cssW);
+    this.viewportHeight.set(cssH);
 
     if (this.state.bgCanvas()) {
       this.state.updateMinZoom(

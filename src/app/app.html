@@ -58,25 +58,27 @@
   </div>
 
   <div class="main-content">
-    <app-canvas-viewport
-      [backgroundUrl]="'/assets/background.jpg'"
-      [isCreateModeInput]="isCreateMode()"
-      [isMagicModeInput]="isMagicMode()"
-      [isMeasurementModeInput]="isMeasurementMode()"
-      [magicToleranceInput]="magicTolerance()"
-      [metricWidthInput]="metricWidth()"
-      [metricHeightInput]="metricHeight()"
-      [debugMagicInput]="debugMagic()"
-      [readOnlyMode]="readOnlyMode()"
-      [externalHoverBoxId]="hoveredBoxId()"
-      [externalSelectBoxId]="selectedBoxId()"
-      (zoomChange)="onZoomChange($event)"
-      (createModeChange)="onCreateModeChange($event)"
-      (magicModeChange)="onMagicModeChange($event)"
-      (measurementModeChange)="onMeasurementModeChange($event)"
-      (selectedBoxChange)="onSelectedBoxChange($event)"
-      (hoveredBoxChange)="onHoveredBoxChange($event)"
-    ></app-canvas-viewport>
+    <div class="canvas-wrapper">
+      <app-canvas-viewport
+        [backgroundUrl]="'/assets/background.jpg'"
+        [isCreateModeInput]="isCreateMode()"
+        [isMagicModeInput]="isMagicMode()"
+        [isMeasurementModeInput]="isMeasurementMode()"
+        [magicToleranceInput]="magicTolerance()"
+        [metricWidthInput]="metricWidth()"
+        [metricHeightInput]="metricHeight()"
+        [debugMagicInput]="debugMagic()"
+        [readOnlyMode]="readOnlyMode()"
+        [externalHoverBoxId]="hoveredBoxId()"
+        [externalSelectBoxId]="selectedBoxId()"
+        (zoomChange)="onZoomChange($event)"
+        (createModeChange)="onCreateModeChange($event)"
+        (magicModeChange)="onMagicModeChange($event)"
+        (measurementModeChange)="onMeasurementModeChange($event)"
+        (selectedBoxChange)="onSelectedBoxChange($event)"
+        (hoveredBoxChange)="onHoveredBoxChange($event)"
+      ></app-canvas-viewport>
+    </div>
 
     @if (showBoxList()) {
       <app-box-list
