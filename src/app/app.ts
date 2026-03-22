@@ -104,7 +104,7 @@ export class App {
     const color = predefinedColors[Math.floor(Math.random() * predefinedColors.length)];
 
     return {
-      id: i,
+      id: i + 1,
       x,
       y,
       w,

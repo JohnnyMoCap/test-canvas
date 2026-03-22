@@ -458,15 +458,12 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //features
   //TODO: Proparly handle a whole different photo being loaded, I think it works now but think is for chumps
   //TODO: dont forget to add low opacity for PENDING state
-  //TODO: fix interacting from fully zoomed out, cant detect image text I think?
-  //TODO: in color on hover when selected doesnt work sometimes?
   //TODO: make sure the new resizing stuff works with browser zoom
+  //TODO: make sure the measurment highlighter gets put in the right spot when changing browser zoom or resizing window
 
   //the future:
   //split component into base and add more extensions for results and coverage and crap
-  //full debug mode? for performance as well?
   // Google Analytics
-  // show projections
   // proper handling with our types
 
   //testing:
