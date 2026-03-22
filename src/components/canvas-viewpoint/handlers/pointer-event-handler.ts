@@ -1,6 +1,6 @@
 import { Box } from '../../../inteface/boxes.interface';
 import { Quadtree } from '../core/quadtree';
-import { Camera, TextMetrics, WorldBoxGeometry } from '../core/types';
+import { PointerHandlerContext, TextMetrics, WorldBoxGeometry } from '../core/types';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
@@ -26,25 +26,21 @@ export class PointerEventHandler {
    * Handle pointer down event
    * Routes to handlers based on priority: measurement > magic detection > context menu > creation > interaction > selection > camera
    */
-  static handlePointerDown(
-    event: PointerEvent,
-    canvas: HTMLCanvasElement,
-    canvasWidth: number,
-    canvasHeight: number,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-    boxes: Box[],
-    state: StateManager,
-    quadtree: Quadtree<Box> | undefined,
-    nametagMetricsCache: Map<string, TextMetrics>,
-    ctx: CanvasRenderingContext2D | undefined,
-    historyService: HistoryService,
-  ): void {
+  static handlePointerDown(event: PointerEvent, hctx: PointerHandlerContext): void {
+    const { canvas, state, quadtree, nametagMetricsCache, historyService } = hctx;
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+    const worldPos = CoordinateTransform.screenToWorld(
+      mx,
+      my,
+      canvas.width,
+      canvas.height,
+      state.camera(),
+    );
 
     // Check if CTRL/CMD is pressed - if so, skip all box interactions and go straight to camera pan;
     const shouldSkipInteractions = event.ctrlKey || event.metaKey || state.readOnlyMode();
@@ -55,12 +51,12 @@ export class PointerEventHandler {
     }
 
     if (state.measurementState().isActive && event.button == 0) {
-      this.handleMeasurementMode(worldPos, camera, state);
+      this.handleMeasurementMode(worldPos, state);
       return;
     }
 
-    if (state.isMagicMode() && state.bgCanvas()) {
-      this.handleMagicDetection(event, canvas, camera, state, historyService);
+    if (state.isMagicMode() && bgc) {
+      this.handleMagicDetection(event, canvas, state, historyService);
       return;
     }
 
@@ -77,53 +73,23 @@ export class PointerEventHandler {
     }
 
     //Box Interaction (Rotation, Resize, Drag) for selected box (blocked in read-only and when CTRL pressed)
-    if (
-      this.handleSelectedBoxInteraction(
-        event,
-        worldPos,
-        canvas,
-        imageWidth,
-        imageHeight,
-        camera,
-        boxes,
-        state,
-      )
-    )
-      return;
+    if (this.handleSelectedBoxInteraction(event, worldPos, canvas, state)) return;
 
     // Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
-    if (
-      this.handleBoxSelection(
-        worldPos,
-        boxes,
-        quadtree,
-        imageWidth,
-        imageHeight,
-        camera,
-        state,
-        nametagMetricsCache,
-        ctx,
-      )
-    )
-      return;
+    if (this.handleBoxSelection(worldPos, state, quadtree, nametagMetricsCache)) return;
 
     // PRIORITY 8: Camera Pan
     this.handleCameraPanStart(event, state);
     return;
   }
 
-  private static handleMeasurementMode(
-    worldPos: { x: number; y: number },
-    camera: Camera,
-    state: StateManager,
-  ) {
-    MeasurementHandler.handlePointerDown(worldPos, camera, state);
+  private static handleMeasurementMode(worldPos: { x: number; y: number }, state: StateManager) {
+    MeasurementHandler.handlePointerDown(worldPos, state.camera(), state);
   }
 
   private static handleMagicDetection(
     event: PointerEvent,
     canvas: HTMLCanvasElement,
-    camera: Camera,
     state: StateManager,
     historyService: HistoryService,
   ) {
@@ -134,7 +100,7 @@ export class PointerEventHandler {
       event,
       canvas,
       bgCanvas,
-      camera,
+      state.camera(),
       state.devicePixelRatio(),
       state.magicTolerance(),
       state.nextTempId(),
@@ -194,28 +160,27 @@ export class PointerEventHandler {
     event: PointerEvent,
     worldPos: { x: number; y: number },
     canvas: HTMLCanvasElement,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-    boxes: Box[],
     state: StateManager,
   ): boolean {
     const selectedBoxId = state.selectedBoxId();
 
     if (isNullOrUndefined(selectedBoxId)) return false;
 
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
+
     const box = BoxStateUtils.findBoxById(boxes, selectedBoxId);
     if (!box) return false;
 
-    const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+    const worldBox = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
     if (!worldBox) return false;
 
     // Try rotation
-    if (this.handleRotationStart(event, worldPos, worldBox, canvas, box, camera, state))
-      return true;
+    if (this.handleRotationStart(event, worldPos, worldBox, canvas, box, state)) return true;
 
     // Try resize
-    if (this.handleResizeStart(event, worldPos, worldBox, canvas, box, camera, state)) return true;
+    if (this.handleResizeStart(event, worldPos, worldBox, canvas, box, state)) return true;
 
     // Try drag
     if (this.handleDragStart(event, worldPos, worldBox, canvas, box, state)) return true;
@@ -229,10 +194,10 @@ export class PointerEventHandler {
     boxGeometry: WorldBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
-    camera: Camera,
     state: StateManager,
   ): boolean {
-    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, boxGeometry, camera)) return false;
+    if (!HoverHandler.detectRotationKnob(worldPos.x, worldPos.y, boxGeometry, state.camera()))
+      return false;
 
     const rotationInfo = BoxManipulationHandler.startRotation(worldPos.x, worldPos.y, boxGeometry);
     state.startRotating(rotationInfo.angle, rotationInfo.boxRotation);
@@ -248,10 +213,14 @@ export class PointerEventHandler {
     boxGeometry: WorldBoxGeometry,
     canvas: HTMLCanvasElement,
     box: Box,
-    camera: Camera,
     state: StateManager,
   ): boolean {
-    const corner = HoverHandler.detectCornerHandle(worldPos.x, worldPos.y, boxGeometry, camera);
+    const corner = HoverHandler.detectCornerHandle(
+      worldPos.x,
+      worldPos.y,
+      boxGeometry,
+      state.camera(),
+    );
 
     if (!corner) return false;
 
@@ -289,22 +258,23 @@ export class PointerEventHandler {
 
   private static handleBoxSelection(
     worldPos: { x: number; y: number },
-    boxes: Box[],
-    quadtree: Quadtree<Box> | undefined,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
     state: StateManager,
+    quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
-    ctx: CanvasRenderingContext2D | undefined,
   ): boolean {
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
+    const camera = state.camera();
+    const ctx = state.ctx();
+
     const hoveredBoxId = HoverHandler.detectHoveredBox(
       worldPos.x,
       worldPos.y,
       boxes,
       quadtree,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       camera,
       state.showNametags(),
       nametagMetricsCache,
@@ -318,7 +288,7 @@ export class PointerEventHandler {
       // Prepare for potential drag - find the box and initialize drag state
       const box = BoxStateUtils.findBoxById(boxes, hoveredBoxId);
       if (box) {
-        const worldBox = BoxUtils.normalizeBoxToWorld(box, imageWidth, imageHeight);
+        const worldBox = BoxUtils.normalizeBoxToWorld(box, bgc.width, bgc.height);
         if (worldBox) {
           // Check if clicking on box OR nametag - both should enable dragging
           const clickedOnBox = CoordinateTransform.pointInBox(worldPos.x, worldPos.y, worldBox);
@@ -358,26 +328,21 @@ export class PointerEventHandler {
    * Handle pointer move event
    * Routes to handlers based on current state
    */
-  static handlePointerMove(
-    event: PointerEvent,
-    canvas: HTMLCanvasElement,
-    canvasWidth: number,
-    canvasHeight: number,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-    boxes: Box[],
-    state: StateManager,
-    quadtree: Quadtree<Box> | undefined,
-    nametagMetricsCache: Map<string, TextMetrics>,
-    ctx: CanvasRenderingContext2D | undefined,
-    onBoxesUpdate: (boxes: Box[]) => void,
-    onCameraUpdate: (camera: Camera) => void,
-  ): void {
+  static handlePointerMove(event: PointerEvent, hctx: PointerHandlerContext): void {
+    const { canvas, state, quadtree, nametagMetricsCache } = hctx;
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+    const worldPos = CoordinateTransform.screenToWorld(
+      mx,
+      my,
+      canvas.width,
+      canvas.height,
+      state.camera(),
+    );
 
     state.updateMouseScreenPosition(event.clientX, event.clientY);
 
@@ -386,39 +351,17 @@ export class PointerEventHandler {
 
     // Handle active interactions
     if (this.handleCreatePreview(worldPos, state)) return;
-    if (this.handleRotation(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
-    if (this.handleResize(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
-    if (this.handleDrag(worldPos, boxes, imageWidth, imageHeight, state, onBoxesUpdate)) return;
-    if (
-      this.handleCameraPan(
-        event,
-        camera,
-        canvasWidth,
-        canvasHeight,
-        imageWidth,
-        imageHeight,
-        state,
-        onCameraUpdate,
-      )
-    )
-      return;
+    if (this.handleRotation(worldPos, state)) return;
+    if (this.handleResize(worldPos, state)) return;
+    if (this.handleDrag(worldPos, state)) return;
+    if (this.handleCameraPan(event, canvas, state)) return;
 
     // Handle hover detection (skip in measurement mode)
     if (!state.measurementState().isActive) {
-      this.handleHoverDetection(
-        worldPos,
-        boxes,
-        quadtree,
-        imageWidth,
-        imageHeight,
-        camera,
-        state,
-        nametagMetricsCache,
-        ctx,
-      );
+      this.handleHoverDetection(worldPos, state, quadtree, nametagMetricsCache);
     } else {
       // Update cursor for measurement mode
-      const cursor = MeasurementHandler.getCursorStyle(worldPos, camera, state);
+      const cursor = MeasurementHandler.getCursorStyle(worldPos, state.camera(), state);
       state.setCursor(cursor);
     }
   }
@@ -444,15 +387,12 @@ export class PointerEventHandler {
     return true;
   }
 
-  private static handleRotation(
-    worldPos: { x: number; y: number },
-    boxes: Box[],
-    imageWidth: number,
-    imageHeight: number,
-    state: StateManager,
-    onBoxesUpdate: (boxes: Box[]) => void,
-  ): boolean {
+  private static handleRotation(worldPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isRotating()) return false;
+
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
 
     const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
@@ -461,25 +401,22 @@ export class PointerEventHandler {
       worldPos.x,
       worldPos.y,
       box,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       state.rotationStartAngle(),
       state.boxStartRotation(),
     );
     const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, rotatedBox);
-    onBoxesUpdate(updatedBoxes);
+    state.updateLocalBoxes(updatedBoxes);
     return true;
   }
 
-  private static handleResize(
-    worldPos: { x: number; y: number },
-    boxes: Box[],
-    imageWidth: number,
-    imageHeight: number,
-    state: StateManager,
-    onBoxesUpdate: (boxes: Box[]) => void,
-  ): boolean {
+  private static handleResize(worldPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isResizing() || !state.resizeCorner()) return false;
+
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
 
     const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
@@ -488,24 +425,21 @@ export class PointerEventHandler {
       worldPos.x,
       worldPos.y,
       box,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       state.resizeCorner()!,
     );
     const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, resizedBox);
-    onBoxesUpdate(updatedBoxes);
+    state.updateLocalBoxes(updatedBoxes);
     return true;
   }
 
-  private static handleDrag(
-    worldPos: { x: number; y: number },
-    boxes: Box[],
-    imageWidth: number,
-    imageHeight: number,
-    state: StateManager,
-    onBoxesUpdate: (boxes: Box[]) => void,
-  ): boolean {
+  private static handleDrag(worldPos: { x: number; y: number }, state: StateManager): boolean {
     if (!state.isDraggingBox()) return false;
+
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
 
     const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
@@ -514,63 +448,63 @@ export class PointerEventHandler {
       worldPos.x,
       worldPos.y,
       box,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       state.dragStartWorld(),
       state.boxStartPos(),
     );
     const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, draggedBox);
-    onBoxesUpdate(updatedBoxes);
+    state.updateLocalBoxes(updatedBoxes);
     return true;
   }
 
   private static handleCameraPan(
     event: PointerEvent,
-    camera: Camera,
-    canvasWidth: number,
-    canvasHeight: number,
-    imageWidth: number,
-    imageHeight: number,
+    canvas: HTMLCanvasElement,
     state: StateManager,
-    onCameraUpdate: (camera: Camera) => void,
   ): boolean {
     if (!state.isPointerDown()) return false;
 
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
+
+    const camera = state.camera();
     const dx = event.clientX - state.lastPointer().x;
     const dy = event.clientY - state.lastPointer().y;
     const newCamera = CameraHandler.pan(
       dx,
       dy,
       camera,
-      canvasWidth,
-      canvasHeight,
-      imageWidth,
-      imageHeight,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
       state.minZoom(),
     );
-    onCameraUpdate(newCamera);
+    state.updateCamera(newCamera);
     state.updateLastPointer(event.clientX, event.clientY);
     return true;
   }
 
   private static handleHoverDetection(
     worldPos: { x: number; y: number },
-    boxes: Box[],
-    quadtree: Quadtree<Box> | undefined,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
     state: StateManager,
+    quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
-    ctx: CanvasRenderingContext2D | undefined,
   ): void {
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+    const camera = state.camera();
+    const ctx = state.ctx();
+
     const hoveredBoxId = HoverHandler.detectHoveredBox(
       worldPos.x,
       worldPos.y,
       boxes,
       quadtree,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       camera,
       state.showNametags(),
       nametagMetricsCache,
@@ -587,8 +521,8 @@ export class PointerEventHandler {
         hoveredBoxId,
         state.selectedBoxId(),
         boxes,
-        imageWidth,
-        imageHeight,
+        bgc.width,
+        bgc.height,
         camera,
         state,
       );
@@ -599,58 +533,31 @@ export class PointerEventHandler {
    * Handle pointer up event
    * Completes interactions and saves to history
    */
-  static handlePointerUp(
-    event: PointerEvent,
-    canvas: HTMLCanvasElement,
-    canvasWidth: number,
-    canvasHeight: number,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-    boxes: Box[],
-    state: StateManager,
-    historyService: HistoryService,
-    onBoxesUpdate: (boxes: Box[]) => void,
-    onRebuildIndex: () => void,
-  ): void {
+  static handlePointerUp(event: PointerEvent, hctx: PointerHandlerContext): void {
+    const { canvas, state, historyService } = hctx;
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+    const worldPos = CoordinateTransform.screenToWorld(
+      mx,
+      my,
+      canvas.width,
+      canvas.height,
+      state.camera(),
+    );
 
     // Handle measurement mode
     if (this.completeMeasurement(state)) return;
 
     // Complete interactions
-    if (
-      this.completeBoxCreation(
-        worldPos,
-        imageWidth,
-        imageHeight,
-        boxes,
-        state,
-        historyService,
-        onBoxesUpdate,
-        onRebuildIndex,
-      )
-    )
-      return;
-    if (
-      this.completeBoxManipulation(
-        worldPos,
-        boxes,
-        state,
-        historyService,
-        onRebuildIndex,
-        imageWidth,
-        imageHeight,
-        camera,
-      )
-    )
-      return;
+    if (this.completeBoxCreation(worldPos, state, historyService)) return;
+    if (this.completeBoxManipulation(worldPos, state, historyService)) return;
 
     // Complete camera pan
-    this.completeCameraPan(worldPos, boxes, state, imageWidth, imageHeight, camera);
+    this.completeCameraPan(worldPos, state);
   }
 
   private static completeMeasurement(state: StateManager): boolean {
@@ -661,32 +568,29 @@ export class PointerEventHandler {
 
   private static completeBoxCreation(
     worldPos: { x: number; y: number },
-    imageWidth: number,
-    imageHeight: number,
-    boxes: Box[],
     state: StateManager,
     historyService: HistoryService,
-    onBoxesUpdate: (boxes: Box[]) => void,
-    onRebuildIndex: () => void,
   ): boolean {
     if (!state.createState().isCreating || !state.createState().startPoint) return false;
 
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
+    const boxes = state.localBoxes();
     const start = state.createState().startPoint!;
     const newBox = BoxCreationHandler.completeCreate(
       start.x,
       start.y,
       worldPos.x,
       worldPos.y,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       state.getNextTempId(),
       historyService,
     );
 
     if (newBox && newBox.tempId) {
-      onBoxesUpdate([...boxes, newBox]);
+      state.updateLocalBoxes([...boxes, newBox]);
       state.updateSelectedBox(newBox.tempId);
-      onRebuildIndex();
     }
 
     state.updateCreateState(BoxCreationHandler.resetCreateState());
@@ -695,15 +599,15 @@ export class PointerEventHandler {
 
   private static completeBoxManipulation(
     worldPos: { x: number; y: number },
-    boxes: Box[],
     state: StateManager,
     historyService: HistoryService,
-    onRebuildIndex: () => void,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
   ): boolean {
     if (!state.isAnyInteractionActive()) return false;
+
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    if (!bgc) return false;
+    const camera = state.camera();
 
     const interactionStart = state.interactionStartState();
     const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
@@ -718,7 +622,6 @@ export class PointerEventHandler {
         state.isDraggingBox(),
         historyService,
       );
-      onRebuildIndex();
     }
 
     state.resetInteractionStates();
@@ -729,8 +632,8 @@ export class PointerEventHandler {
       state.hoveredBoxId(),
       state.selectedBoxId(),
       boxes,
-      imageWidth,
-      imageHeight,
+      bgc.width,
+      bgc.height,
       camera,
       state,
     );
@@ -738,62 +641,56 @@ export class PointerEventHandler {
     return true;
   }
 
-  private static completeCameraPan(
-    worldPos: { x: number; y: number },
-    boxes: Box[],
-    state: StateManager,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-  ): void {
+  private static completeCameraPan(worldPos: { x: number; y: number }, state: StateManager): void {
+    const boxes = state.localBoxes();
+    const bgc = state.bgCanvas();
+    const camera = state.camera();
+
     state.updatePointerDown(false);
 
-    HoverHandler.updateCursorForHover(
-      worldPos.x,
-      worldPos.y,
-      state.hoveredBoxId(),
-      state.selectedBoxId(),
-      boxes,
-      imageWidth,
-      imageHeight,
-      camera,
-      state,
-    );
+    if (bgc) {
+      HoverHandler.updateCursorForHover(
+        worldPos.x,
+        worldPos.y,
+        state.hoveredBoxId(),
+        state.selectedBoxId(),
+        boxes,
+        bgc.width,
+        bgc.height,
+        camera,
+        state,
+      );
+    }
   }
 
   /**
    * Handle wheel event for zooming
    */
-  static handleWheel(
-    event: WheelEvent,
-    canvas: HTMLCanvasElement,
-    canvasWidth: number,
-    canvasHeight: number,
-    imageWidth: number,
-    imageHeight: number,
-    camera: Camera,
-    state: StateManager,
-    onCameraUpdate: (camera: Camera) => void,
-  ): void {
+  static handleWheel(event: WheelEvent, hctx: PointerHandlerContext): void {
+    const { canvas, state } = hctx;
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+
     event.preventDefault();
 
     const rect = canvas.getBoundingClientRect();
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
-    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvasWidth, canvasHeight, camera);
+    const camera = state.camera();
+    const worldPos = CoordinateTransform.screenToWorld(mx, my, canvas.width, canvas.height, camera);
 
     const newCamera = CameraHandler.zoom(
       event.deltaY,
       worldPos.x,
       worldPos.y,
       camera,
-      canvasWidth,
-      canvasHeight,
-      imageWidth,
-      imageHeight,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
       state.minZoom(),
     );
 
-    onCameraUpdate(newCamera);
+    state.updateCamera(newCamera);
   }
 }

@@ -1,3 +1,8 @@
+import { Box } from '../../../inteface/boxes.interface';
+import { HistoryService } from '../../../services/history.service';
+import { StateManager } from '../utils/state-manager';
+import { Quadtree } from './quadtree';
+
 /**
  * Camera state and configuration
  */
@@ -122,4 +127,16 @@ export interface MeasurementState {
   isDraggingPoint: 'one' | 'two' | null;
   metricWidth: number; // Real-world width in meters
   metricHeight: number; // Real-world height in meters
+}
+
+/**
+ * Context object passed to all public PointerEventHandler methods.
+ * Bundles the stable, per-component references that never change between events.
+ */
+export interface PointerHandlerContext {
+  canvas: HTMLCanvasElement;
+  state: StateManager;
+  quadtree: Quadtree<Box> | undefined;
+  nametagMetricsCache: Map<string, TextMetrics>;
+  historyService: HistoryService;
 }

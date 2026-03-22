@@ -1,6 +1,6 @@
 import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { Box } from '../../../inteface/boxes.interface';
-import { ResizeCorner, MeasurementState } from '../core/types';
+import { Camera, ResizeCorner, MeasurementState } from '../core/types';
 import { CreateBoxState } from '../core/creation-state';
 import { ContextMenuState } from './context-menu-utils';
 import { MeasurementUtils } from './measurement-utils';
@@ -78,6 +78,16 @@ export class StateManager {
   readonly canvasAspectRatio = this._canvasAspectRatio.asReadonly();
   updateCanvasAspectRatio(ratio: number): void {
     this._canvasAspectRatio.set(ratio);
+  }
+
+  /**
+   * Current camera state: zoom level and world-space pan offset (x/y).
+   * Updated on pan, zoom, and any operation that changes the viewport.
+   */
+  private _camera = signal<Camera>({ zoom: 1, x: 0, y: 0 });
+  readonly camera = this._camera.asReadonly();
+  updateCamera(camera: Camera): void {
+    this._camera.set(camera);
   }
 
   // ========================================
@@ -497,6 +507,20 @@ export class StateManager {
   readonly contrast = this._contrast.asReadonly();
   updateContrast(contrast: number): void {
     this._contrast.set(contrast);
+  }
+
+  // ========================================
+  // BOX DATA
+  // ========================================
+
+  /**
+   * Current list of boxes visible on the canvas (synced from HistoryService).
+   * Not updated during active drag/resize/rotate interactions to avoid quadtree invalidation.
+   */
+  private _localBoxes = signal<Box[]>([]);
+  readonly localBoxes = this._localBoxes.asReadonly();
+  updateLocalBoxes(boxes: Box[]): void {
+    this._localBoxes.set(boxes);
   }
 
   // ========================================

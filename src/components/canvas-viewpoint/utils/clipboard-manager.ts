@@ -102,7 +102,7 @@ export class ClipboardManager {
     return {
       ...clipboard,
       tempId: BoxCreationUtils.generateTempId(nextTempId),
-      id: undefined, // Clear id so it gets a new one on save
+      id: undefined, // id is type never since we have tempId, but set to undefined to satisfy type checker
       x: newX,
       y: newY,
     };

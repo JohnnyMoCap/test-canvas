@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { Box, getBoxId } from '../../inteface/boxes.interface';
 import { Quadtree } from './core/quadtree';
-import { Camera, TextMetrics } from './core/types';
+import { Camera, PointerHandlerContext, TextMetrics } from './core/types';
 import { BoxType } from './core/creation-state';
 import { CameraUtils } from './utils/camera-utils';
 import { BoxCreationUtils } from './utils/box-creation-utils';
@@ -134,8 +134,6 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private state: StateManager;
 
   // Signals
-  camera = signal<Camera>({ zoom: 1, x: 0, y: 0 });
-  private localBoxes = signal<Box[]>([]);
   private dirty = signal(true);
 
   // Caches and indexes
@@ -146,8 +144,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private hotkeyUnsubs: (() => void)[] = [];
   /*
-  * stops rendering on destroy, gets overriden in startRenderLoop()
-  */
+   * stops rendering on destroy, gets overriden in startRenderLoop()
+   */
   private _stopRenderLoop: () => void = () => {};
   private _lastPinchDist: number | null = null;
 
@@ -161,7 +159,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // Scale bar computed properties
   viewportWidth = signal(0);
   viewportHeight = signal(0);
-  scaleBarZoom = computed(() => this.camera().zoom);
+  scaleBarZoom = computed(() => this.state.camera().zoom);
   scaleBarImageWidth = computed(() => this.state.bgCanvas()?.width || 0);
   scaleBarImageHeight = computed(() => this.state.bgCanvas()?.height || 0);
   scaleBarMetricWidth = computed(() => this.state.measurementState().metricWidth);
@@ -206,9 +204,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   //TODO: not used atm, is it used in prod? check.
   resetCamera() {
     const defaultZoom = this.state.minZoom() > 0 ? this.state.minZoom() : 1;
-    this.camera.set({ zoom: defaultZoom, x: 0, y: 0 });
+    this.state.updateCamera({ zoom: defaultZoom, x: 0, y: 0 });
     this.scheduleRender();
-    this.zoomChange.emit(this.camera().zoom);
+    this.zoomChange.emit(this.state.camera().zoom);
   }
 
   /**
@@ -221,7 +219,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     const canvas = this.canvasRef.nativeElement;
     const newCamera = CameraUtils.zoomToBox(
       boxId,
-      this.localBoxes(),
+      this.state.localBoxes(),
       canvas.width,
       canvas.height,
       bgc.width,
@@ -232,9 +230,9 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (!newCamera) return;
 
     // Clamp camera to ensure we don't go out of bounds
-    this.camera.set(this.clampCamera(newCamera));
+    this.state.updateCamera(this.clampCamera(newCamera));
     this.scheduleRender();
-    this.zoomChange.emit(this.camera().zoom);
+    this.zoomChange.emit(this.state.camera().zoom);
   }
 
   toggleCreateMode() {
@@ -279,7 +277,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       type,
       wp.worldPos.x,
       wp.worldPos.y,
-      this.camera(),
+      this.state.camera(),
       bgc.width,
       bgc.height,
       BoxCreationUtils.generateTempId(this.state.nextTempId()),
@@ -301,88 +299,41 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   // INFRASTRUCTURE: Event Routing
   // ========================================
 
+  private get pointerContext(): PointerHandlerContext {
+    return {
+      canvas: this.canvasRef.nativeElement,
+      state: this.state,
+      quadtree: this.quadtree,
+      nametagMetricsCache: this.nametagMetricsCache,
+      historyService: this.historyService,
+    };
+  }
+
   onWheel(e: WheelEvent) {
-    const canvas = this.canvasRef.nativeElement;
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-
-    PointerEventHandler.handleWheel(
-      e,
-      canvas,
-      canvas.width,
-      canvas.height,
-      bgc.width,
-      bgc.height,
-      this.camera(),
-      this.state,
-      (newCamera) => {
-        this.camera.set(newCamera);
-        this.scheduleRender();
-        this.zoomChange.emit(newCamera.zoom);
-      },
-    );
-
-    // Show scale bar on zoom
+    if (!this.state.bgCanvas()) return;
+    PointerEventHandler.handleWheel(e, this.pointerContext);
+    this.scheduleRender();
+    this.zoomChange.emit(this.state.camera().zoom);
     this.scaleBarRef?.show();
   }
 
   onPointerDown(e: PointerEvent) {
-    const canvas = this.canvasRef.nativeElement;
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
-
-    PointerEventHandler.handlePointerDown(
-      e,
-      canvas,
-      canvas.width,
-      canvas.height,
-      bgc.width,
-      bgc.height,
-      this.camera(),
-      this.localBoxes(),
-      this.state,
-      this.quadtree,
-      this.nametagMetricsCache,
-      this.state.ctx(),
-      this.historyService,
-    );
-    //this.scheduleRender();
+    if (!this.state.bgCanvas()) return;
+    PointerEventHandler.handlePointerDown(e, this.pointerContext);
   }
 
   onPointerUp(e: PointerEvent) {
-    const canvas = this.canvasRef.nativeElement;
-    const bgc = this.state.bgCanvas();
-
-    if (!bgc) return;
-
-    PointerEventHandler.handlePointerUp(
-      e,
-      canvas,
-      canvas.width,
-      canvas.height,
-      bgc.width,
-      bgc.height,
-      this.camera(),
-      this.localBoxes(),
-      this.state,
-      this.historyService,
-      (boxes) => {
-        this.localBoxes.set(boxes);
-        this.scheduleRender();
-      },
-      () => {
-        this.rebuildIndex();
-      },
-    );
+    if (!this.state.bgCanvas()) return;
+    PointerEventHandler.handlePointerUp(e, this.pointerContext);
+    this.rebuildIndex();
     this.scheduleRender();
   }
 
   onPointerMove(e: PointerEvent) {
-    const canvas = this.canvasRef.nativeElement;
-    const bgc = this.state.bgCanvas();
-    if (!bgc) return;
+    if (!this.state.bgCanvas()) return;
 
     // Check if pointer is outside canvas bounds
+    const canvas = this.canvasRef.nativeElement;
     const rect = canvas.getBoundingClientRect();
     const isOutsideCanvas =
       e.clientX < rect.left ||
@@ -396,30 +347,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    PointerEventHandler.handlePointerMove(
-      e,
-      canvas,
-      canvas.width,
-      canvas.height,
-      bgc.width,
-      bgc.height,
-      this.camera(),
-      this.localBoxes(),
-      this.state,
-      this.quadtree,
-      this.nametagMetricsCache,
-      this.state.ctx(),
-      (boxes) => {
-        this.localBoxes.set(boxes);
-        this.scheduleRender();
-      },
-      (newCamera) => {
-        this.camera.set(newCamera);
-        this.scheduleRender();
-      },
-    );
-
-    // Show scale bar on movement
+    PointerEventHandler.handlePointerMove(e, this.pointerContext);
+    this.scheduleRender();
     this.scaleBarRef?.show();
   }
 
@@ -480,7 +409,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this._lastPinchDist = newDist;
 
     const canvas = this.canvasRef.nativeElement;
-    const cam = this.camera();
+    const cam = this.state.camera();
     const newZoom = Math.max(this.state.minZoom(), Math.min(10, cam.zoom * ratio));
 
     const rect = canvas.getBoundingClientRect();
@@ -498,7 +427,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       y: cam.y + dy * scale,
     });
 
-    this.camera.set(newCamera);
+    this.state.updateCamera(newCamera);
     this.scheduleRender();
     this.zoomChange.emit(newCamera.zoom);
     this.scaleBarRef?.show();
@@ -542,14 +471,14 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       for (const key of this.nametagMetricsCache.keys()) {
         if (!newIds.has(key)) this.nametagMetricsCache.delete(key);
       }
-      this.localBoxes.set([...boxes]);
+      this.state.updateLocalBoxes([...boxes]);
       this.rebuildIndex();
     });
 
     // Trigger render on camera or box changes
     effect(() => {
-      const _ = this.camera();
-      const __ = this.localBoxes();
+      const _ = this.state.camera();
+      const __ = this.state.localBoxes();
       const ___ = this.state.createState();
       this.scheduleRender();
     });
@@ -630,7 +559,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (!ctx || !bgc) return;
 
     const canvas = this.canvasRef.nativeElement;
-    const cam = this.camera();
+    const cam = this.state.camera();
     const viewBounds = CameraUtils.getViewBoundsInWorld(canvas.width, canvas.height, cam);
     const visibleBoxes = this.queryVisible(viewBounds);
 
@@ -673,7 +602,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
     if (!this.state.bgCanvas()) return [];
 
-    const allBoxes = this.localBoxes();
+    const allBoxes = this.state.localBoxes();
 
     // If no quadtree, return all boxes in z-order
     if (!this.quadtree) {
@@ -717,7 +646,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     this.onResize();
-    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0 });
+    this.state.updateCamera({ zoom: this.state.minZoom(), x: 0, y: 0 });
     this.scheduleRender();
   }
 
@@ -746,7 +675,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     }
 
     this.onResize();
-    this.camera.set({ zoom: this.state.minZoom(), x: 0, y: 0 });
+    this.state.updateCamera({ zoom: this.state.minZoom(), x: 0, y: 0 });
     this.rebuildIndex();
     this.scheduleRender();
   }
@@ -801,10 +730,10 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
           this.state.bgCanvas()!.height,
         ),
       );
-      this.camera.set(
+      this.state.updateCamera(
         this.clampCamera({
-          ...this.camera(),
-          zoom: Math.max(this.camera().zoom, this.state.minZoom()),
+          ...this.state.camera(),
+          zoom: Math.max(this.state.camera().zoom, this.state.minZoom()),
         }),
       );
     }
@@ -813,7 +742,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   private rebuildIndex() {
     this.quadtree = LifecycleManager.rebuildIndex(
-      this.localBoxes(),
+      this.state.localBoxes(),
       this.state.bgCanvas(),
       this.state.showNametags(),
     );
@@ -842,7 +771,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
     if (isNullOrUndefined(selected)) return;
-    this.state.updateClipboard(ClipboardManager.copyBox(selected, this.localBoxes()));
+    this.state.updateClipboard(ClipboardManager.copyBox(selected, this.state.localBoxes()));
   }
 
   private handlePaste(): void {
@@ -859,7 +788,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.state.lastMouseScreen(),
       canvas,
       rect,
-      this.camera(),
+      this.state.camera(),
       bgc.width,
       bgc.height,
       this.state.devicePixelRatio(),
