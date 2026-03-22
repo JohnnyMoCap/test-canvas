@@ -12,8 +12,8 @@ import { BoxStateUtils } from '../utils/box-state-utils';
 import { BoxCreationHandler } from './box-creation.handler';
 import { CameraHandler } from './camera.handler';
 import { ContextMenuHandler } from './context-menu.handler';
-import { MagicDetectionHandler } from './magic-detection.handler';
 import { MeasurementHandler } from './measurement.handler';
+import { MagicDetectionHandler } from './magic-detection.handler';
 import { isNullOrUndefined } from '../utils/validation-utils';
 import { CursorStyles } from '../cursor/cursor-styles';
 
@@ -26,7 +26,7 @@ export class PointerEventHandler {
    * Handle pointer down event
    * Routes to handlers based on priority: measurement > magic detection > context menu > creation > interaction > selection > camera
    */
-  static handlePointerDown(event: PointerEvent, hctx: PointerHandlerContext): void {
+  static handlePointerDown(event: PointerEvent, magicHandler: MagicDetectionHandler, hctx: PointerHandlerContext): void {
     const { canvas, state, quadtree, nametagMetricsCache, historyService } = hctx;
     const bgc = state.bgCanvas();
     if (!bgc) return;
@@ -55,8 +55,8 @@ export class PointerEventHandler {
       return;
     }
 
-    if (state.isMagicMode() && bgc) {
-      this.handleMagicDetection(event, canvas, state, historyService);
+    if (state.isMagicMode() && event.button === 0) {
+      magicHandler.handlePointerDown(event, canvas, state);
       return;
     }
 
@@ -85,34 +85,6 @@ export class PointerEventHandler {
 
   private static handleMeasurementMode(absPos: { x: number; y: number }, state: StateManager) {
     MeasurementHandler.handlePointerDown(absPos, state.camera(), state);
-  }
-
-  private static handleMagicDetection(
-    event: PointerEvent,
-    canvas: HTMLCanvasElement,
-    state: StateManager,
-    historyService: HistoryService,
-  ) {
-    const bgCanvas = state.bgCanvas();
-    if (!bgCanvas) return;
-
-    const newBox = MagicDetectionHandler.detectAndCreateBox(
-      event,
-      canvas,
-      bgCanvas,
-      state.camera(),
-      state.devicePixelRatio(),
-      state.magicTolerance(),
-      state.nextTempId(),
-      historyService,
-      state.debugMagicDetection(),
-    );
-
-    if (newBox) {
-      state.getNextTempId();
-    }
-
-    return;
   }
 
   private static handleContextMenu(
@@ -215,12 +187,7 @@ export class PointerEventHandler {
     box: Box,
     state: StateManager,
   ): boolean {
-    const corner = HoverHandler.detectCornerHandle(
-      absPos.x,
-      absPos.y,
-      boxGeometry,
-      state.camera(),
-    );
+    const corner = HoverHandler.detectCornerHandle(absPos.x, absPos.y, boxGeometry, state.camera());
 
     if (!corner) return false;
 
@@ -677,7 +644,13 @@ export class PointerEventHandler {
     const mx = (event.clientX - rect.left) * state.devicePixelRatio();
     const my = (event.clientY - rect.top) * state.devicePixelRatio();
     const camera = state.camera();
-    const absPos = CoordinateTransform.screenToAbsolute(mx, my, canvas.width, canvas.height, camera);
+    const absPos = CoordinateTransform.screenToAbsolute(
+      mx,
+      my,
+      canvas.width,
+      canvas.height,
+      camera,
+    );
 
     const newCamera = CameraHandler.zoom(
       event.deltaY,

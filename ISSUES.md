@@ -6,16 +6,6 @@ These are the TODOs from the source reorganized with context and suggested appro
 
 ---
 
-### 33. Canvas sizing leaves extra space (TODO in canvas-viewpoint.ts line 406)
-
-**File:** `src/components/canvas-viewpoint/canvas-viewpoint.ts` — `onResize`
-
-**Prompt:**
-
-> Investigate the `onResize()` method in `canvas-viewpoint.ts`. The canvas is sized based on `containerWidth` and the aspect ratio. Check if the parent element has padding, border, or if flexbox is adding space. Add `box-sizing: border-box` and `overflow: hidden` to `.viewport-root` in `canvas-viewpoint.css`. Log `containerWidth`, `canvas.width`, and `canvas.getBoundingClientRect()` at resize time to identify where the discrepancy originates.
-
----
-
 ### 34. Pending box state (opacity) not implemented (TODO in canvas-viewpoint.ts line 410)
 
 **File:** `src/components/canvas-viewpoint/utils/frame-renderer.ts` — `renderFrame`

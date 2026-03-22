@@ -29,6 +29,7 @@ import { LifecycleManager } from './utils/lifecycle-manager';
 import { PointerEventHandler } from './handlers/pointer-event-handler';
 import { ClipboardManager } from './utils/clipboard-manager';
 import { isNullOrUndefined } from './utils/validation-utils';
+import { MagicDetectionHandler } from './handlers/magic-detection.handler';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 import { ScaleBarComponent } from './scale-bar.component';
@@ -56,9 +57,21 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
       this.toggleMagicMode();
     }
   }
+  @Input() set magicAutoTuneInput(value: boolean) {
+    if (value !== this.state.magicAutoTune()) {
+      this.state.updateMagicAutoTune(value);
+    }
+  }
+  /** Fixed tolerance used when magicAutoTune is off (Manhattan RGB distance, 0–765). */
   @Input() set magicToleranceInput(value: number) {
     if (value !== this.state.magicTolerance()) {
       this.state.updateMagicTolerance(value);
+    }
+  }
+  /** ±Sensitivity offset applied on top of the auto-tuned tolerance. */
+  @Input() set magicAdjustmentInput(value: number) {
+    if (value !== this.state.magicAdjustment()) {
+      this.state.updateMagicAdjustment(value);
     }
   }
   @Input() set debugMagicInput(value: boolean) {
@@ -149,6 +162,8 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   private _stopRenderLoop: () => void = () => {};
   private _lastPinchDist: number | null = null;
 
+  private magicHandler!: MagicDetectionHandler;
+
   contextMenuVisible = computed(() => this.state.contextMenuState()?.visible ?? false);
   contextMenuX = computed(() => this.state.contextMenuState()?.x ?? 0);
   contextMenuY = computed(() => this.state.contextMenuState()?.y ?? 0);
@@ -172,6 +187,11 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
   ) {
     // Initialize state manager
     this.state = new StateManager(ContextMenuUtils.close());
+    this.magicHandler = new MagicDetectionHandler(
+      this.historyService,
+      () => this.scheduleRender(),
+      () => this.rebuildIndex(),
+    );
 
     //TODO: make sure to do this consistantly when changing to new photo
     // Initialize nextTempId to avoid collisions with existing box IDs
@@ -200,6 +220,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
     this._stopRenderLoop();
     this.resizeObserver?.disconnect();
     this.hotkeyUnsubs.forEach((fn) => fn());
+    this.magicHandler.destroy();
   }
 
   //TODO: not used atm, is it used in prod? check.
@@ -320,7 +341,7 @@ export class CanvasViewportComponent implements AfterViewInit, OnDestroy {
 
   onPointerDown(e: PointerEvent) {
     if (!this.state.bgCanvas()) return;
-    PointerEventHandler.handlePointerDown(e, this.pointerContext);
+    PointerEventHandler.handlePointerDown(e, this.magicHandler, this.pointerContext);
   }
 
   onPointerUp(e: PointerEvent) {

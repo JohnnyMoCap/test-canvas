@@ -193,14 +193,36 @@ export class StateManager {
   }
 
   /**
-   * Color similarity threshold (0-255) for magic box detection.
-   * Lower = stricter matching (only very similar colors), Higher = more lenient.
-   * Example: 30 means pixels within 30 units in RGB space are considered "same color".
+   * When true, the BFS tolerance is derived automatically from local pixel variance at the
+   * click point (baseTolerance + k*stdDev + magicAdjustment, clamped to [toleranceMin, toleranceMax]).
+   * When false, magicTolerance is used directly as the fixed BFS tolerance.
+   */
+  private _magicAutoTune = signal(true);
+  readonly magicAutoTune = this._magicAutoTune.asReadonly();
+  updateMagicAutoTune(autoTune: boolean): void {
+    this._magicAutoTune.set(autoTune);
+  }
+
+  /**
+   * Manual fixed tolerance for magic detection (0–765 Manhattan RGB distance).
+   * Used directly when magicAutoTune=false.
+   * Default 30 means pixels within ±10 per channel are considered the same color.
    */
   private _magicTolerance = signal(30);
   readonly magicTolerance = this._magicTolerance.asReadonly();
   updateMagicTolerance(tolerance: number): void {
     this._magicTolerance.set(tolerance);
+  }
+
+  /**
+   * Sensitivity offset applied on top of the auto-tuned tolerance (magicAutoTune=true only).
+   * Positive values make the fill more aggressive; negative values make it stricter.
+   * Ignored when magicAutoTune=false.
+   */
+  private _magicAdjustment = signal(0);
+  readonly magicAdjustment = this._magicAdjustment.asReadonly();
+  updateMagicAdjustment(adjustment: number): void {
+    this._magicAdjustment.set(adjustment);
   }
 
   /**

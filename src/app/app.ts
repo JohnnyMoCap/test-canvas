@@ -91,7 +91,7 @@ export class App {
     this.isMeasurementMode.set(isMeasurementMode);
   }
 
-  exampleBoxes: Box[] = Array.from({ length: 4000 }, (_, i) => {
+  exampleBoxes: Box[] = Array.from({ length: 10 }, (_, i) => {
     const x = Math.random();
     const y = Math.random();
 

@@ -1,131 +1,179 @@
-﻿import { Box } from '../../../inteface/boxes.interface';
-import { Camera } from '../core/types';
-import { CoordinateTransform } from '../utils/coordinate-transform';
-import { MagicDetectionUtils } from '../utils/magic-detection-utils';
-import { HistoryService } from '../../../services/history.service';
+import { Box } from '../../../inteface/boxes.interface';
 import { BoxCreationUtils } from '../utils/box-creation-utils';
+import { BoxUtils } from '../utils/box-utils';
+import { CoordinateTransform } from '../utils/coordinate-transform';
+import { StateManager } from '../utils/state-manager';
+import { HistoryService } from '../../../services/history.service';
+import type { MagicConfig, MagicWorkerResult } from '../workers/magic-detection.types';
 
 /**
- * Handler for magic detection operations
- * Layer 3: Business Logic
+ * Owns the magic-detection Web Worker and handles the full detection lifecycle.
+ * Instance class (not static) because it holds long-lived Worker state.
+ * Layer 3: Business Logic Handler
  */
 export class MagicDetectionHandler {
-  /**
-   * Detect and create a box from a clicked region
-   */
-  static detectAndCreateBox(
-    e: PointerEvent,
-    canvas: HTMLCanvasElement,
-    bgCanvas: HTMLCanvasElement,
-    camera: Camera,
-    devicePixelRatio: number,
-    tolerance: number,
-    nextTempId: number,
-    historyService: HistoryService,
-    debug: boolean = false,
-  ): Box | null {
-    const startTime = performance.now();
+  private worker: Worker | null = null;
+  private busy = false;
+  private activeState: StateManager | null = null;
 
-    if (debug) {
-      console.log('Magic detection triggered');
+  constructor(
+    private historyService: HistoryService,
+    private scheduleRender: () => void,
+    private rebuildIndex: () => void,
+  ) {}
+
+  /**
+   * Triggered by PointerEventHandler when a pointer-down lands in magic mode.
+   * Cancels any in-progress detection, reads the bgCanvas, and dispatches to the Worker.
+   */
+  handlePointerDown(event: PointerEvent, canvas: HTMLCanvasElement, state: StateManager): void {
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
+
+    // Cancel any in-progress detection
+    if (this.busy) {
+      this.worker?.terminate();
+      this.worker = null;
+      this.busy = false;
     }
 
     const rect = canvas.getBoundingClientRect();
-    const screenX = (e.clientX - rect.left) * devicePixelRatio;
-    const screenY = (e.clientY - rect.top) * devicePixelRatio;
+    const dpr = state.devicePixelRatio();
+    const screenX = (event.clientX - rect.left) * dpr;
+    const screenY = (event.clientY - rect.top) * dpr;
 
     const absPos = CoordinateTransform.screenToAbsolute(
       screenX,
       screenY,
       canvas.width,
       canvas.height,
-      camera,
+      state.camera(),
     );
 
-    // Convert absolute coordinates (centered at 0,0) back to pixel coordinates (0,0 at top-left)
-    const pixelX = absPos.x + bgCanvas.width / 2;
-    const pixelY = absPos.y + bgCanvas.height / 2;
+    const pixelX = Math.max(0, Math.min(bgc.width - 1, Math.floor(absPos.x + bgc.width / 2)));
+    const pixelY = Math.max(0, Math.min(bgc.height - 1, Math.floor(absPos.y + bgc.height / 2)));
 
-    // Clamp to background bounds
-    const clampedX = Math.max(0, Math.min(bgCanvas.width - 1, Math.floor(pixelX)));
-    const clampedY = Math.max(0, Math.min(bgCanvas.height - 1, Math.floor(pixelY)));
+    const bgCtx = bgc.getContext('2d');
+    if (!bgCtx) return;
 
-    if (debug) {
-      console.log('Click position:', {
-        screen: { x: e.clientX, y: e.clientY },
-        world: { x: absPos.x.toFixed(1), y: absPos.y.toFixed(1) },
-        pixel: { x: pixelX.toFixed(1), y: pixelY.toFixed(1) },
-        clamped: { x: clampedX, y: clampedY },
-        backgroundSize: { w: bgCanvas.width, h: bgCanvas.height },
-        zoom: camera.zoom.toFixed(2),
+    const imageData = bgCtx.getImageData(0, 0, bgc.width, bgc.height);
+    // Transfer the buffer (zero-copy handoff — main thread loses access after this)
+    const buffer = imageData.data.buffer;
+
+    const config: MagicConfig = {
+      autoTune: state.magicAutoTune(),
+      manualTolerance: state.magicTolerance(),
+      manualAdjustment: state.magicAdjustment(),
+      baseTolerance: 20,
+      toleranceScaleFactor: 1.5,
+      toleranceMin: 15,
+      toleranceMax: 110,
+      sampleRadius: 7,
+      connectivity: 4,
+      maxFillRatio: 0.15,
+      debug: state.debugMagicDetection(),
+    };
+
+    this.activeState = state;
+    this.busy = true;
+    this.getOrCreateWorker().postMessage(
+      { buffer, width: bgc.width, height: bgc.height, clickX: pixelX, clickY: pixelY, config },
+      [buffer],
+    );
+  }
+
+  /**
+   * Terminate the worker and release all references.
+   * Call from the component's ngOnDestroy.
+   */
+  destroy(): void {
+    this.worker?.terminate();
+    this.worker = null;
+    this.busy = false;
+    this.activeState = null;
+  }
+
+  // ---------------------------------------------------------------------------
+
+  private getOrCreateWorker(): Worker {
+    if (!this.worker) {
+      this.worker = new Worker(new URL('../workers/magic-detection.worker', import.meta.url), {
+        type: 'module',
+      });
+      this.worker.onmessage = (e: MessageEvent<MagicWorkerResult>) => this.onWorkerResult(e.data);
+      this.worker.onerror = (e: ErrorEvent) => {
+        console.error('Magic detection worker error:', e.message);
+        this.busy = false;
+      };
+    }
+    return this.worker;
+  }
+
+  private onWorkerResult(result: MagicWorkerResult): void {
+    this.busy = false;
+    const state = this.activeState;
+    if (!state) return;
+
+    if (!result.success) {
+      if (state.debugMagicDetection()) {
+        console.log('[Magic] Detection failed:', result.reason);
+      }
+      return;
+    }
+
+    if (state.debugMagicDetection()) {
+      console.log('[Magic] Detection succeeded:', {
+        pixelCount: result.pixelCount,
+        bbox: {
+          cx: result.centerX.toFixed(1),
+          cy: result.centerY.toFixed(1),
+          w: result.bboxWidth,
+          h: result.bboxHeight,
+        },
+        rotation: ((result.rotation * 180) / Math.PI).toFixed(1) + '°',
+        usedTolerance: result.usedTolerance.toFixed(1),
+        elapsedMs: result.elapsedMs.toFixed(2),
       });
     }
 
-    // Get image data from background canvas
-    const bgCtx = bgCanvas.getContext('2d');
-    if (!bgCtx) {
-      if (debug) console.log('No background context');
-      return null;
-    }
+    const bgc = state.bgCanvas();
+    if (!bgc) return;
 
-    const imageData = bgCtx.getImageData(0, 0, bgCanvas.width, bgCanvas.height);
-
-    // Detect region with tolerance
-    const result = MagicDetectionUtils.detectRegion(
-      imageData,
-      clampedX,
-      clampedY,
-      tolerance,
-      debug,
+    const newBox = MagicDetectionHandler.createBoxFromDetection(
+      result,
+      state.nextTempId(),
+      bgc.width,
+      bgc.height,
     );
+    state.getNextTempId();
+    this.historyService.recordAdd(newBox);
+    this.rebuildIndex();
+    this.scheduleRender();
+  }
 
-    const detectionTime = performance.now() - startTime;
-
-    if (result) {
-      //TODO: make it use this
-      // const newBox = BoxCreationUtils.createBoxFromContextMenu(
-      //       'magic',
-      //       wp.absPos.x,
-      //       wp.absPos.y,
-      //       this.camera(),
-      //       bgc.width,
-      //       bgc.height,
-      //       BoxCreationUtils.generateTempId(this.state.nextTempId()),
-      //     );
-      const newBox = MagicDetectionUtils.createBoxFromDetection(
-        result,
-        nextTempId,
-        bgCanvas.width,
-        bgCanvas.height,
-      );
-
-      if (debug) {
-        console.log('Detection successful:', {
-          //pixelCount: result.points.length,
-          boundingBox: {
-            center: { x: result.x.toFixed(1), y: result.y.toFixed(1) },
-            size: { w: result.width.toFixed(1), h: result.height.toFixed(1) },
-            area: (result.width * result.height).toFixed(0),
-          },
-          normalized: {
-            x: newBox.x.toFixed(4),
-            y: newBox.y.toFixed(4),
-            w: newBox.w.toFixed(4),
-            h: newBox.h.toFixed(4),
-          },
-          rotation: (result.rotation * (180 / Math.PI)).toFixed(1) + '°',
-          detectionTime: detectionTime.toFixed(2) + 'ms',
-          tolerance: tolerance,
-        });
-      }
-
-      historyService.recordAdd(newBox);
-      return newBox;
-    } else {
-      if (debug) {
-        console.log('No region detected (time: ' + detectionTime.toFixed(2) + 'ms)');
-      }
-      return null;
-    }
+  private static createBoxFromDetection(
+    result: Extract<MagicWorkerResult, { success: true }>,
+    tempId: number,
+    bgWidth: number,
+    bgHeight: number,
+  ): Box {
+    const absX = result.centerX - bgWidth / 2;
+    const absY = result.centerY - bgHeight / 2;
+    const normalizedPos = BoxUtils.absoluteToNormalized(absX, absY, bgWidth, bgHeight);
+    const normalizedDims = BoxUtils.absoluteDimensionsToNormalized(
+      result.bboxWidth,
+      result.bboxHeight,
+      bgWidth,
+      bgHeight,
+    );
+    return {
+      tempId: BoxCreationUtils.generateTempId(tempId),
+      x: normalizedPos.x,
+      y: normalizedPos.y,
+      w: normalizedDims.w,
+      h: normalizedDims.h,
+      rotation: result.rotation,
+      color: `hsl(${Math.floor((25 / 50) * 360)}, 70%, 50%)`,
+    };
   }
 }
