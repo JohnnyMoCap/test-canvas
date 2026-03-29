@@ -1,6 +1,6 @@
 ﻿import { MeasurementPoint, MeasurementState, Camera } from '../core/types';
 import { MeasurementUtils } from '../utils/measurement-utils';
-import { StateManager } from '../utils/state-manager';
+import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 
 /**
  * Handler for measurement tool interactions
@@ -11,11 +11,7 @@ export class MeasurementHandler {
    * Handle pointer down in measurement mode
    * Returns true if the event was handled
    */
-  static handlePointerDown(
-    absPos: MeasurementPoint,
-    camera: Camera,
-    state: StateManager,
-  ) {
+  static handlePointerDown(absPos: MeasurementPoint, camera: Camera, state: StateManager) {
     const measurementState = state.measurementState();
     if (!measurementState.isActive) return;
 

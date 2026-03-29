@@ -2,7 +2,7 @@ import { Box } from '../../../interface/boxes.interface';
 import { BoxCreationUtils } from '../utils/box-creation-utils';
 import { BoxUtils } from '../utils/box-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';
-import { StateManager } from '../utils/state-manager';
+import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 import { HistoryService } from '../../../services/history.service';
 import type { MagicConfig, MagicWorkerResult } from '../workers/magic-detection.types';
 

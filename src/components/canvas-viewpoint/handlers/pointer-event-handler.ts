@@ -4,7 +4,7 @@ import { PointerHandlerContext, TextMetrics, AbsoluteBoxGeometry } from '../core
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { BoxUtils } from '../utils/box-utils';
 import { NametagUtils } from '../utils/nametag-utils';
-import { StateManager } from '../utils/state-manager';
+import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 import { HistoryService } from '../../../services/history.service';
 import { HoverHandler } from './hover.handler';
 import { BoxManipulationHandler } from './box-manipulation.handler';

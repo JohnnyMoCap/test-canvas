@@ -1,6 +1,6 @@
 ﻿import { Box } from '../../../interface/boxes.interface';
 import { HistoryService } from '../../../services/history.service';
-import { StateManager } from '../utils/state-manager';
+import { LabelingStateManager } from '../utils/labeling-state-manager';
 import { Quadtree } from './quadtree';
 
 /**
@@ -135,7 +135,7 @@ export interface MeasurementState {
  */
 export interface PointerHandlerContext {
   canvas: HTMLCanvasElement;
-  state: StateManager;
+  state: LabelingStateManager;
   quadtree: Quadtree<Box> | undefined;
   nametagMetricsCache: Map<string, TextMetrics>;
   historyService: HistoryService;

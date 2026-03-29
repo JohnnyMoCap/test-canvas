@@ -1,0 +1,11 @@
+<div
+  class="viewport-root"
+  (wheel)="onWheel($event)"
+  (contextmenu)="$event.preventDefault()"
+  (pointerdown)="onBasePointerDown($event)"
+  (pointermove)="onBasePointerMove($event)"
+  (pointerup)="onBasePointerUp($event)"
+  (pointercancel)="onBasePointerUp($event)"
+>
+  <canvas #canvasEl [style.filter]="canvasFilter()"></canvas>
+</div>

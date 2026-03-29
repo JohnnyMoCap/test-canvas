@@ -6,7 +6,7 @@ import { NametagUtils } from '../utils/nametag-utils';
 import { CoordinateTransform } from '../utils/coordinate-transform';
 import { CursorStyles } from '../cursor/cursor-styles';
 import { BoxStateUtils } from '../utils/box-state-utils';
-import { StateManager } from '../utils/state-manager';
+import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 import { isNullOrUndefined } from '../utils/validation-utils';
 
 /**
