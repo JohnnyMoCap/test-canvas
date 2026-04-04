@@ -1,20 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
 
-import { CanvasViewpoint } from './canvas-viewpoint';
+import { CanvasViewportComponent } from './canvas-viewpoint';
 
-describe('CanvasViewpoint', () => {
-  let component: CanvasViewpoint;
-  let fixture: ComponentFixture<CanvasViewpoint>;
+describe('CanvasViewportComponent', () => {
+  let component: CanvasViewportComponent;
+  let fixture: ComponentFixture<CanvasViewportComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CanvasViewpoint]
-    })
-    .compileComponents();
+      imports: [CanvasViewportComponent],
+      providers: [provideZonelessChangeDetection(), provideRouter([])],
+    }).compileComponents();
 
-    fixture = TestBed.createComponent(CanvasViewpoint);
+    fixture = TestBed.createComponent(CanvasViewportComponent);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    // Note: fixture.whenStable() is intentionally omitted here.
+    // AfterViewInit calls getContext('2d') which jsdom does not support.
+    // Full component rendering is covered by Storybook stories.
   });
 
   it('should create', () => {
