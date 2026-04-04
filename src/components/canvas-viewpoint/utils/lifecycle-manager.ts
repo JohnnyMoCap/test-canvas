@@ -1,4 +1,4 @@
-import { Signal, WritableSignal } from '@angular/core';
+
 import { Quadtree } from '../core/quadtree';
 import { Box } from '../../../interface/boxes.interface';
 import { QuadtreeUtils } from './quadtree-utils';
@@ -16,7 +16,7 @@ export class LifecycleManager {
    * itself
    *
    */
-  static startRenderLoop(dirtySignal: Signal<boolean>, renderCallback: () => void): () => void {
+  static startRenderLoop(getDirty: () => boolean, renderCallback: () => void): () => void {
     // When set to false the loop stops rescheduling itself on the next tick.
     let running = true;
     let lastFrameTime = 0;
@@ -30,8 +30,7 @@ export class LifecycleManager {
       lastFrameTime = currentTime;
 
       // Only call into the render pipeline if something actually changed.
-      // The dirty signal is set to true whenever state mutations occur.
-      if (!dirtySignal()) return;
+      if (!getDirty()) return;
 
       renderCallback();
     };

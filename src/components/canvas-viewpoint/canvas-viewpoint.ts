@@ -1,4 +1,5 @@
 ﻿import {
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   ViewChild,
@@ -34,19 +35,45 @@ import { HistoryService } from '../../services/history.service';
 import { HotkeyService } from '../../services/hotkey.service';
 import { BaseViewportComponent } from './base-viewport.component';
 
-//TODO: now movement is slow? check why
+/**
+ * Full labeling viewport — extends `BaseViewportComponent` with box annotation,
+ * magic detection, measurement, undo/redo, clipboard, and touch support.
+ *
+ * ## Interaction model
+ * - **Left-click + drag**: create/resize/move boxes (delegated to `PointerEventHandler`)
+ * - **Middle-click + drag**: pan the camera (via `shouldBasePan` override)
+ * - **Scroll wheel / pinch**: cursor-centred zoom
+ * - **Keyboard**: undo/redo/copy/paste/delete/escape via `HotkeyService`
+ *
+ * ## State
+ * All reactive state lives in `LabelingStateManager` (narrows the base class
+ * `BaseStateManager` via `declare protected state`).
+ *
+ * ## Render pipeline
+ * The rAF loop calls `renderOverlays()` each dirty frame:
+ *   1. Query visible boxes from the spatial quadtree
+ *   2. Resolve the current mouse position in absolute image coords
+ *   3. Delegate the full draw to `FrameRenderer.renderFrame`
+ */
 @Component({
   selector: 'app-canvas-viewport',
   templateUrl: './canvas-viewpoint.html',
   styleUrls: ['./canvas-viewpoint.css'],
   standalone: true,
   imports: [BoxContextMenuComponent, ScaleBarComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CanvasViewportComponent extends BaseViewportComponent {
   @ViewChild('scaleBarRef') scaleBarRef?: ScaleBarComponent;
 
   // ── Override state to the narrow labeling type ───────────────────────────
-  protected declare state: LabelingStateManager;
+
+  /**
+   * TypeScript-only type narrowing — no runtime field is emitted.
+   * Declares that `this.state` is a `LabelingStateManager` (a subtype of
+   * `BaseStateManager`) so labeling-specific signals are accessible without casts.
+   */
+  declare protected state: LabelingStateManager;
 
   // ── Labeling-specific @Inputs ────────────────────────────────────────────
 
@@ -141,6 +168,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   private hotkeyUnsubs: (() => void)[] = [];
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private magicHandler!: MagicDetectionHandler;
+  /** Spatial index of the current box set; rebuilt after every structural change. */
   protected quadtree?: Quadtree<Box>;
 
   // ── Computed (labeling-specific) ──────────────────────────────────────────
@@ -204,7 +232,8 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     canvas: HTMLCanvasElement,
     viewBounds: { minX: number; minY: number; maxX: number; maxY: number },
   ): void {
-    const bgc = this.state.bgCanvas()!;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
     const visibleBoxes = this.queryVisible(viewBounds);
 
     let currentMouseAbs: { x: number; y: number } | null = null;
@@ -308,11 +337,22 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   // ── Pointer overrides ─────────────────────────────────────────────────────
 
+  /**
+   * Restricts camera pan to middle-click only.
+   *
+   * Left-click (button 0) is reserved for box interactions handled by
+   * `PointerEventHandler`. Overrides the base class default which allows
+   * left-click pan.
+   */
   protected override shouldBasePan(e: PointerEvent): boolean {
     // Left button is reserved for box interactions; only allow middle-click pan
     return e.button === 1 || e.buttons === 4;
   }
 
+  /**
+   * Bundles the context object passed to every `PointerEventHandler` call.
+   * Computed lazily so it always reflects the latest canvas ref and state.
+   */
   private get pointerContext(): PointerHandlerContext {
     return {
       canvas: this.canvasRef.nativeElement,
@@ -323,6 +363,10 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     };
   }
 
+  /**
+   * Handles scroll-wheel zoom and also briefly shows the scale bar.
+   * Delegates zoom math to `PointerEventHandler.handleWheel`.
+   */
   override onWheel(e: WheelEvent): void {
     if (!this.state.bgCanvas()) return;
     PointerEventHandler.handleWheel(e, this.pointerContext);
@@ -331,11 +375,13 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scaleBarRef?.show();
   }
 
+  /** Routes pointer-down to box creation, selection, or resize via `PointerEventHandler`. */
   onPointerDown(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
     PointerEventHandler.handlePointerDown(e, this.magicHandler, this.pointerContext);
   }
 
+  /** Finalises the current interaction and rebuilds the spatial index. */
   onPointerUp(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
     PointerEventHandler.handlePointerUp(e, this.pointerContext);
@@ -343,6 +389,11 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
+  /**
+   * Handles ongoing pointer movement.
+   * If the cursor leaves the canvas while an interaction is active, synthesises
+   * a pointer-up to cleanly end the gesture.
+   */
   onPointerMove(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
 
@@ -364,6 +415,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scaleBarRef?.show();
   }
 
+  /** Starts a single-finger drag or records the initial two-finger pinch distance. */
   onTouchStart(e: TouchEvent): void {
     e.preventDefault();
     if (e.touches.length >= 2) {
@@ -374,6 +426,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     }
   }
 
+  /** Dispatches two-finger moves to `handlePinchZoom` and single-finger moves to pointer logic. */
   onTouchMove(e: TouchEvent): void {
     e.preventDefault();
     if (e.touches.length >= 2) {
@@ -383,6 +436,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     }
   }
 
+  /** Ends the current touch gesture and resets the pinch distance. */
   onTouchEnd(e: TouchEvent): void {
     e.preventDefault();
     this._lastPinchDist = null;
@@ -391,8 +445,13 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     }
   }
 
+  /** Distance between the two touch points at the previous pinch event; null when not pinching. */
   private _lastPinchDist: number | null = null;
 
+  /**
+   * Wraps a `Touch` point in a synthetic `PointerEvent` so the shared pointer
+   * handler pipeline can process touch and mouse events uniformly.
+   */
   private touchToPointer(touch: Touch): PointerEvent {
     return new PointerEvent('pointermove', {
       clientX: touch.clientX,
@@ -404,12 +463,21 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     });
   }
 
+  /** Euclidean distance (CSS pixels) between two touch points. */
   private pinchDist(t0: Touch, t1: Touch): number {
     const dx = t1.clientX - t0.clientX;
     const dy = t1.clientY - t0.clientY;
     return Math.sqrt(dx * dx + dy * dy);
   }
 
+  /**
+   * Applies a pinch-zoom step, keeping the midpoint between the two fingers
+   * fixed in absolute image coordinates.
+   *
+   * Computes the zoom ratio from the change in finger distance, converts the
+   * midpoint to image-space, and adjusts the camera translation so that the
+   * midpoint does not appear to move.
+   */
   private handlePinchZoom(t0: Touch, t1: Touch): void {
     const bgc = this.state.bgCanvas();
     if (!bgc || this._lastPinchDist === null) return;
@@ -442,6 +510,10 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.zoomChange.emit(newCamera.zoom);
   }
 
+  /**
+   * Animates the camera to frame the specified box at a comfortable zoom level.
+   * No-ops if the box is not found or the background is not yet loaded.
+   */
   zoomToBox(boxId: number | null | undefined): void {
     const bgc = this.state.bgCanvas();
     if (!bgc) return;
@@ -463,6 +535,11 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   // ── Quadtree ─────────────────────────────────────────────────────────────
 
+  /**
+   * Rebuilds the spatial quadtree from the current box list.
+   * Called after every structural change: box added, deleted, resized, or
+   * after history undo/redo. Also called once at startup via the box-sync effect.
+   */
   protected rebuildIndex(): void {
     this.quadtree = LifecycleManager.rebuildIndex(
       this.state.localBoxes(),
@@ -473,6 +550,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
+  /** Handles a box-type selection from the right-click context menu. */
   onContextMenuSelect(type: BoxType): void {
     if (this.state.readOnlyMode()) return;
     const wp = this.state.contextMenuState();
@@ -497,12 +575,14 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.closeContextMenu();
   }
 
+  /** Hides the context menu by resetting its state to the closed sentinel. */
   closeContextMenu(): void {
     this.state.updateContextMenu(ContextMenuUtils.close());
   }
 
   // ── Mode toggles ──────────────────────────────────────────────────────────
 
+  /** Toggles box-creation mode on/off and notifies the parent. */
   toggleCreateMode(): void {
     if (this.state.readOnlyMode()) return;
     this.state.toggleCreateMode();
@@ -512,12 +592,14 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.createModeChange.emit(this.state.isCreateMode());
   }
 
+  /** Toggles magic-wand (auto-detect) mode on/off and notifies the parent. */
   toggleMagicMode(): void {
     if (this.state.readOnlyMode()) return;
     this.state.toggleMagicMode();
     this.magicModeChange.emit(this.state.isMagicMode());
   }
 
+  /** Toggles measurement (ruler) mode on/off and notifies the parent. */
   toggleMeasurementMode(): void {
     if (this.state.readOnlyMode()) return;
     MeasurementHandler.toggleMeasurementMode(this.state);
@@ -525,6 +607,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
+  /** Updates the real-world dimensions used by the measurement overlay (e.g. metres). */
   updateMetricDimensions(width: number, height: number): void {
     MeasurementHandler.updateMetricDimensions(width, height, this.state);
     this.scheduleRender();
@@ -532,6 +615,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   // ── Clipboard & undo ──────────────────────────────────────────────────────
 
+  /** Reverts the last recorded action and refreshes the canvas. */
   private handleUndo(): void {
     if (this.state.readOnlyMode()) return;
     this.historyService.undo();
@@ -539,6 +623,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
+  /** Re-applies the most recently undone action and refreshes the canvas. */
   private handleRedo(): void {
     if (this.state.readOnlyMode()) return;
     this.historyService.redo();
@@ -546,6 +631,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
+  /** Copies the currently selected box to the internal clipboard. */
   private handleCopy(): void {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
@@ -553,6 +639,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.state.updateClipboard(ClipboardManager.copyBox(selected, this.state.localBoxes()));
   }
 
+  /** Pastes the clipboard box near the current cursor position. */
   private handlePaste(): void {
     if (this.state.readOnlyMode()) return;
     const clipboard = this.state.clipboard();
@@ -587,6 +674,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.nametagMetricsCache.delete(String(boxId));
   }
 
+  /** Deletes the currently selected box and clears the selection. */
   private handleDelete(): void {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
@@ -598,6 +686,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
+  /** Cancels the active mode (measurement → create/magic → normal) on Escape. */
   private handleEscape(): void {
     if (this.state.measurementState().isActive) {
       this.toggleMeasurementMode();
@@ -615,6 +704,16 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   // ── Visible box query ────────────────────────────────────────────────────
 
+  /**
+   * Returns the subset of boxes that overlap the given view bounds.
+   *
+   * Uses the quadtree for an O(log n) spatial query, then falls back to the
+   * full box list if the index has not been built yet. The currently selected
+   * box is always included (even if panned off-screen) so handles remain visible
+   * during a drag that extends beyond the viewport.
+   *
+   * @param bounds - Visible area in absolute image coordinates.
+   */
   private queryVisible(bounds: { minX: number; minY: number; maxX: number; maxY: number }): Box[] {
     if (!this.state.bgCanvas()) return [];
 
