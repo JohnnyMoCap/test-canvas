@@ -80,7 +80,7 @@ export class PointerEventHandler {
     if (this.handleSelectedBoxInteraction(event, absPos, canvas, state)) return;
 
     // Selection (clicking on unselected box) (blocked in read-only and when CTRL pressed)
-    if (this.handleBoxSelection(absPos, state, quadtree, nametagMetricsCache)) return;
+    if (this.handleBoxSelection(absPos, state, quadtree, nametagMetricsCache, canvas)) return;
 
     // PRIORITY 8: Camera Pan
     this.handleCameraPanStart(event, state);
@@ -232,6 +232,7 @@ export class PointerEventHandler {
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
+    canvas: HTMLCanvasElement,
   ): boolean {
     const boxes = state.localBoxes();
     const bgc = state.bgCanvas();
@@ -251,6 +252,8 @@ export class PointerEventHandler {
       nametagMetricsCache,
       ctx,
       state.selectedBoxId(),
+      canvas.width,
+      canvas.height,
     );
 
     if (hoveredBoxId) {
@@ -272,6 +275,8 @@ export class PointerEventHandler {
               camera,
               nametagMetricsCache,
               ctx,
+              canvas.width,
+              canvas.height,
             );
 
           if (clickedOnBox || clickedOnNametag) {
@@ -329,7 +334,7 @@ export class PointerEventHandler {
 
     // Handle hover detection (skip in measurement mode)
     if (!state.measurementState().isActive) {
-      this.handleHoverDetection(absPos, state, quadtree, nametagMetricsCache);
+      this.handleHoverDetection(absPos, state, quadtree, nametagMetricsCache, canvas);
     } else {
       // Update cursor for measurement mode
       const cursor = MeasurementHandler.getCursorStyle(absPos, state.camera(), state);
@@ -462,6 +467,7 @@ export class PointerEventHandler {
     state: StateManager,
     quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
+    canvas: HTMLCanvasElement,
   ): void {
     const boxes = state.localBoxes();
     const bgc = state.bgCanvas();
@@ -481,6 +487,8 @@ export class PointerEventHandler {
       nametagMetricsCache,
       ctx,
       state.selectedBoxId(),
+      canvas.width,
+      canvas.height,
     );
 
     state.updateHoverState(hoveredBoxId);

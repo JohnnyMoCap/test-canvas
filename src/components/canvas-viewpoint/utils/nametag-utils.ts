@@ -6,6 +6,63 @@ import { Box, getBoxId } from '../../../interface/boxes.interface';
  */
 export class NametagUtils {
   /**
+   * Computes the visible region of absolute space, given the camera and canvas size.
+   * Returns null when canvas dimensions are unknown (visibility can't be determined).
+   */
+  private static getViewportBounds(
+    camera: Camera,
+    canvasWidth?: number,
+    canvasHeight?: number,
+  ): { left: number; right: number; top: number; bottom: number } | null {
+    if (!canvasWidth || !canvasHeight) return null;
+    const halfW = canvasWidth / (2 * camera.zoom);
+    const halfH = canvasHeight / (2 * camera.zoom);
+    return {
+      left: camera.x - halfW,
+      right: camera.x + halfW,
+      top: camera.y - halfH,
+      bottom: camera.y + halfH,
+    };
+  }
+
+  /**
+   * Picks which box corner to anchor the nametag to. Prefers a corner whose
+   * resulting tag rectangle is FULLY on-screen (a corner point being visible
+   * isn't enough - the tag extends up and to the right of it, and that
+   * extent can still land off-screen), falling back to the topmost corner
+   * when no placement keeps the tag fully visible.
+   */
+  private static pickLabelCorner(
+    absCorners: { x: number; y: number }[],
+    tagWidth: number,
+    tagHeight: number,
+    viewport: { left: number; right: number; top: number; bottom: number } | null,
+  ): { x: number; y: number } {
+    const tagFullyVisible = (c: { x: number; y: number }) => {
+      if (!viewport) return true;
+      const tagX = c.x;
+      const tagY = c.y - tagHeight;
+      return (
+        tagX >= viewport.left &&
+        tagX + tagWidth <= viewport.right &&
+        tagY >= viewport.top &&
+        tagY + tagHeight <= viewport.bottom
+      );
+    };
+
+    const visibleCorners = absCorners.filter(tagFullyVisible);
+    const candidates = visibleCorners.length > 0 ? visibleCorners : absCorners;
+
+    let best = candidates[0];
+    for (const corner of candidates) {
+      if (corner.y < best.y) {
+        best = corner;
+      }
+    }
+    return best;
+  }
+
+  /**
    * Gets nametag bounds in absolute space
    */
   static getNametagBounds(
@@ -13,6 +70,8 @@ export class NametagUtils {
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D,
+    canvasWidth?: number,
+    canvasHeight?: number,
   ): { x: number; y: number; w: number; h: number } | null {
     const text = String(getBoxId(box.raw));
 
@@ -53,16 +112,11 @@ export class NametagUtils {
       y: box.y + (c.lx * sin + c.ly * cos),
     }));
 
-    // Find topmost corner
-    let topmostCorner = absCorners[0];
-    for (const corner of absCorners) {
-      if (corner.y < topmostCorner.y) {
-        topmostCorner = corner;
-      }
-    }
+    const viewport = this.getViewportBounds(camera, canvasWidth, canvasHeight);
+    const labelCorner = this.pickLabelCorner(absCorners, tagWidth, tagHeight, viewport);
 
-    const tagX = topmostCorner.x;
-    const tagY = topmostCorner.y - tagHeight;
+    const tagX = labelCorner.x;
+    const tagY = labelCorner.y - tagHeight;
 
     return { x: tagX, y: tagY, w: tagWidth, h: tagHeight };
   }
@@ -77,8 +131,10 @@ export class NametagUtils {
     camera: Camera,
     metricsCache: Map<string, TextMetrics>,
     ctx?: CanvasRenderingContext2D,
+    canvasWidth?: number,
+    canvasHeight?: number,
   ): boolean {
-    const bounds = this.getNametagBounds(box, camera, metricsCache, ctx);
+    const bounds = this.getNametagBounds(box, camera, metricsCache, ctx, canvasWidth, canvasHeight);
     if (!bounds) return false;
 
     // Simple AABB check (nametag is always horizontal)
@@ -136,15 +192,11 @@ export class NametagUtils {
       y: box.y + (c.lx * sin + c.ly * cos),
     }));
 
-    // Find topmost corner in absolute space (smallest y)
-    let topmostCorner = absCorners[0];
-    for (const corner of absCorners) {
-      if (corner.y < topmostCorner.y) {
-        topmostCorner = corner;
-      }
-    }
+    // Pick a corner to anchor the tag to, preferring one whose tag rect is fully on-screen
+    const viewport = this.getViewportBounds(camera, canvasWidth, canvasHeight);
+    const labelCorner = this.pickLabelCorner(absCorners, tagWidth, tagHeight, viewport);
 
-    // Draw nametag at topmost corner, always horizontal
+    // Draw nametag at the chosen corner, always horizontal
     ctx.save();
     ctx.setTransform(
       camera.zoom,
@@ -155,8 +207,8 @@ export class NametagUtils {
       canvasHeight / 2 - camera.y * camera.zoom,
     );
 
-    const tagX = topmostCorner.x;
-    const tagY = topmostCorner.y - tagHeight;
+    const tagX = labelCorner.x;
+    const tagY = labelCorner.y - tagHeight;
 
     // Draw nametag background
     ctx.fillStyle = isPending ? box.color.replace(')', ', 0.4)') : box.color;

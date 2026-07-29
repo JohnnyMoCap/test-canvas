@@ -29,6 +29,8 @@ export class HoverHandler {
     nametagMetricsCache: Map<string, TextMetrics>,
     ctx: CanvasRenderingContext2D | undefined,
     selectedBoxId?: number | null,
+    canvasWidth?: number,
+    canvasHeight?: number,
   ): number | null {
     // Check selected box first (including rotation knob) since it might not be in the query range
     if (selectedBoxId != null) {
@@ -55,7 +57,16 @@ export class HoverHandler {
 
       if (
         showNametags &&
-        NametagUtils.pointInNametag(wx, wy, AbsoluteBox, camera, nametagMetricsCache, ctx)
+        NametagUtils.pointInNametag(
+          wx,
+          wy,
+          AbsoluteBox,
+          camera,
+          nametagMetricsCache,
+          ctx,
+          canvasWidth,
+          canvasHeight,
+        )
       ) {
         return getBoxId(rawBox);
       }
