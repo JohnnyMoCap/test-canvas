@@ -95,7 +95,13 @@ When `autoTune = false`, the `manualTolerance` value is used directly without an
 
 ## Step 3 — Flood Fill (BFS)
 
-This is the core algorithm. Starting from the seed pixel (the clicked pixel), we expand outward to all neighbouring pixels whose colour is within tolerance of the seed colour.
+This is the core algorithm. Starting from the seed pixel (the clicked pixel), we expand outward to all neighbouring pixels that are similar enough to the seed on **any** of three cues — not colour alone (see `flood-fill.ts`):
+
+1. **Colour** - Manhattan RGB distance from the seed pixel, within `tolerance`. The original, primary cue; alone it's enough for solid-coloured objects on a contrasting background.
+2. **Gradient** - local Sobel edge strength/direction close to the seed neighbourhood's. Lets the fill continue across an anti-aliased or textured edge (a rivet's rim, a crack's outline) where the raw colour drifts pixel-to-pixel but the "this is an edge, and it points this way" character stays consistent.
+3. **Shading** - local brightness variability close to the seed neighbourhood's. Lets the fill continue across a smooth brightness gradient (a dent's shaded basin) that a tight colour tolerance would otherwise stop at partway through.
+
+Cues 2 and 3 only apply when the seed neighbourhood itself shows a meaningful amount of that signal - two different flat, textureless colours both read as "no edge, no variance," which would otherwise make them indistinguishable and let the fill leak across any flat-to-flat colour boundary.
 
 ### Algorithm
 
@@ -108,12 +114,12 @@ while queue is not empty:
     mark pixel as part of the region
 
     for each neighbour (up to 8, depending on connectivity setting):
-        if not visited and colour_distance(neighbour, seed) ≤ tolerance:
+        if not visited and (colour_similar OR gradient_similar OR shading_similar):
             add to queue
             mark as visited
 ```
 
-This is standard Breadth-First Search (BFS), sometimes called "paint bucket" fill.
+This is standard Breadth-First Search (BFS), sometimes called "paint bucket" fill, extended with the two extra acceptance cues above.
 
 ### Colour Distance
 
@@ -183,11 +189,17 @@ And the angle of the first principal component is:
 
 If the region is approximately circular (both variances are equal and cross-covariance is near zero), no rotation is applied — it would be meaningless and numerically unstable.
 
+### Width/Height Must Be Measured Along the Rotated Axes, Not the World Axes
+
+A box is rendered by translating to its centre, rotating the canvas by `box.rotation`, then drawing a plain axis-aligned `width × height` rectangle in that now-rotated frame. That means `width`/`height` have to be the region's extent **along its own rotated axes** — reusing the plain axis-aligned bounding box's width/height next to a non-zero rotation over-sizes and misaligns the drawn box (a diagonal region's axis-aligned bbox is wider than its true extent along its own long/short axes).
+
+So after computing `rotation`, the Worker does a second pass over the already-collected accepted pixels (no extra memory - the BFS queue already holds every accepted position), rotating each one by `-rotation` around the mean position to find its min/max along the region's own local axes, then rotates that local centre back by `+rotation` to place it in image coordinates. See `computeOrientedBounds()` in `flood-fill.ts` (and the identical logic in `mask-to-box.ts` for the SAM engine, which has the same rotation + axis-aligned-size mismatch problem).
+
 ---
 
 ## Step 5 — Converting the Result to a Box
 
-The Worker returns coordinates in **background-image pixel space** (origin = top-left corner of the image).
+The Worker returns coordinates in **background-image pixel space** (origin = top-left corner of the image), already using the oriented (not axis-aligned) centre/width/height from the previous step.
 
 The app stores boxes in **normalized space** (origin = image centre, values in the range 0–1 expressed as fractions of the image size).
 

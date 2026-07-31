@@ -9,19 +9,20 @@ import type { SamWorkerRequest, SamWorkerResponse } from '../workers/sam.types';
 import type { MagicEngine } from './magic-engine';
 
 /**
- * Selectable SAM checkpoints - both are SlimSAM (a pruned distillation of
- * Meta's Segment Anything, small enough to run client-side), differing only
- * in how much of the original model was kept. More retained weights =
- * better mask quality (particularly for the small/subtle local features
- * this tool is aimed at) at the cost of a larger download. Exposed as a
- * choice rather than picking one, since there was no way to A/B them
- * against real photos in this environment - see `MIN_CONFIDENT_IOU` in
- * `sam.worker.ts` for the other lever on "does it pick the small local
- * feature or the whole panel."
+ * Selectable SAM checkpoints, in increasing order of size/quality. The two
+ * SlimSAM options are a pruned distillation of Meta's Segment Anything
+ * (small enough to comfortably run client-side); `sam-vit-base` is the
+ * original, un-pruned model - much larger and slower in-browser, but the
+ * highest-quality masks available as a drop-in `SamModel.from_pretrained`
+ * swap. Exposed as a choice rather than picking one, since there was no way
+ * to A/B them against real photos in this environment - see
+ * `MIN_CONFIDENT_IOU` in `sam.worker.ts` for the other lever on "does it
+ * pick the small local feature or the whole panel."
  */
 export const SAM_MODEL_OPTIONS: { id: string; label: string }[] = [
   { id: 'Xenova/slimsam-77-uniform', label: 'SlimSAM 77% (more accurate, larger download)' },
   { id: 'Xenova/slimsam-50-uniform', label: 'SlimSAM 50% (smaller, faster)' },
+  { id: 'Xenova/sam-vit-base', label: 'SAM ViT-Base (full model, best quality, largest/slowest)' },
 ];
 const DEFAULT_SAM_MODEL_ID = SAM_MODEL_OPTIONS[0].id;
 

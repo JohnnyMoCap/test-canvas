@@ -60,6 +60,16 @@ export class PointerEventHandler {
       return;
     }
 
+    // In magic mode, right-click pans instead of opening the box-type context
+    // menu (its normal role - see the button===2 branch below) or triggering
+    // the magic wand (left-click only) - lets the user reposition the view
+    // without leaving magic mode. Ctrl/Cmd+left-click already does the same
+    // via `shouldSkipInteractions` above.
+    if (state.isMagicMode() && event.button === 2) {
+      this.handleCameraPanStart(event, state);
+      return;
+    }
+
     if (state.isMagicMode() && event.button === 0) {
       magicHandler.handlePointerDown(event, canvas, state);
       return;
