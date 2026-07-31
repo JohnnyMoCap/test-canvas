@@ -8,6 +8,7 @@ import { CursorStyles } from '../cursor/cursor-styles';
 import { BoxStateUtils } from '../utils/box-state-utils';
 import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 import { isNullOrUndefined } from '../utils/validation-utils';
+import { TouchUtils } from '../utils/touch-utils';
 
 /**
  * Handler for hover detection and interaction point detection
@@ -31,6 +32,7 @@ export class HoverHandler {
     selectedBoxId?: number | null,
     canvasWidth?: number,
     canvasHeight?: number,
+    isCoarsePointer = false,
   ): number | null {
     // Check selected box first (including rotation knob) since it might not be in the query range
     if (selectedBoxId != null) {
@@ -39,7 +41,7 @@ export class HoverHandler {
         const AbsoluteBox = BoxUtils.normalizeBoxToAbsolute(selectedBox, imageWidth, imageHeight);
         if (AbsoluteBox) {
           // Check rotation knob first (it can be outside the small query range)
-          if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera)) {
+          if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera, isCoarsePointer)) {
             return selectedBoxId;
           }
         }
@@ -87,9 +89,11 @@ export class HoverHandler {
     wy: number,
     boxGeometry: AbsoluteBoxGeometry,
     camera: Camera,
+    isCoarsePointer = false,
   ): boolean {
     const knobDistance = 30 / camera.zoom;
-    const knobSize = 10 / camera.zoom;
+    // Only the hit-test radius grows on touch/pen - the knob's visual position is unchanged.
+    const knobSize = (10 / camera.zoom) * (isCoarsePointer ? TouchUtils.HIT_TARGET_MULTIPLIER : 1);
 
     // Calculate knob position on the shorter side
     const localKnobX = 0;
@@ -120,9 +124,9 @@ export class HoverHandler {
     wy: number,
     box: { x: number; y: number; w: number; h: number; rotation: number },
     camera: Camera,
+    isCoarsePointer = false,
   ): ResizeCorner | null {
-    const handleSize = 12 / camera.zoom;
-    const threshold = handleSize;
+    const threshold = (12 / camera.zoom) * (isCoarsePointer ? TouchUtils.HIT_TARGET_MULTIPLIER : 1);
 
     // Transform point to box local space (accounting for rotation)
     const dx = wx - box.x;
@@ -164,6 +168,7 @@ export class HoverHandler {
     imageHeight: number,
     camera: Camera,
     state: StateManager,
+    isCoarsePointer = false,
   ): void {
     // In create mode, always use crosshair
     if (state.isCreateMode() || state.isMagicMode()) {
@@ -184,7 +189,7 @@ export class HoverHandler {
 
       if (!isNullOrUndefined(hoveredBoxId) && hoveredBoxId === selectedBoxId && AbsoluteBox) {
         // Check rotation knob first
-        if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera)) {
+        if (this.detectRotationKnob(wx, wy, AbsoluteBox, camera, isCoarsePointer)) {
           state.setCursor(CursorStyles.getRotationKnobCursor());
           return;
         }
@@ -192,7 +197,7 @@ export class HoverHandler {
 
       if (AbsoluteBox) {
         // Check corner handles, corners are clickable outside the internal box area
-        const corner = this.detectCornerHandle(wx, wy, AbsoluteBox, camera);
+        const corner = this.detectCornerHandle(wx, wy, AbsoluteBox, camera, isCoarsePointer);
         if (corner) {
           const cursor = CursorStyles.getResizeCursor(corner, AbsoluteBox);
           state.setCursor(cursor);

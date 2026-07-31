@@ -43,7 +43,7 @@ export class CameraHandler {
   }
 
   /**
-   * Perform camera zoom
+   * Perform camera zoom from a wheel delta, anchored on a world point.
    */
   static zoom(
     delta: number,
@@ -59,22 +59,79 @@ export class CameraHandler {
   ): Camera {
     const zoomSpeed = 0.001;
     const zoomFactor = Math.exp(-delta * zoomSpeed);
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, camera.zoom * zoomFactor));
+    return this.zoomTo(
+      camera.zoom * zoomFactor,
+      absX,
+      absY,
+      camera,
+      canvasWidth,
+      canvasHeight,
+      imageWidth,
+      imageHeight,
+      minZoom,
+      maxZoom,
+    );
+  }
 
-    // Calculate new camera position to zoom towards world point
-    const dx = absX - camera.x;
-    const dy = absY - camera.y;
+  /**
+   * Perform camera zoom from a multiplicative ratio (e.g. pinch distance
+   * change), anchored on a world point. Shares the same anchor math as
+   * `zoom()` so wheel-zoom and pinch-zoom can never drift apart.
+   */
+  static zoomByRatio(
+    ratio: number,
+    absX: number,
+    absY: number,
+    camera: Camera,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    minZoom: number,
+    maxZoom: number = 10,
+  ): Camera {
+    return this.zoomTo(
+      camera.zoom * ratio,
+      absX,
+      absY,
+      camera,
+      canvasWidth,
+      canvasHeight,
+      imageWidth,
+      imageHeight,
+      minZoom,
+      maxZoom,
+    );
+  }
+
+  /**
+   * Moves the camera to `targetZoom` (clamped to `[minZoom, maxZoom]`) while
+   * keeping the world point `(absX, absY)` visually fixed on screen.
+   */
+  private static zoomTo(
+    targetZoom: number,
+    absX: number,
+    absY: number,
+    camera: Camera,
+    canvasWidth: number,
+    canvasHeight: number,
+    imageWidth: number,
+    imageHeight: number,
+    minZoom: number,
+    maxZoom: number,
+  ): Camera {
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
 
     // When zooming in (newZoom > camera.zoom), we want to move camera towards the point
     // scale should be positive and < 1 when zooming in
+    const dx = absX - camera.x;
+    const dy = absY - camera.y;
     const scale = 1 - camera.zoom / newZoom;
-    const newX = camera.x + dx * scale;
-    const newY = camera.y + dy * scale;
 
     const newCamera: Camera = {
       ...camera,
-      x: newX,
-      y: newY,
+      x: camera.x + dx * scale,
+      y: camera.y + dy * scale,
       zoom: newZoom,
     };
 

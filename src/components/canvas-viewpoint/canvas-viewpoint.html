@@ -4,9 +4,7 @@
   (pointerdown)="onPointerDown($event)"
   (pointerup)="onPointerUp($event)"
   (pointermove)="onPointerMove($event)"
-  (touchstart)="onTouchStart($event)"
-  (touchmove)="onTouchMove($event)"
-  (touchend)="onTouchEnd($event)"
+  (pointercancel)="onPointerCancel($event)"
   (contextmenu)="$event.preventDefault()"
 >
   <canvas #canvasEl [style.filter]="canvasFilter()"></canvas>

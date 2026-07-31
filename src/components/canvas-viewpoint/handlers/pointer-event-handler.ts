@@ -16,6 +16,7 @@ import { MeasurementHandler } from './measurement.handler';
 import { MagicDetectionHandler } from './magic-detection.handler';
 import { isNullOrUndefined } from '../utils/validation-utils';
 import { CursorStyles } from '../cursor/cursor-styles';
+import { TouchUtils } from '../utils/touch-utils';
 
 /**
  * Routes pointer events to appropriate handlers based on state
@@ -55,7 +56,7 @@ export class PointerEventHandler {
     }
 
     if (state.measurementState().isActive && event.button == 0) {
-      this.handleMeasurementMode(absPos, state);
+      this.handleMeasurementMode(absPos, state, TouchUtils.isCoarsePointer(event.pointerType));
       return;
     }
 
@@ -87,8 +88,12 @@ export class PointerEventHandler {
     return;
   }
 
-  private static handleMeasurementMode(absPos: { x: number; y: number }, state: StateManager) {
-    MeasurementHandler.handlePointerDown(absPos, state.camera(), state);
+  private static handleMeasurementMode(
+    absPos: { x: number; y: number },
+    state: StateManager,
+    isCoarsePointer: boolean,
+  ) {
+    MeasurementHandler.handlePointerDown(absPos, state.camera(), state, isCoarsePointer);
   }
 
   private static handleContextMenu(
@@ -172,7 +177,15 @@ export class PointerEventHandler {
     box: Box,
     state: StateManager,
   ): boolean {
-    if (!HoverHandler.detectRotationKnob(absPos.x, absPos.y, boxGeometry, state.camera()))
+    if (
+      !HoverHandler.detectRotationKnob(
+        absPos.x,
+        absPos.y,
+        boxGeometry,
+        state.camera(),
+        TouchUtils.isCoarsePointer(event.pointerType),
+      )
+    )
       return false;
 
     const rotationInfo = BoxManipulationHandler.startRotation(absPos.x, absPos.y, boxGeometry);
@@ -191,7 +204,13 @@ export class PointerEventHandler {
     box: Box,
     state: StateManager,
   ): boolean {
-    const corner = HoverHandler.detectCornerHandle(absPos.x, absPos.y, boxGeometry, state.camera());
+    const corner = HoverHandler.detectCornerHandle(
+      absPos.x,
+      absPos.y,
+      boxGeometry,
+      state.camera(),
+      TouchUtils.isCoarsePointer(event.pointerType),
+    );
 
     if (!corner) return false;
 
@@ -332,12 +351,21 @@ export class PointerEventHandler {
     if (this.handleDrag(absPos, state)) return;
     if (this.handleCameraPan(event, canvas, state)) return;
 
+    const isCoarsePointer = TouchUtils.isCoarsePointer(event.pointerType);
+
     // Handle hover detection (skip in measurement mode)
     if (!state.measurementState().isActive) {
-      this.handleHoverDetection(absPos, state, quadtree, nametagMetricsCache, canvas);
+      this.handleHoverDetection(
+        absPos,
+        state,
+        quadtree,
+        nametagMetricsCache,
+        canvas,
+        isCoarsePointer,
+      );
     } else {
       // Update cursor for measurement mode
-      const cursor = MeasurementHandler.getCursorStyle(absPos, state.camera(), state);
+      const cursor = MeasurementHandler.getCursorStyle(absPos, state.camera(), state, isCoarsePointer);
       state.setCursor(cursor);
     }
   }
@@ -445,8 +473,11 @@ export class PointerEventHandler {
     if (!bgc) return false;
 
     const camera = state.camera();
-    const dx = event.clientX - state.lastPointer().x;
-    const dy = event.clientY - state.lastPointer().y;
+    // Pan math operates in physical canvas pixels (same space as canvas.width/height),
+    // but clientX/Y deltas are CSS pixels - scale by DPR so the point under the
+    // pointer stays exactly fixed instead of drifting on any DPR != 1 display.
+    const dx = (event.clientX - state.lastPointer().x) * state.devicePixelRatio();
+    const dy = (event.clientY - state.lastPointer().y) * state.devicePixelRatio();
     const newCamera = CameraHandler.pan(
       dx,
       dy,
@@ -468,6 +499,7 @@ export class PointerEventHandler {
     quadtree: Quadtree<Box> | undefined,
     nametagMetricsCache: Map<string, TextMetrics>,
     canvas: HTMLCanvasElement,
+    isCoarsePointer = false,
   ): void {
     const boxes = state.localBoxes();
     const bgc = state.bgCanvas();
@@ -489,6 +521,7 @@ export class PointerEventHandler {
       state.selectedBoxId(),
       canvas.width,
       canvas.height,
+      isCoarsePointer,
     );
 
     state.updateHoverState(hoveredBoxId);
@@ -504,6 +537,7 @@ export class PointerEventHandler {
         bgc.height,
         camera,
         state,
+        isCoarsePointer,
       );
     }
   }
@@ -528,15 +562,17 @@ export class PointerEventHandler {
       state.camera(),
     );
 
+    const isCoarsePointer = TouchUtils.isCoarsePointer(event.pointerType);
+
     // Handle measurement mode
     if (this.completeMeasurement(state)) return;
 
     // Complete interactions
     if (this.completeBoxCreation(absPos, state, historyService)) return;
-    if (this.completeBoxManipulation(absPos, state, historyService)) return;
+    if (this.completeBoxManipulation(absPos, state, historyService, isCoarsePointer)) return;
 
     // Complete camera pan
-    this.completeCameraPan(absPos, state);
+    this.completeCameraPan(absPos, state, isCoarsePointer);
   }
 
   private static completeMeasurement(state: StateManager): boolean {
@@ -580,6 +616,7 @@ export class PointerEventHandler {
     absPos: { x: number; y: number },
     state: StateManager,
     historyService: HistoryService,
+    isCoarsePointer = false,
   ): boolean {
     if (!state.isAnyInteractionActive()) return false;
 
@@ -615,12 +652,17 @@ export class PointerEventHandler {
       bgc.height,
       camera,
       state,
+      isCoarsePointer,
     );
 
     return true;
   }
 
-  private static completeCameraPan(absPos: { x: number; y: number }, state: StateManager): void {
+  private static completeCameraPan(
+    absPos: { x: number; y: number },
+    state: StateManager,
+    isCoarsePointer = false,
+  ): void {
     const boxes = state.localBoxes();
     const bgc = state.bgCanvas();
     const camera = state.camera();
@@ -638,6 +680,7 @@ export class PointerEventHandler {
         bgc.height,
         camera,
         state,
+        isCoarsePointer,
       );
     }
   }

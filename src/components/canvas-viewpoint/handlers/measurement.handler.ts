@@ -1,6 +1,7 @@
 ﻿import { MeasurementPoint, MeasurementState, Camera } from '../core/types';
 import { MeasurementUtils } from '../utils/measurement-utils';
 import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
+import { TouchUtils } from '../utils/touch-utils';
 
 /**
  * Handler for measurement tool interactions
@@ -11,7 +12,12 @@ export class MeasurementHandler {
    * Handle pointer down in measurement mode
    * Returns true if the event was handled
    */
-  static handlePointerDown(absPos: MeasurementPoint, camera: Camera, state: StateManager) {
+  static handlePointerDown(
+    absPos: MeasurementPoint,
+    camera: Camera,
+    state: StateManager,
+    isCoarsePointer = false,
+  ) {
     const measurementState = state.measurementState();
     if (!measurementState.isActive) return;
 
@@ -19,8 +25,10 @@ export class MeasurementHandler {
     const pointTwo = measurementState.pointTwo;
 
     // Calculate hit detection threshold - use a fixed absolute-space size that represents ~15 pixels on screen
-    // This ensures consistent clicking regardless of zoom level
-    const hitThreshold = 15 / camera.zoom;
+    // This ensures consistent clicking regardless of zoom level. Enlarged on touch/pen so grabbing
+    // a ruler endpoint doesn't require pixel-precise contact.
+    const hitThreshold =
+      (15 / camera.zoom) * (isCoarsePointer ? TouchUtils.HIT_TARGET_MULTIPLIER : 1);
 
     // Check if clicking on point two (higher priority)
     if (pointTwo && MeasurementUtils.isPointNear(absPos, pointTwo, hitThreshold)) {
@@ -112,13 +120,15 @@ export class MeasurementHandler {
     absPos: MeasurementPoint | null,
     camera: Camera,
     state: StateManager,
+    isCoarsePointer = false,
   ): string {
     const measurementState = state.measurementState();
     if (!measurementState.isActive || !absPos) return 'crosshair';
 
     const pointOne = measurementState.pointOne;
     const pointTwo = measurementState.pointTwo;
-    const hitThreshold = 15 / camera.zoom;
+    const hitThreshold =
+      (15 / camera.zoom) * (isCoarsePointer ? TouchUtils.HIT_TARGET_MULTIPLIER : 1);
 
     // Check if hovering over a point
     if (pointTwo && MeasurementUtils.isPointNear(absPos, pointTwo, hitThreshold)) {

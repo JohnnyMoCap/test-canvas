@@ -15,6 +15,7 @@ import { Quadtree } from './core/quadtree';
 import { Camera, PointerHandlerContext, TextMetrics } from './core/types';
 import { BoxType } from './core/creation-state';
 import { CameraUtils } from './utils/camera-utils';
+import { CameraHandler } from './handlers/camera.handler';
 import { BoxCreationUtils } from './utils/box-creation-utils';
 import { ContextMenuUtils } from './utils/context-menu-utils';
 import { FrameRenderer } from './utils/frame-renderer';
@@ -28,6 +29,7 @@ import { PointerEventHandler } from './handlers/pointer-event-handler';
 import { ClipboardManager } from './utils/clipboard-manager';
 import { isNullOrUndefined } from './utils/validation-utils';
 import { MagicDetectionHandler } from './handlers/magic-detection.handler';
+import { GestureRecognizerHandler, PinchDelta } from './handlers/gesture-recognizer.handler';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
 import { ScaleBarComponent } from './scale-bar.component';
@@ -40,10 +42,27 @@ import { BaseViewportComponent } from './base-viewport.component';
  * magic detection, measurement, undo/redo, clipboard, and touch support.
  *
  * ## Interaction model
- * - **Left-click + drag**: create/resize/move boxes (delegated to `PointerEventHandler`)
+ * - **Left-click + drag / one-finger touch**: create/resize/move boxes
+ *   (delegated to `PointerEventHandler`)
  * - **Middle-click + drag**: pan the camera (via `shouldBasePan` override)
- * - **Scroll wheel / pinch**: cursor-centred zoom
+ * - **Scroll wheel / two-finger pinch**: cursor- or midpoint-centred zoom
+ * - **Two-finger drag**: pans the camera, simultaneously with pinch-zoom
  * - **Keyboard**: undo/redo/copy/paste/delete/escape via `HotkeyService`
+ *
+ * Touch is handled entirely through native Pointer Events (no parallel
+ * `TouchEvent` listeners) — this avoids double-handling, since a touch fires
+ * both `pointerdown`/`touchstart` for the same physical contact.
+ *
+ * ## Multi-touch
+ * All raw multi-pointer bookkeeping (how many fingers, single vs. pinch, a
+ * missed `pointerup` never leaving a gesture stuck) is owned by
+ * `GestureRecognizerHandler` (`gestureRecognizer`) — a Layer 1 module below
+ * `PointerEventHandler` (Layer 2) that turns raw pointer events into a small,
+ * unambiguous stream of semantic callbacks (`onPrimaryDown/Move/Up`,
+ * `onPinchStart/Change/End`, `onInterrupted`). This component only wires
+ * those callbacks to the existing, unchanged `PointerEventHandler`/
+ * `CameraHandler` calls — see `setupFeatureEffects()` for the wiring and
+ * `gesture-recognizer.handler.ts` for the state machine itself.
  *
  * ## State
  * All reactive state lives in `LabelingStateManager` (narrows the base class
@@ -168,6 +187,8 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   private hotkeyUnsubs: (() => void)[] = [];
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private magicHandler!: MagicDetectionHandler;
+  /** Layer 1 multi-pointer/pinch state machine; constructed in `setupFeatureEffects()`. */
+  private gestureRecognizer!: GestureRecognizerHandler;
   /** Spatial index of the current box set; rebuilt after every structural change. */
   protected quadtree?: Quadtree<Box>;
 
@@ -213,6 +234,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     super.ngOnDestroy();
     this.hotkeyUnsubs.forEach((fn) => fn());
     this.magicHandler.destroy();
+    this.gestureRecognizer?.destroy();
   }
 
   // ── Resize override ────────────────────────────────────────────────────────
@@ -277,6 +299,25 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   protected override setupFeatureEffects(): void {
     const opts = { injector: this.injector };
 
+    this.gestureRecognizer = new GestureRecognizerHandler(this.canvasRef.nativeElement, {
+      onPrimaryDown: (e) =>
+        PointerEventHandler.handlePointerDown(e, this.magicHandler, this.pointerContext),
+      onPrimaryMove: (e) => this.handlePrimaryMove(e),
+      onPrimaryUp: (e) => {
+        PointerEventHandler.handlePointerUp(e, this.pointerContext);
+        this.rebuildIndex();
+        this.scheduleRender();
+      },
+      onPinchStart: () => {},
+      onPinchChange: (delta) => this.applyPinchDelta(delta),
+      onPinchEnd: () => {},
+      onInterrupted: () => {
+        this.state.resetInteractionStates();
+        this.state.resetCreationState();
+        this.scheduleRender();
+      },
+    });
+
     // Sync local boxes from history service (but not during active interactions)
     effect(() => {
       if (this.state.isDraggingOrInteracting()) {
@@ -326,12 +367,12 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
   protected override setupFeatureHotkeys(): void {
     this.hotkeyUnsubs.push(
-      this.hotkeyService.on('UNDO', () => this.handleUndo()),
-      this.hotkeyService.on('REDO', () => this.handleRedo()),
-      this.hotkeyService.on('COPY', () => this.handleCopy()),
-      this.hotkeyService.on('PASTE', () => this.handlePaste()),
-      this.hotkeyService.on('DELETE', () => this.handleDelete()),
-      this.hotkeyService.on('ESCAPE', () => this.handleEscape()),
+      this.hotkeyService.on('UNDO', () => this.undo()),
+      this.hotkeyService.on('REDO', () => this.redo()),
+      this.hotkeyService.on('COPY', () => this.copySelectedBox()),
+      this.hotkeyService.on('PASTE', () => this.pasteClipboard()),
+      this.hotkeyService.on('DELETE', () => this.deleteSelectedBox()),
+      this.hotkeyService.on('ESCAPE', () => this.exitActiveMode()),
     );
   }
 
@@ -375,28 +416,42 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scaleBarRef?.show();
   }
 
-  /** Routes pointer-down to box creation, selection, or resize via `PointerEventHandler`. */
+  /** Delegates to `gestureRecognizer` — see its `onPrimaryDown`/`onPinchStart` wiring above. */
   onPointerDown(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
-    PointerEventHandler.handlePointerDown(e, this.magicHandler, this.pointerContext);
+    this.gestureRecognizer.handlePointerDown(e);
   }
 
-  /** Finalises the current interaction and rebuilds the spatial index. */
+  /** Delegates to `gestureRecognizer` — see its `onPrimaryUp`/`onPinchEnd` wiring above. */
   onPointerUp(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
-    PointerEventHandler.handlePointerUp(e, this.pointerContext);
-    this.rebuildIndex();
-    this.scheduleRender();
+    this.gestureRecognizer.handlePointerUp(e);
   }
 
   /**
-   * Handles ongoing pointer movement.
-   * If the cursor leaves the canvas while an interaction is active, synthesises
-   * a pointer-up to cleanly end the gesture.
+   * Delegates to `gestureRecognizer`, which routes cancel through the
+   * identical completion path as a normal pointer-up internally — no
+   * in-progress drag/resize/rotate/pinch is ever left stuck mid-interaction.
    */
+  onPointerCancel(e: PointerEvent): void {
+    this.gestureRecognizer.handlePointerCancel(e);
+  }
+
+  /** Delegates to `gestureRecognizer` — see its `onPrimaryMove`/`onPinchChange` wiring above. */
   onPointerMove(e: PointerEvent): void {
     if (!this.state.bgCanvas()) return;
+    this.gestureRecognizer.handlePointerMove(e);
+  }
 
+  /**
+   * Handles a recognized single-pointer move. If the pointer leaves the
+   * canvas bounds while a box interaction or box-creation drag is active,
+   * synthesises a pointer-up to cleanly end the gesture instead of letting
+   * it continue tracking off-canvas. This stays a component-level concern
+   * (not part of `GestureRecognizerHandler`) since it depends on Layer 3
+   * box-editing state (`isDraggingOrInteracting`/`isCreateMode`).
+   */
+  private handlePrimaryMove(e: PointerEvent): void {
     const canvas = this.canvasRef.nativeElement;
     const rect = canvas.getBoundingClientRect();
     const isOutsideCanvas =
@@ -406,7 +461,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
       e.clientY > rect.bottom;
 
     if (isOutsideCanvas && (this.state.isDraggingOrInteracting() || this.state.isCreateMode())) {
-      this.onPointerUp(e);
+      this.gestureRecognizer.handlePointerUp(e);
       return;
     }
 
@@ -415,99 +470,52 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scaleBarRef?.show();
   }
 
-  /** Starts a single-finger drag or records the initial two-finger pinch distance. */
-  onTouchStart(e: TouchEvent): void {
-    e.preventDefault();
-    if (e.touches.length >= 2) {
-      this._lastPinchDist = this.pinchDist(e.touches[0], e.touches[1]);
-    } else if (e.touches.length === 1) {
-      this._lastPinchDist = null;
-      this.onPointerDown(this.touchToPointer(e.touches[0]));
-    }
-  }
-
-  /** Dispatches two-finger moves to `handlePinchZoom` and single-finger moves to pointer logic. */
-  onTouchMove(e: TouchEvent): void {
-    e.preventDefault();
-    if (e.touches.length >= 2) {
-      this.handlePinchZoom(e.touches[0], e.touches[1]);
-    } else if (e.touches.length === 1 && this._lastPinchDist === null) {
-      this.onPointerMove(this.touchToPointer(e.touches[0]));
-    }
-  }
-
-  /** Ends the current touch gesture and resets the pinch distance. */
-  onTouchEnd(e: TouchEvent): void {
-    e.preventDefault();
-    this._lastPinchDist = null;
-    if (e.changedTouches.length > 0) {
-      this.onPointerUp(this.touchToPointer(e.changedTouches[0]));
-    }
-  }
-
-  /** Distance between the two touch points at the previous pinch event; null when not pinching. */
-  private _lastPinchDist: number | null = null;
-
   /**
-   * Wraps a `Touch` point in a synthetic `PointerEvent` so the shared pointer
-   * handler pipeline can process touch and mouse events uniformly.
+   * Applies one pinch step: first pans by the midpoint's screen-space delta
+   * (so a two-finger drag pans even without any change in finger distance),
+   * then zooms anchored on the current midpoint so it stays visually fixed.
+   * Reuses `CameraHandler.pan`/`zoomByRatio` — the same math as single-finger
+   * pan and wheel-zoom — rather than duplicating the anchor formula.
+   * `delta` is in CSS pixels (the recognizer is DPR-agnostic); DPR-scaling
+   * to physical canvas pixels happens here, same as everywhere else.
    */
-  private touchToPointer(touch: Touch): PointerEvent {
-    return new PointerEvent('pointermove', {
-      clientX: touch.clientX,
-      clientY: touch.clientY,
-      button: 0,
-      buttons: 1,
-      bubbles: true,
-      cancelable: true,
-    });
-  }
-
-  /** Euclidean distance (CSS pixels) between two touch points. */
-  private pinchDist(t0: Touch, t1: Touch): number {
-    const dx = t1.clientX - t0.clientX;
-    const dy = t1.clientY - t0.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  /**
-   * Applies a pinch-zoom step, keeping the midpoint between the two fingers
-   * fixed in absolute image coordinates.
-   *
-   * Computes the zoom ratio from the change in finger distance, converts the
-   * midpoint to image-space, and adjusts the camera translation so that the
-   * midpoint does not appear to move.
-   */
-  private handlePinchZoom(t0: Touch, t1: Touch): void {
+  private applyPinchDelta(delta: PinchDelta): void {
     const bgc = this.state.bgCanvas();
-    if (!bgc || this._lastPinchDist === null) return;
-
-    const newDist = this.pinchDist(t0, t1);
-    const ratio = newDist / this._lastPinchDist;
-    this._lastPinchDist = newDist;
+    if (!bgc) return;
 
     const canvas = this.canvasRef.nativeElement;
-    const cam = this.state.camera();
-    const newZoom = Math.max(this.state.minZoom(), Math.min(10, cam.zoom * ratio));
-
     const rect = canvas.getBoundingClientRect();
-    const mx = ((t0.clientX + t1.clientX) / 2 - rect.left) * this.state.devicePixelRatio();
-    const my = ((t0.clientY + t1.clientY) / 2 - rect.top) * this.state.devicePixelRatio();
+    const dpr = this.state.devicePixelRatio();
+
+    let cam = CameraHandler.pan(
+      delta.panDeltaX * dpr,
+      delta.panDeltaY * dpr,
+      this.state.camera(),
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.state.minZoom(),
+    );
+
+    const mx = (delta.midpoint.x - rect.left) * dpr;
+    const my = (delta.midpoint.y - rect.top) * dpr;
     const absMid = CoordinateTransform.screenToAbsolute(mx, my, canvas.width, canvas.height, cam);
+    cam = CameraHandler.zoomByRatio(
+      delta.distanceRatio,
+      absMid.x,
+      absMid.y,
+      cam,
+      canvas.width,
+      canvas.height,
+      bgc.width,
+      bgc.height,
+      this.state.minZoom(),
+    );
 
-    const dx = absMid.x - cam.x;
-    const dy = absMid.y - cam.y;
-    const scale = 1 - cam.zoom / newZoom;
-    const newCamera = this.clampCamera({
-      ...cam,
-      zoom: newZoom,
-      x: cam.x + dx * scale,
-      y: cam.y + dy * scale,
-    });
-
-    this.state.updateCamera(newCamera);
+    this.state.updateCamera(cam);
     this.scheduleRender();
-    this.zoomChange.emit(newCamera.zoom);
+    this.zoomChange.emit(cam.zoom);
   }
 
   /**
@@ -580,6 +588,35 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.state.updateContextMenu(ContextMenuUtils.close());
   }
 
+  /**
+   * Opens the box-type picker centred on the visible canvas area, rather
+   * than at a click point. This is the touch equivalent of the desktop
+   * right-click context menu (there's no "right-click point" on touch) —
+   * intended to be called from a host toolbar's "Add finding" button.
+   */
+  openAddFindingMenu(): void {
+    if (this.state.readOnlyMode()) return;
+    const bgc = this.state.bgCanvas();
+    if (!bgc) return;
+
+    const canvas = this.canvasRef.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    const centerClientX = rect.left + rect.width / 2;
+    const centerClientY = rect.top + rect.height / 2;
+
+    const absPos = CoordinateTransform.screenToAbsolute(
+      canvas.width / 2,
+      canvas.height / 2,
+      canvas.width,
+      canvas.height,
+      this.state.camera(),
+    );
+
+    this.state.updateContextMenu(
+      ContextMenuUtils.open(centerClientX, centerClientY, absPos.x, absPos.y),
+    );
+  }
+
   // ── Mode toggles ──────────────────────────────────────────────────────────
 
   /** Toggles box-creation mode on/off and notifies the parent. */
@@ -616,7 +653,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   // ── Clipboard & undo ──────────────────────────────────────────────────────
 
   /** Reverts the last recorded action and refreshes the canvas. */
-  private handleUndo(): void {
+  undo(): void {
     if (this.state.readOnlyMode()) return;
     this.historyService.undo();
     this.rebuildIndex();
@@ -624,7 +661,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   }
 
   /** Re-applies the most recently undone action and refreshes the canvas. */
-  private handleRedo(): void {
+  redo(): void {
     if (this.state.readOnlyMode()) return;
     this.historyService.redo();
     this.rebuildIndex();
@@ -632,7 +669,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   }
 
   /** Copies the currently selected box to the internal clipboard. */
-  private handleCopy(): void {
+  copySelectedBox(): void {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
     if (isNullOrUndefined(selected)) return;
@@ -640,7 +677,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   }
 
   /** Pastes the clipboard box near the current cursor position. */
-  private handlePaste(): void {
+  pasteClipboard(): void {
     if (this.state.readOnlyMode()) return;
     const clipboard = this.state.clipboard();
     const bgc = this.state.bgCanvas();
@@ -675,7 +712,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   }
 
   /** Deletes the currently selected box and clears the selection. */
-  private handleDelete(): void {
+  deleteSelectedBox(): void {
     if (this.state.readOnlyMode()) return;
     const selected = this.state.selectedBoxId();
     if (isNullOrUndefined(selected)) return;
@@ -686,8 +723,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     this.scheduleRender();
   }
 
-  /** Cancels the active mode (measurement → create/magic → normal) on Escape. */
-  private handleEscape(): void {
+  exitActiveMode(): void {
     if (this.state.measurementState().isActive) {
       this.toggleMeasurementMode();
       return;
