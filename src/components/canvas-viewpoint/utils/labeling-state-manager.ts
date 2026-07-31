@@ -5,6 +5,7 @@ import { CreateBoxState } from '../core/creation-state';
 import { ContextMenuState } from './context-menu-utils';
 import { MeasurementUtils } from './measurement-utils';
 import { BaseStateManager } from './base-state-manager';
+import { MagicEngineKind } from '../handlers/magic-engine';
 
 /**
  * Full state for the labeling viewport.
@@ -121,6 +122,13 @@ export class LabelingStateManager extends BaseStateManager {
   readonly debugMagicDetection = this._debugMagicDetection.asReadonly();
   updateDebugMagicDetection(debug: boolean): void {
     this._debugMagicDetection.set(debug);
+  }
+
+  /** Which magic-wand implementation a click dispatches to - see `handlers/magic-engine.ts`. */
+  private _magicEngine = signal<MagicEngineKind>('classical');
+  readonly magicEngine = this._magicEngine.asReadonly();
+  updateMagicEngine(engine: MagicEngineKind): void {
+    this._magicEngine.set(engine);
   }
 
   // ========================================

@@ -13,7 +13,7 @@ import { BoxCreationHandler } from './box-creation.handler';
 import { CameraHandler } from './camera.handler';
 import { ContextMenuHandler } from './context-menu.handler';
 import { MeasurementHandler } from './measurement.handler';
-import { MagicDetectionHandler } from './magic-detection.handler';
+import type { MagicEngine } from './magic-engine';
 import { isNullOrUndefined } from '../utils/validation-utils';
 import { CursorStyles } from '../cursor/cursor-styles';
 import { TouchUtils } from '../utils/touch-utils';
@@ -29,7 +29,7 @@ export class PointerEventHandler {
    */
   static handlePointerDown(
     event: PointerEvent,
-    magicHandler: MagicDetectionHandler,
+    magicHandler: MagicEngine,
     hctx: PointerHandlerContext,
   ): void {
     const { canvas, state, quadtree, nametagMetricsCache, historyService } = hctx;

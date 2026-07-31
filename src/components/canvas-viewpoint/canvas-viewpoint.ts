@@ -29,6 +29,8 @@ import { PointerEventHandler } from './handlers/pointer-event-handler';
 import { ClipboardManager } from './utils/clipboard-manager';
 import { isNullOrUndefined } from './utils/validation-utils';
 import { MagicDetectionHandler } from './handlers/magic-detection.handler';
+import { SamMagicHandler, SAM_MODEL_OPTIONS } from './handlers/sam-magic.handler';
+import type { MagicEngine, MagicEngineKind } from './handlers/magic-engine';
 import { GestureRecognizerHandler, PinchDelta } from './handlers/gesture-recognizer.handler';
 
 import { BoxContextMenuComponent } from './box-context-menu.component';
@@ -187,6 +189,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   private hotkeyUnsubs: (() => void)[] = [];
   private nametagMetricsCache = new Map<string, TextMetrics>();
   private magicHandler!: MagicDetectionHandler;
+  private samMagicHandler!: SamMagicHandler;
   /** Layer 1 multi-pointer/pinch state machine; constructed in `setupFeatureEffects()`. */
   private gestureRecognizer!: GestureRecognizerHandler;
   /** Spatial index of the current box set; rebuilt after every structural change. */
@@ -206,6 +209,19 @@ export class CanvasViewportComponent extends BaseViewportComponent {
   scaleBarMetricWidth = computed(() => this.state.measurementState().metricWidth);
   scaleBarMetricHeight = computed(() => this.state.measurementState().metricHeight);
 
+  /** Which magic-wand implementation a click currently dispatches to. */
+  magicEngine = computed(() => this.state.magicEngine());
+  /** True once the SAM model has finished downloading and initialising. */
+  samReady = computed(() => this.samMagicHandler.isReady());
+  /** True while SAM is embedding an image or predicting a mask. */
+  samProcessing = computed(() => this.samMagicHandler.isProcessing());
+  /** Last SAM load/prediction error, if any, for UI display. */
+  samError = computed(() => this.samMagicHandler.lastError());
+  /** Which SAM checkpoint is currently (or about to be) loaded - see `SAM_MODEL_OPTIONS`. */
+  samModelId = computed(() => this.samMagicHandler.modelId());
+  /** The selectable SAM checkpoints, for the model-variant dropdown. */
+  readonly samModelOptions = SAM_MODEL_OPTIONS;
+
   // ── Constructor ───────────────────────────────────────────────────────────
 
   constructor(
@@ -216,6 +232,11 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     super(el);
     this.state = new LabelingStateManager(ContextMenuUtils.close());
     this.magicHandler = new MagicDetectionHandler(
+      this.historyService,
+      () => this.scheduleRender(),
+      () => this.rebuildIndex(),
+    );
+    this.samMagicHandler = new SamMagicHandler(
       this.historyService,
       () => this.scheduleRender(),
       () => this.rebuildIndex(),
@@ -234,6 +255,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     super.ngOnDestroy();
     this.hotkeyUnsubs.forEach((fn) => fn());
     this.magicHandler.destroy();
+    this.samMagicHandler.destroy();
     this.gestureRecognizer?.destroy();
   }
 
@@ -301,7 +323,7 @@ export class CanvasViewportComponent extends BaseViewportComponent {
 
     this.gestureRecognizer = new GestureRecognizerHandler(this.canvasRef.nativeElement, {
       onPrimaryDown: (e) =>
-        PointerEventHandler.handlePointerDown(e, this.magicHandler, this.pointerContext),
+        PointerEventHandler.handlePointerDown(e, this.activeMagicEngine, this.pointerContext),
       onPrimaryMove: (e) => this.handlePrimaryMove(e),
       onPrimaryUp: (e) => {
         PointerEventHandler.handlePointerUp(e, this.pointerContext);
@@ -402,6 +424,11 @@ export class CanvasViewportComponent extends BaseViewportComponent {
       nametagMetricsCache: this.nametagMetricsCache,
       historyService: this.historyService,
     };
+  }
+
+  /** Whichever `MagicEngine` is currently selected - see `setMagicEngine()`. */
+  private get activeMagicEngine(): MagicEngine {
+    return this.state.magicEngine() === 'ai-model' ? this.samMagicHandler : this.magicHandler;
   }
 
   /**
@@ -634,6 +661,26 @@ export class CanvasViewportComponent extends BaseViewportComponent {
     if (this.state.readOnlyMode()) return;
     this.state.toggleMagicMode();
     this.magicModeChange.emit(this.state.isMagicMode());
+  }
+
+  /**
+   * Switches which `MagicEngine` a magic-wand click dispatches to -
+   * `'classical'` (colour flood-fill, `MagicDetectionHandler`) or
+   * `'ai-model'` (SAM, `SamMagicHandler`). Proactively kicks off the model
+   * download/init when switching to `'ai-model'`, so that cost isn't hidden
+   * behind the user's first click - see `samReady`/`samProcessing` for the
+   * resulting loading state.
+   */
+  setMagicEngine(engine: MagicEngineKind): void {
+    this.state.updateMagicEngine(engine);
+    if (engine === 'ai-model') {
+      this.samMagicHandler.ensureInitialized();
+    }
+  }
+
+  /** Switches which SAM checkpoint is loaded - see `SAM_MODEL_OPTIONS` and `SamMagicHandler.setModelId()`. */
+  setSamModelId(modelId: string): void {
+    this.samMagicHandler.setModelId(modelId);
   }
 
   /** Toggles measurement (ruler) mode on/off and notifies the parent. */

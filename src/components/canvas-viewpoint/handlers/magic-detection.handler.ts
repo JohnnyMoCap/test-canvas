@@ -5,13 +5,16 @@ import { CoordinateTransform } from '../utils/coordinate-transform';
 import { LabelingStateManager as StateManager } from '../utils/labeling-state-manager';
 import { HistoryService } from '../../../services/history.service';
 import type { MagicConfig, MagicWorkerResult } from '../workers/magic-detection.types';
+import type { MagicEngine } from './magic-engine';
 
 /**
  * Owns the magic-detection Web Worker and handles the full detection lifecycle.
  * Instance class (not static) because it holds long-lived Worker state.
+ * The "classical" `MagicEngine` - colour flood-fill, see `SamMagicHandler`
+ * (`sam-magic.handler.ts`) for the model-backed alternative.
  * Layer 3: Business Logic Handler
  */
-export class MagicDetectionHandler {
+export class MagicDetectionHandler implements MagicEngine {
   private worker: Worker | null = null;
   private busy = false;
   private activeState: StateManager | null = null;

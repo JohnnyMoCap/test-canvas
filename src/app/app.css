@@ -85,6 +85,19 @@ app-box-list {
   border-color: #4caf50;
 }
 
+.controls .engine-select {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.controls .engine-status {
+  font-size: 12px;
+  font-style: italic;
+  color: #555;
+}
+
 .magic-controls {
   position: absolute;
   top: 10px;
