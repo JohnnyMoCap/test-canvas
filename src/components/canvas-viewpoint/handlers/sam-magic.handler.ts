@@ -9,19 +9,23 @@ import type { SamWorkerRequest, SamWorkerResponse } from '../workers/sam.types';
 import type { MagicEngine } from './magic-engine';
 
 /**
- * Selectable SAM checkpoints, in increasing order of size/quality. The two
- * SlimSAM options are a pruned distillation of Meta's Segment Anything
- * (small enough to comfortably run client-side); `sam-vit-base` is the
- * original, un-pruned model - much larger and slower in-browser, but the
- * highest-quality masks available as a drop-in `SamModel.from_pretrained`
+ * Selectable SAM checkpoints, in increasing order of size/quality. The
+ * SlimSAM "50"/"77" naming is a PRUNING RATIO (% of the original SAM's
+ * parameters removed), not a retention percentage - confirmed against the
+ * SlimSAM paper/repo (czg1225/SlimSAM), not just guessed from the name.
+ * So slimsam-50 (50% pruned) keeps more of the original model than
+ * slimsam-77 (77% pruned) - it's the LARGER, MORE ACCURATE of the two, the
+ * reverse of what the bigger number might suggest. `sam-vit-base` is the
+ * original, un-pruned model - much larger and slower in-browser again, but
+ * the highest-quality masks available as a drop-in `SamModel.from_pretrained`
  * swap. Exposed as a choice rather than picking one, since there was no way
  * to A/B them against real photos in this environment - see
  * `MIN_CONFIDENT_IOU` in `sam.worker.ts` for the other lever on "does it
  * pick the small local feature or the whole panel."
  */
 export const SAM_MODEL_OPTIONS: { id: string; label: string }[] = [
-  { id: 'Xenova/slimsam-77-uniform', label: 'SlimSAM 77% (more accurate, larger download)' },
-  { id: 'Xenova/slimsam-50-uniform', label: 'SlimSAM 50% (smaller, faster)' },
+  { id: 'Xenova/slimsam-50-uniform', label: 'SlimSAM 50% pruned (more accurate, larger download)' },
+  { id: 'Xenova/slimsam-77-uniform', label: 'SlimSAM 77% pruned (smaller, faster)' },
   { id: 'Xenova/sam-vit-base', label: 'SAM ViT-Base (full model, best quality, largest/slowest)' },
 ];
 const DEFAULT_SAM_MODEL_ID = SAM_MODEL_OPTIONS[0].id;
