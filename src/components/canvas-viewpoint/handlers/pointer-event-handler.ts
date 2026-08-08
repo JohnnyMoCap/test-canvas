@@ -458,17 +458,42 @@ export class PointerEventHandler {
     const box = BoxStateUtils.findBoxById(boxes, state.selectedBoxId()!);
     if (!box) return true;
 
+    const dragStart = state.dragStartAbsolute();
+    const boxStart = state.boxStartPos();
+
     const draggedBox = BoxManipulationHandler.drag(
       absPos.x,
       absPos.y,
       box,
       bgc.width,
       bgc.height,
-      state.dragStartAbsolute(),
-      state.boxStartPos(),
+      dragStart,
+      boxStart,
     );
     const updatedBoxes = BoxManipulationHandler.updateBoxInArray(boxes, draggedBox);
     state.updateLocalBoxes(updatedBoxes);
+
+    // dragStart/boxStart are fixed for the whole gesture, so the requested
+    // position is always "box-start + total mouse delta since drag began" -
+    // if the boundary clamp holds the box back from that, the un-applied
+    // portion of the movement doesn't just disappear, it keeps building up
+    // in that delta. The moment the clamp later relaxes (e.g. dragging back
+    // away from an edge), the full backlog would apply at once - a visible
+    // jump to "where the box would be if it had never been held back."
+    // Re-anchoring to the actual (possibly clamped) position whenever the
+    // clamp changes anything discards that backlog instead of saving it up.
+    const requestedX = boxStart.x + (absPos.x - dragStart.x);
+    const requestedY = boxStart.y + (absPos.y - dragStart.y);
+    const requestedNormalized = BoxUtils.absoluteToNormalized(requestedX, requestedY, bgc.width, bgc.height);
+    if (
+      Math.abs(draggedBox.x - requestedNormalized.x) > 1e-9 ||
+      Math.abs(draggedBox.y - requestedNormalized.y) > 1e-9
+    ) {
+      const draggedAbsX = draggedBox.x * bgc.width - bgc.width / 2;
+      const draggedAbsY = draggedBox.y * bgc.height - bgc.height / 2;
+      state.startDragging(absPos.x, absPos.y, draggedAbsX, draggedAbsY);
+    }
+
     return true;
   }
 

@@ -97,8 +97,11 @@ export class BoxManipulator {
       h: normalizedDims.h,
     };
 
-    // Clamp to bounds to ensure box stays fully within canvas
-    return BoundaryUtils.clampBoxToBounds(resizedBox, bgWidth, bgHeight);
+    // Clamp to bounds to ensure box stays within canvas. Passing the
+    // pre-resize `box` lets the clamp keep privileging whichever corner was
+    // already out (if any) instead of re-picking fresh every frame, see
+    // BoundaryUtils.clampBoxToBounds's doc comment.
+    return BoundaryUtils.clampBoxToBounds(resizedBox, bgWidth, bgHeight, box);
   }
 
   /**
@@ -112,8 +115,11 @@ export class BoxManipulator {
       y: normalized.y,
     };
 
-    // Clamp to bounds to ensure box stays fully within canvas
-    return BoundaryUtils.clampBoxToBounds(movedBox, bgWidth, bgHeight);
+    // Clamp to bounds to ensure box stays within canvas. Passing the
+    // pre-move `box` lets the clamp keep privileging whichever corner was
+    // already out (if any) instead of re-picking fresh every frame, see
+    // BoundaryUtils.clampBoxToBounds's doc comment.
+    return BoundaryUtils.clampBoxToBounds(movedBox, bgWidth, bgHeight, box);
   }
 
   /**
